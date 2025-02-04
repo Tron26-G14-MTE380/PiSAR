@@ -1,0 +1,3 @@
+[submodule "thirdparty/variant/variant"]
+	path = thirdparty/variant/variant
+	url = https://github.com/mpark/variant.git

@@ -1,0 +1,35 @@
+{
+    "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
+    "name": "mpark-variant",
+    "version": "1.4.0",
+    "description": "A C++17/20 variant implementation for use with any C++ compiler.",
+    "authors": [
+      {
+        "name": "MPark",
+        "url": "https://github.com/mpark/variant"
+      }
+    ],
+    "license": "MIT",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/mpark/variant.git"
+    },
+    "dependencies": [],
+    "srcFilter": [
+      "+<src/*.cpp>",   
+      "+<include/*.h>"
+    ],
+    "keywords": [
+      "C++17",
+      "C++20",
+      "variant",
+      "type-traits",
+      "type-safe"
+    ],
+    "build": {
+        "includeDir": "variant/include",
+        "srcFilter": [],
+        "srcDir": "variant/include"
+    }
+}
+  
