@@ -1,0 +1,31 @@
+{
+    "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
+    "name": "tcbrindle-span",
+    "version": "1.0.0",
+    "description": "Single-header implementation of C++20's std::span, conforming to the C++20 committee draft. ",
+    "authors": [
+      {
+        "name": "tcbrindle"
+      }
+    ],
+    "license": "BSL-1.0",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/tcbrindle/span.git"
+    },
+    "dependencies": [],
+    "srcFilter": [
+      "+<src/*.cpp>",   
+      "+<include/*.h>",
+      "+<include/*.hpp>"
+    ],
+    "keywords": [
+      "span"
+    ],
+    "build": {
+        "includeDir": "span/include",
+        "srcFilter": [],
+        "srcDir": "span/include"
+    }
+}
+  
