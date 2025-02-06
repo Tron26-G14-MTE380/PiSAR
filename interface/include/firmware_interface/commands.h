@@ -7,7 +7,7 @@ namespace pisar::interface {
 struct HeartbeatRequest {};
 
 struct HeartbeatResponse {
-    uint32_t time_alive;
+    uint32_t time_alive_ms;
 };
 
 using Request = Message<HeartbeatRequest>;
