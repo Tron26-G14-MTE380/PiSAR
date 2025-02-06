@@ -1,12 +1,16 @@
 #pragma once
 
-#include "stdint.h"
+#include <cstdint>
 
 #include "tl/optional.hpp"
 #include "tcb/span.hpp"
 #include "mpark/variant.hpp"
 
+#include "firmware_interface/message.h"
+
 namespace pisar::interface {
+
+namespace detail {
 
 using VariantDiscriminator = uint32_t;
 
@@ -16,7 +20,7 @@ constexpr tl::optional<tcb::span<uint8_t>> encodeVariant(const TVariant& variant
     *((VariantDiscriminator*)encode_buffer.data()) = variant.index();
     const tcb::span<uint8_t> data_buffer = encode_buffer.subspan(sizeof(VariantDiscriminator));
     
-    return mpark::visit([&](const auto& data) 
+    return mpark::visit([&](const auto& data) -> tl::optional<tcb::span<uint8_t>>
     {
         if (sizeof(data) + sizeof(VariantDiscriminator) < encode_buffer.size())
         {
@@ -28,8 +32,6 @@ constexpr tl::optional<tcb::span<uint8_t>> encodeVariant(const TVariant& variant
         return encode_buffer.subspan(0,sizeof(data) + sizeof(VariantDiscriminator));
     }, variant);
 }
-
-namespace detail {
 
 // Recursive base case
 template <class TVariant, std::size_t tkSearchIndex=0>
@@ -55,8 +57,6 @@ struct VariantDecoderImpl {
         return value;
     }
 };
-
-}
 
 template<class TVariant>
 constexpr tl::optional<TVariant> decodeVariant(const tcb::span<const uint8_t> buffer)
@@ -86,5 +86,26 @@ constexpr tl::optional<TVariant> decodeVariant(const tcb::span<const uint8_t> bu
     // ...
     return detail::VariantDecoderImpl<TVariant>::decode(index, buffer);
 }
+
+}
+
+template<class TMessage>
+class MessageEncoder {
+public:
+    inline constexpr tl::optional<tcb::span<uint8_t>> encode(const TMessage& message, const tcb::span<uint8_t> encode_buffer)
+    {
+        return detail::encodeVariant<TMessage>(message, encode_buffer);
+    }
+};
+
+template<class TMessage>
+class MessageDecoder {
+public:
+    inline constexpr tl::optional<TMessage> decode(const tcb::span<const uint8_t> buffer)
+    {
+        return detail::decodeVariant<TMessage>(buffer);
+    }
+
+};
 
 }
