@@ -1,6 +1,6 @@
 #pragma once
 
-#include "firmware_interface/message.h"
+#include "mcu_interface/message.h"
 
 namespace pisar::interface {
 

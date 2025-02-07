@@ -1,6 +1,6 @@
 {
     "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
-    "name": "PiSAR-firmware-interface",
+    "name": "PiSAR-mcu-interface",
     "version": "1.0.0",
     "description": "Implementation of interface between the PiSAR raspberry pi brain and microcontroller",
     "authors": [

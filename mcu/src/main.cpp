@@ -1,8 +1,8 @@
 #include "Arduino.h"
 
 #include "mpark/variant.hpp"
-#include "firmware_interface/codec.h"
-#include "firmware_interface/commands.h"
+#include "mcu_interface/codec.h"
+#include "mcu_interface/commands.h"
 
 void setup() 
 {

@@ -6,7 +6,7 @@
 #include "tcb/span.hpp"
 #include "mpark/variant.hpp"
 
-#include "firmware_interface/message.h"
+#include "mcu_interface/message.h"
 
 namespace pisar::interface {
 
@@ -138,7 +138,7 @@ public:
      * 
      * @param message The message to encode.
      * @param encode_buffer The buffer to encode the message into.
-     * @return constexpr tl::optional<tcb::span<uint8_t>> Span over the encoded buffer if successful otherwise nullopt.
+     * @return constexpr tl::optional<tcb::span<uint8_t>> Span over the encoded buffer if successful otherwise nullopt. 
      */
     inline constexpr tl::optional<tcb::span<uint8_t>> encode(
         const TMessage& message, const tcb::span<uint8_t> encode_buffer
