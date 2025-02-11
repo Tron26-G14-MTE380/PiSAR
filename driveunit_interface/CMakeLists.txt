@@ -5,13 +5,6 @@ add_library(${LIBRARY_NAME} INTERFACE)
 
 target_include_directories(${LIBRARY_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
 
-target_link_libraries(${LIBRARY_NAME} 
-    INTERFACE 
-        optional
-        span
-        variant
-)
-
 install(TARGETS ${LIBRARY_NAME}
         EXPORT ${LIBRARY_NAME}Targets
         INCLUDES DESTINATION include)

@@ -11,8 +11,8 @@ namespace pisar::driveunit_interface {
  * @tparam Ts The set of possible commands that the message can be. Must be POD structs.
  */
 template<typename... Ts>
-class Message : public mpark::variant<Ts...> {
-    using mpark::variant<Ts...>::variant;
+class Message : public std::variant<Ts...> {
+    using std::variant<Ts...>::variant;
 };
 
 }

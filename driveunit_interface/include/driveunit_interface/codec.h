@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 
-#include "tl/optional.hpp"
-#include "tcb/span.hpp"
-#include "mpark/variant.hpp"
+#include <optional>
+#include <span>
+#include <variant>
 
 #include "driveunit_interface/message.h"
 
@@ -24,21 +25,21 @@ using VariantDiscriminator = uint32_t;
  * @tparam TVariant The variant type. 
  * @param variant The variant to encode.
  * @param encode_buffer The buffer to encode into. Must be big enouph to hold the serialized data and discriminator.
- * @return constexpr tl::optional<tcb::span<uint8_t>> Optional containing Span of the encoded data 
+ * @return constexpr std::optional<std::span<std::byte>> Optional containing Span of the encoded data 
  * if successful otherwise nullopt.
  */
 template<class TVariant>
-constexpr tl::optional<tcb::span<uint8_t>> encodeVariant(const TVariant& variant, const tcb::span<uint8_t> encode_buffer)
+constexpr std::optional<std::span<std::byte>> encodeVariant(const TVariant& variant, const std::span<std::byte> encode_buffer)
 {
     *((VariantDiscriminator*)encode_buffer.data()) = variant.index();
-    const tcb::span<uint8_t> data_buffer = encode_buffer.subspan(sizeof(VariantDiscriminator));
+    const std::span<std::byte> data_buffer = encode_buffer.subspan(sizeof(VariantDiscriminator));
     
-    return mpark::visit([&](const auto& data) -> tl::optional<tcb::span<uint8_t>>
+    return std::visit([&](const auto& data) -> std::optional<std::span<std::byte>>
     {
         if (sizeof(data) + sizeof(VariantDiscriminator) < encode_buffer.size())
         {
             // Encode buffer is too small
-            return tl::nullopt;
+            return std::nullopt;
         }
 
         std::memcpy(data_buffer.data(), &data, sizeof(data));
@@ -63,9 +64,9 @@ struct VariantDecoderImpl {
      * 
      * @param targetIndex The target index of the alternative held in the buffer.
      * @param buffer The buffer containing the encoded serialized variant data.
-     * @return constexpr tl::optional<TVariant> The decoded variant if successful otherwise nullopt on failure.
+     * @return constexpr std::optional<TVariant> The decoded variant if successful otherwise nullopt on failure.
      */
-    static constexpr tl::optional<TVariant> decode(uint32_t targetIndex, const tcb::span<uint8_t>& buffer) 
+    static constexpr std::optional<TVariant> decode(uint32_t targetIndex, const std::span<std::byte>& buffer) 
     {
         if (targetIndex != tkSearchIndex) 
         {
@@ -73,12 +74,12 @@ struct VariantDecoderImpl {
         }
 
         // If we get here, then we've "found" the variant value
-        using VariantValueType = mpark::variant_alternative_t<tkSearchIndex, TVariant>;
+        using VariantValueType = std::variant_alternative_t<tkSearchIndex, TVariant>;
 
         // Ensure there's enough data for the selected type
         if (sizeof(VariantValueType) > buffer.size()) 
         {
-            return tl::nullopt;
+            return std::nullopt;
         }
 
         VariantValueType value;
@@ -92,27 +93,27 @@ struct VariantDecoderImpl {
  * 
  * @tparam TVariant The variant type to decode into.
  * @param buffer The buffer to decode from.
- * @return constexpr tl::optional<TVariant> The decoded variant if successful otherwise nullopt on failure.
+ * @return constexpr std::optional<TVariant> The decoded variant if successful otherwise nullopt on failure.
  */
 template<class TVariant>
-constexpr tl::optional<TVariant> decodeVariant(const tcb::span<const uint8_t> buffer)
+constexpr std::optional<TVariant> decodeVariant(const std::span<const std::byte> buffer)
 {
     if (buffer.size() < sizeof(VariantDiscriminator)) 
     {
         // Buffer too small to contain variant index
-        return tl::nullopt;
+        return std::nullopt;
     }
 
     // Read the first 4 bytes as the variant index
     VariantDiscriminator index = 0;
     std::memcpy(&index, buffer.data(), sizeof(VariantDiscriminator));
 
-    const tcb::span<const uint8_t> data_buffer = buffer.subspan(sizeof(VariantDiscriminator));
+    const std::span<const std::byte> data_buffer = buffer.subspan(sizeof(VariantDiscriminator));
 
     // Ensure index is valid
-    if (index >= mpark::variant_size_v<TVariant>)
+    if (index >= std::variant_size_v<TVariant>)
     {
-        return tl::nullopt;
+        return std::nullopt;
     }
 
     // Recursive branching visitor, basically compiles down to
@@ -128,9 +129,9 @@ constexpr tl::optional<TVariant> decodeVariant(const tcb::span<const uint8_t> bu
 /**
  * @brief Message encoder used to encode messages.
  * 
- * @tparam TMessage The message type to encode.
+ * @tparam TMessageVariant The message variant type to encode.
  */
-template<class TMessage>
+template<class TMessageVariant>
 class MessageEncoder {
 public:
     /**
@@ -138,33 +139,33 @@ public:
      * 
      * @param message The message to encode.
      * @param encode_buffer The buffer to encode the message into.
-     * @return constexpr tl::optional<tcb::span<uint8_t>> Span over the encoded buffer if successful otherwise nullopt. 
+     * @return constexpr std::optional<std::span<std::byte>> Span over the encoded buffer if successful otherwise nullopt. 
      */
-    inline constexpr tl::optional<tcb::span<uint8_t>> encode(
-        const TMessage& message, const tcb::span<uint8_t> encode_buffer
+    inline constexpr std::optional<std::span<std::byte>> encode(
+        const TMessageVariant& message, const std::span<std::byte> encode_buffer
     )
     {
-        return detail::encodeVariant<TMessage>(message, encode_buffer);
+        return detail::encodeVariant<TMessageVariant>(message, encode_buffer);
     }
 };
 
 /**
  * @brief Mesage encoder used to decode messages.
  * 
- * @tparam TMessage The message type to decode.
+ * @tparam TMessageVariant The message variant type to decode.
  */
-template<class TMessage>
+template<class TMessageVariant>
 class MessageDecoder {
 public:
     /**
      * @brief Decodes a given buffer to the message. Message must be encoded using the @ref MessageEncoder.
      * 
      * @param buffer The buffer to decode the message from. 
-     * @return constexpr tl::optional<TMessage> The decoded message if successful otherwise nullopt.
+     * @return constexpr std::optional<TMessageVariant> The decoded message if successful otherwise nullopt.
      */
-    inline constexpr tl::optional<TMessage> decode(const tcb::span<const uint8_t> buffer)
+    inline constexpr std::optional<TMessageVariant> decode(const std::span<const std::byte> buffer)
     {
-        return detail::decodeVariant<TMessage>(buffer);
+        return detail::decodeVariant<TMessageVariant>(buffer);
     }
 
 };
