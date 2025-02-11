@@ -1,8 +1,8 @@
 #pragma once
 
-#include "mcu_interface/message.h"
+#include "driveunit_interface/message.h"
 
-namespace pisar::interface {
+namespace pisar::driveunit_interface {
 
 struct HeartbeatRequest {};
 

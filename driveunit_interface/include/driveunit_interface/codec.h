@@ -6,9 +6,9 @@
 #include "tcb/span.hpp"
 #include "mpark/variant.hpp"
 
-#include "mcu_interface/message.h"
+#include "driveunit_interface/message.h"
 
-namespace pisar::interface {
+namespace pisar::driveunit_interface {
 
 namespace detail {
 /**
@@ -168,5 +168,11 @@ public:
     }
 
 };
+
+template<class TMessage>
+inline constexpr size_t encodedSize()
+{
+    return sizeof(TMessage) + sizeof(detail::VariantDiscriminator);
+}
 
 }

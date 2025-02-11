@@ -2,10 +2,10 @@
 
 #include "mpark/variant.hpp"
 
-namespace pisar::interface {
+namespace pisar::driveunit_interface {
 
 /**
- * @brief Represents a packet sent between the MCU and main raspberry pi board. 
+ * @brief Represents a packet sent between the driveunit and main raspberry pi board. 
  * Implemented as a type safe union (variant) of possible commands/requests or responses.
  * 
  * @tparam Ts The set of possible commands that the message can be. Must be POD structs.
