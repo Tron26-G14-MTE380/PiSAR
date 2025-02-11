@@ -1,9 +1,0 @@
-[submodule "thirdparty/variant/variant"]
-	path = thirdparty/variant/variant
-	url = https://github.com/mpark/variant.git
-[submodule "thirdparty/span/span"]
-	path = thirdparty/span/span
-	url = https://github.com/tcbrindle/span.git
-[submodule "thirdparty/optional/optional"]
-	path = thirdparty/optional/optional
-	url = https://github.com/TartanLlama/optional.git
