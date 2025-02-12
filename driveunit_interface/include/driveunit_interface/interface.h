@@ -10,7 +10,7 @@ struct HeartbeatResponse {
     uint32_t time_alive_ms;
 };
 
-using Request = Message<HeartbeatRequest>;
-using Response = Message<HeartbeatResponse>;
+using Request = MessageSet<HeartbeatRequest>;
+using Response = MessageSet<HeartbeatResponse>;
 
 };

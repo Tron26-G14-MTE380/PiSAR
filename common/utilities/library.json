@@ -1,8 +1,8 @@
 {
     "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
-    "name": "PiSAR-driveunit-interface",
+    "name": "PiSAR-utilities",
     "version": "1.0.0",
-    "description": "Implementation of interface between the PiSAR raspberry pi brain and drive unit",
+    "description": "Collection of common c++ utilities for the PiSAR platform.",
     "authors": [
       {
         "name": "Ashkan Ebrahimi"
@@ -21,14 +21,7 @@
       }
     ],
     "license": "Mozilla Public License Version 2.0",
-    "dependencies": [
-      {
-        "name": "zpp_bits"
-      },
-      {
-        "name": "pisar_utilities"
-      }
-    ],
+    "dependencies": [],
     "build": {
         "includeDir": "include",
         "srcFilter": [

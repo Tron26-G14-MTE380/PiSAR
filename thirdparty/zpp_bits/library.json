@@ -1,0 +1,23 @@
+{
+    "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
+    "name": "zpp_bits",
+    "version": "4.4.25",
+    "description": "A modern C++20 binary serialization and RPC library, with just one header file.",
+    "authors": [
+      {
+        "name": "eyalz800"
+      }
+    ],
+    "license": "MIT",
+    "dependencies": [],
+    "build": {
+        "includeDir": "zpp_bits",
+        "srcFilter": [
+          "+<src/*.cpp>",   
+          "+<include/*.h>",
+          "+<include/*.hpp>"
+        ],
+        "srcDir": "zpp_bits"
+    }
+}
+  
