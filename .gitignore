@@ -39,3 +39,7 @@
 
 # PIO
 .pio
+
+# python
+.venv/
+__pycache__/
