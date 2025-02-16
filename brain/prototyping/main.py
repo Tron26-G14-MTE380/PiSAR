@@ -2,7 +2,8 @@ import sys
 import time
 import cv2
 import numpy as np
-from line_follower import LineFollower, LineFollowerConfig, LineFollowerDebugData, create_debug_frame
+from debug_display import create_debug_frame
+from line_follower import LineFollower, LineFollowerConfig, LineFollowerDebugData
 from camera import CameraCalibration
 from projection import RobotHomographyProjection
 from video_source import RepeatedImageFileSource, VideoCameraSource
