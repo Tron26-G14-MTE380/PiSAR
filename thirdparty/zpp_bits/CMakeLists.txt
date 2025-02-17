@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.20)
 
 set(LIBRARY_NAME zpp_bits)
 add_library(${LIBRARY_NAME} INTERFACE)

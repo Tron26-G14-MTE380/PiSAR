@@ -1,3 +1,6 @@
 [submodule "thirdparty/zpp_bits/zpp_bits"]
 	path = thirdparty/zpp_bits/zpp_bits
 	url = https://github.com/eyalz800/zpp_bits.git
+[submodule "mcp/thirdparty/eigen/eigen"]
+	path = mcp/thirdparty/eigen/eigen
+	url = https://gitlab.com/libeigen/eigen.git

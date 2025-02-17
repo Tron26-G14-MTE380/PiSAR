@@ -1,0 +1,61 @@
+---
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 100
+UseTab: Never
+
+# Naming conventions
+Naming:
+  VariableCase: lower_case
+  GlobalVariablePrefix: g_
+  ConstantVariableCase: CamelCase
+  ConstantVariablePrefix: k
+  GlobalConstantVariableCase: CamelCase
+  GlobalConstantVariablePrefix: gk
+  ConstantStaticMemberVariableCase: CamelCase
+  ConstantStaticMemberVariablePrefix: sk
+  MemberVariableCase: lower_case
+  MemberVariablePrefix: m_
+  GlobalPointerPrefix: gp_
+  ConstantPointerCase: CamelCase
+  ConstantPointerPrefix: kp
+  GlobalConstantPointerCase: CamelCase
+  GlobalConstantPointerPrefix: gkp
+  ConstantStaticMemberPointerCase: CamelCase
+  ConstantStaticMemberPointerPrefix: skp
+  MemberPointerVariableCase: lower_case
+  MemberPointerVariablePrefix: mp_
+
+  FunctionCase: camelBack
+  ClassCase: CamelCase
+  EnumCase: CamelCase
+  EnumConstantCase: CamelCase
+  EnumConstantPrefix: k
+  TemplateTypeParameterCase: CamelCase
+  TemplateTypeParameterPrefix: T
+  TemplateValueParameterCase: CamelCase
+  TemplateValueParameterPrefix: tk
+
+  MacroCase: UPPER_CASE
+
+# Formatting rules
+IndentCaseLabels: true
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignConsecutiveMacros: true
+AlignAfterOpenBracket: Align
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBraces: Attach
+BreakConstructorInitializers: BeforeComma
+ReflowComments: false
+SortUsingDeclarations: true
+AllowShortFunctionsOnASingleLine: None
+AlwaysBreakTemplateDeclarations: Yes
+FixNamespaceComments: true
+SpaceBeforeParens: ControlStatements
+Cpp11BracedListStyle: true
+NamespaceIndentation: All
+PointerAlignment: Left
+SpacesBeforeTrailingComments: 2
+SpaceBeforeAssignmentOperators: true
