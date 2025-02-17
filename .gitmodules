@@ -4,3 +4,6 @@
 [submodule "mcp/thirdparty/eigen/eigen"]
 	path = mcp/thirdparty/eigen/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "mcp/thirdparty/opencv/opencv"]
+	path = mcp/thirdparty/opencv/opencv
+	url = https://github.com/opencv/opencv.git
