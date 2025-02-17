@@ -8,10 +8,10 @@ from camera import CameraCalibration
 from projection import RobotHomographyProjection
 from video_source import RepeatedImageFileSource, VideoCameraSource
 
-debug = True
+debug = False
 
-resolution_width = 640
-resolution_height = 480
+resolution_width = 320
+resolution_height = 240
 
 camera_height=45
 camera_offset=5
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     resolution = (resolution_width, resolution_height)
     #video_source = VideoCameraSource(resolution=resolution)
-    video_source = RepeatedImageFileSource("prototyping/red_tape2.jpg", resolution=resolution)
+    video_source = RepeatedImageFileSource("sample_images/red_tape2.jpg", resolution=resolution)
     with video_source:
         
         tracker = LineFollower(video_source, projection=projection, config=tracker_config)
