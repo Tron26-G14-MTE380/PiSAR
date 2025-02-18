@@ -1,0 +1,13 @@
+{
+    "configurations": [
+        {
+            "name": "pisar_common",
+            "cppStandard": "c++20",
+            "includePath": [
+                "${workspaceFolder:common}/utilities/include",
+                "${workspaceFolder:driveunit_interface}/include"
+            ]        
+        }
+    ],
+    "version": 4
+}

@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/core/include",
+                "${workspaceFolder}/thirdparty/install/include",
+                "${workspaceFolder}/thirdparty/install/include/eigen3",
+            ],
+            "cppStandard": "c++20"        
+        }
+    ],
+    "version": 4
+}
