@@ -1,17 +1,22 @@
+#include "pisar/math.h"
+#include "pisar/vision/video_source.h"
+#include "pisar/vision/line_tracker.h"
+#include "pisar/vision/homography.h"
+
+#include <easy/profiler.h>
+
 #include <numbers>
 #include <iostream>
 #include <ranges>
 #include <algorithm>
 #include <span>
 
-#include "pisar/math.h"
-#include "pisar/vision/video_source.h"
-#include "pisar/vision/line_tracker.h"
-#include "pisar/vision/homography.h"
 
 using namespace pisar::mcp;
 
 constexpr bool kDebug = false;
+constexpr bool kProfile = true;
+constexpr uint64_t kProfileTimeMs = 10000;
 
 const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> kTapeHsvThresholds = {
     std::make_pair(cv::Scalar(0, 120, 70), cv::Scalar(10, 255, 255)),
@@ -38,7 +43,7 @@ const CameraCalibrationData kCameraCalibration {
 
 const HomographyProjection kProjection = HomographyProjection(kCameraTransform, kAxisMapping, kCameraCalibration);
 
-cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& debug_images, int grid_padding = 10)
+cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& debug_images, int max_size = 640, int grid_padding = 10)
 {
     if (debug_images.empty()) {
         return cv::Mat::ones(100, 100, CV_8UC3) * 255; // Return a blank white canvas if empty
@@ -55,8 +60,8 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& de
     }
 
     // Ensures no image exceeds 320px in width/height
-    double scale_factor = (std::max(min_width, min_height) > 320) ?
-                          320.0 / static_cast<double>(std::max(min_width, min_height)) : 1.0;
+    double scale_factor = (std::max(min_width, min_height) > max_size) ?
+                          static_cast<double>(max_size) / static_cast<double>(std::max(min_width, min_height)) : 1.0;
 
     // Resize images while maintaining aspect ratio
     std::vector<cv::Mat> resized_images(debug_images.size());
@@ -133,25 +138,32 @@ void displayDebug(const cv::Mat debug_canvas)
 
 int main() 
 {
-    RepeatedImageFileSource video_source("sample_images/red_tape2.jpg");
+    if constexpr(kProfile)
+    {
+        EASY_PROFILER_ENABLE;
+    }
+
+    RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
     auto line_tracker = LineTracker<kDebug>(std::span(kTapeHsvThresholds));
     const auto sized_projection = kProjection.for_image({640, 480});
 
     video_source.start({640, 480});
-    
+ 
+    const auto start = std::chrono::high_resolution_clock::now(); // Start time
+
     std::optional<cv::Mat> captured_frame;
     while ((captured_frame = video_source.getFrame()).has_value())
     {
-        const auto start = std::chrono::high_resolution_clock::now(); // Start time
+        const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
 
         const auto image_trajectory = line_tracker.extractTrajectory(captured_frame.value());
         std::vector<Eigen::Vector2d> world_trajectory(image_trajectory.size());
-        //sized_projection.project(std::span(image_trajectory), std::span(world_trajectory));
         
-        const auto end = std::chrono::high_resolution_clock::now(); // Start time
-        const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count(); // Convert to milliseconds
+        sized_projection.project(std::span(image_trajectory), std::span(world_trajectory));
+        
+        const auto loop_end = std::chrono::high_resolution_clock::now(); // end time
+        const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(loop_end - loop_start).count(); // Convert to milliseconds
         const double fps = 1000000.0 / elapsed;
-
         std::cout << "FPS: " << fps << std::endl;
 
         if constexpr (kDebug)
@@ -163,10 +175,23 @@ int main()
                 std::make_pair("HSV Filtered", debug_data.hsvFiltered),
                 std::make_pair("Skeleton", debug_data.skeleton),
                 std::make_pair("Filtered Skeleton", debug_data.filtered_skeleton),
-                std::make_pair("Trajectory", debug_data.trajectory)
+                std::make_pair("Trajectory", debug_data.trajectory),
+                std::make_pair("Simplified Trajectory", debug_data.simplified_trajectory)
             };
 
             displayDebug(createDebugCanvas(debug_image_map));
+        }
+        
+        if constexpr (kProfile)
+        {
+            const auto end = std::chrono::high_resolution_clock::now(); // end time
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(); // Convert to milliseconds
+            
+            if (elapsed > kProfileTimeMs)
+            {
+                profiler::dumpBlocksToFile("profile.prof");
+                break;
+            }
         }
     }
 

@@ -1,9 +1,12 @@
 #pragma once
 
 #include "pisar/vision/thinning.h"
+#include "pisar/vision/path_extraction.h"
+#include "pisar/vision/path_simplification.h"
 
 #include <opencv2/opencv.hpp>
 #include <eigen/Dense>
+#include <easy/profiler.h>
 
 #include <span>
 #include <vector>
@@ -13,6 +16,31 @@
 #include <variant>
 
 namespace pisar::mcp {
+
+
+/// @brief Computes the bounding box of nonzero pixels in a binary image.
+/// @param img Input binary image (8-bit, single-channel).
+/// @return Bounding box as cv::Rect.
+cv::Rect computeBoundingBox(const cv::Mat& img) {
+    CV_Assert(img.type() == CV_8UC1);
+
+    int min_x = 0, max_x = img.cols - 1, min_y = 0, max_y = img.rows - 1;
+
+    // Find first and last rows that contain nonzero pixels
+    while (min_y <= max_y && cv::countNonZero(img.row(min_y)) == 0) ++min_y;
+    while (max_y >= min_y && cv::countNonZero(img.row(max_y)) == 0) --max_y;
+
+    if (min_y > max_y) return cv::Rect(); // No nonzero pixels found
+
+    //return cv::Rect(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1); 
+
+    // Find first and last columns that contain nonzero pixels
+    cv::Mat roi = img.rowRange(min_y, max_y + 1);
+    while (min_x < img.cols && cv::countNonZero(roi.col(min_x)) == 0) ++min_x;
+    while (max_x < img.cols && cv::countNonZero(roi.col(max_x)) == 0) --max_x;
+
+    return cv::Rect(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1);
+}
 
 /**
  * @brief Extracts a fitted trajectory from a skeletonized path.
@@ -26,6 +54,7 @@ public:
         cv::Mat skeleton;
         cv::Mat filtered_skeleton;
         cv::Mat trajectory;
+        cv::Mat simplified_trajectory;
     };
 
 private:
@@ -50,9 +79,11 @@ public:
      */
     [[nodiscard]] std::vector<Eigen::Vector2i> extractTrajectory(const cv::Mat& frame)
     {
+        EASY_FUNCTION();
+
         cv::Mat preprocessed = preprocess(frame);
         cv::Mat binary_mask = applyHSVThreshold(preprocessed);
-        cv::Mat skeleton = skeletonize(binary_mask);
+        cv::Mat skeleton = skeletonizeCropped(binary_mask);
         return fitSkeleton(skeleton);
     }
 
@@ -67,6 +98,8 @@ private:
      */
     [[nodiscard]] cv::Mat preprocess(const cv::Mat& input)
     {
+        EASY_FUNCTION();
+
         cv::Mat blurred;
         cv::GaussianBlur(input, blurred, cv::Size(5, 5), 0);
         if constexpr (tkDebug)
@@ -83,6 +116,8 @@ private:
      */
     [[nodiscard]] cv::Mat applyHSVThreshold(const cv::Mat& input)
     {
+        EASY_FUNCTION();
+
         cv::Mat hsv, mask;
         cv::cvtColor(input, hsv, cv::COLOR_BGR2HSV);
         mask = cv::Mat::zeros(input.size(), CV_8U);
@@ -103,17 +138,25 @@ private:
 
     /**
      * @brief Applies skeletonization with component filtering.
-     * @param input Binary image.
+     * @param binary_input Binary image.
      * @return Skeletonized image with noise removed.
      */
-    [[nodiscard]] cv::Mat skeletonize(const cv::Mat& input)
+    [[nodiscard]] cv::Mat skeletonize(const cv::Mat& binary_input)
     {
-        cv::Mat binary;
-        cv::threshold(input, binary, 127, 255, cv::THRESH_BINARY);
+        EASY_FUNCTION();
+
+        const int padding = 3;
+
+        // Pad to simulate an "extended line" --> thinning doesn't truncate or flatten tips
+        cv::Mat padded_binary;
+        cv::copyMakeBorder(binary_input, padded_binary, padding, padding, padding, padding, cv::BORDER_REPLICATE, cv::Scalar(0));
     
         // Apply Zhang-Suen thinning
         cv::Mat skeleton;
-        thinningZhangSuen(binary, skeleton);
+        thinningMaRenParallel(padded_binary, skeleton);
+
+        // Remove padding
+        skeleton = skeleton(cv::Rect(padding, padding, skeleton.cols - 2 * padding, skeleton.rows - 2 * padding));
     
         // Remove small connected components
         cv::Mat filtered_skeleton = filterComponents(skeleton);
@@ -127,6 +170,21 @@ private:
         return filtered_skeleton;
     }
 
+    [[nodiscard]] cv::Mat skeletonizeCropped(const cv::Mat& binary_mask)
+    {
+        EASY_FUNCTION();
+
+        const cv::Rect bbox = computeBoundingBox(binary_mask);
+        if (bbox.width == 0 || bbox.height == 0) return {};
+
+        // Crop the region of interest (ROI)
+        cv::Mat cropped_binary_mask = binary_mask(bbox).clone(); // Clone ensures we work on a separate copy
+
+        cv::Mat cropped_skeleton = skeletonize(cropped_binary_mask);
+
+        return cropped_skeleton;
+    }
+
     /**
      * @brief Filters small connected components from a skeletonized image.
      * @param skeleton Skeletonized image.
@@ -134,6 +192,8 @@ private:
      */
     [[nodiscard]] cv::Mat filterComponents(const cv::Mat& skeleton) const
     {
+        EASY_FUNCTION();
+
         cv::Mat labels, stats, centroids;
         int num_labels = cv::connectedComponentsWithStats(skeleton, labels, stats, centroids, 8);
     
@@ -165,6 +225,8 @@ private:
      */
     [[nodiscard]] std::vector<Eigen::Vector2i> fitSkeleton(const cv::Mat& skeleton)
     {
+        EASY_FUNCTION();
+
         std::vector<Eigen::Vector2i> points;
         for (int y = 0; y < skeleton.rows; ++y) {
             for (int x = 0; x < skeleton.cols; ++x) {
@@ -174,7 +236,8 @@ private:
             }
         }
 
-        const std::vector<Eigen::Vector2i> ordered_points = orderPoints(points);
+        // const std::vector<Eigen::Vector2i> ordered_points = orderPoints(points);
+        const std::vector<Eigen::Vector2i> ordered_points = extractLongestPath(points);
 
         if constexpr (tkDebug)
         {
@@ -195,56 +258,30 @@ private:
                 cv::line(m_debug.trajectory, prev_pt, current_pt, 255, 1);
             }
         }
-    
-        return ordered_points;
-    }    
+        
+        const std::vector<Eigen::Vector2i> simplified_trajectory = simplifyPath(std::span(ordered_points), 3);
 
-    /**
-     * @brief Orders skeleton points into a continuous trajectory using nearest-neighbor traversal.
-     * @param points List of skeleton keypoints.
-     * @return Ordered list of trajectory points.
-     */
-    [[nodiscard]] std::vector<Eigen::Vector2i> orderPoints(const std::vector<Eigen::Vector2i>& points)
-    {
-        if (points.empty()) return {};
-    
-        std::vector<Eigen::Vector2i> ordered_path;
-        std::vector<bool> visited(points.size(), false);
-    
-        // Find the starting point (left-most point)
-        auto min_it = std::min_element(points.begin(), points.end(), [](const Eigen::Vector2i& a, const Eigen::Vector2i& b) {
-            return a.x() < b.x();
-        });
-    
-        int start_idx = std::distance(points.begin(), min_it);
-        ordered_path.push_back(points[start_idx]);
-        visited[start_idx] = true;
-    
-        // Nearest-neighbor traversal to order points
-        while (ordered_path.size() < points.size()) {
-            int last_idx = static_cast<int>(ordered_path.size()) - 1;
-            double min_dist = std::numeric_limits<double>::max();
-            int next_idx = -1;
-    
-            for (size_t i = 0; i < points.size(); ++i) {
-                if (visited[i]) continue;
-    
-                double dist = (ordered_path[last_idx] - points[i]).norm();
-                if (dist < min_dist) {
-                    min_dist = dist;
-                    next_idx = static_cast<int>(i);
-                }
+        if constexpr (tkDebug)
+        {
+            // Create an empty image (same size as input_img, single-channel black)
+            m_debug.simplified_trajectory = cv::Mat::zeros(skeleton.size(), skeleton.type());
+
+            // Draw points
+            for (const auto& pt : simplified_trajectory) 
+            {
+                cv::circle(m_debug.simplified_trajectory, cv::Point(pt.x(), pt.y()), 3, 255, cv::FILLED);
             }
-    
-            if (next_idx != -1) {
-                ordered_path.push_back(points[next_idx]);
-                visited[next_idx] = true;
-            } else {
-                break;
+
+            // Connect points with lines
+            for (size_t i = 1; i < simplified_trajectory.size(); ++i) 
+            {
+                const auto prev_pt = cv::Point(simplified_trajectory[i - 1].x(), simplified_trajectory[i - 1].y());
+                const auto current_pt = cv::Point(simplified_trajectory[i].x(), simplified_trajectory[i].y());
+                cv::line(m_debug.simplified_trajectory, prev_pt, current_pt, 255, 1);
             }
         }
     
-        return ordered_path;
+        return simplified_trajectory;
     }
 };
 

@@ -11,6 +11,7 @@ file(MAKE_DIRECTORY ${THIRD_PARTY_INSTALL_DIR})
 
 # Build & install dependencies
 add_subdirectory(eigen)
+add_subdirectory(easy_profiler)
 add_subdirectory(opencv)
 
 # Install all files to ${CMAKE_INSTALL_PREFIX}

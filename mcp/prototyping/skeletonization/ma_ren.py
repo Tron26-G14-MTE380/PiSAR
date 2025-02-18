@@ -42,22 +42,6 @@ def num_ordered_pairs(matrix: np.ndarray, row: int, col: int) -> int:
         (p7 == 0 and p8 == 1) + (p8 == 0 and p1 == 1)
     )
 
-def zhang_condition(img: np.ndarray, r: int, c: int):
-    p1 = int(img[r-1, c])
-    p2 = int(img[r-1, c+1])
-    p3 = int(img[r, c+1])
-    p4 = int(img[r+1, c+1])
-    p5 = int(img[r+1, c])
-    p6 = int(img[r+1, c-1])
-    p7 = int(img[r, c-1])
-    p8 = int(img[r-1, c-1])
-
-    return (
-        (p1 == 1 and p3 == 1 and p5 == 1) == 0 and
-        (p3 == 1 and p5 == 1 and p7 == 1) == 0
-    )
-
-
 def check_template_a(img: np.ndarray, r: int, c: int):
     return bool(
         int(img[r, c-1]) == 0 and
@@ -364,7 +348,7 @@ class SkeletonizationVisualization:
             cv2.imshow("debug", img)
             cv2.waitKey(1)
 
-def jun_ma(img: np.ndarray):
+def ma_ren(img: np.ndarray):
     img = img.copy()
     row, col = img.shape
     delete_matrix = np.zeros(img.shape, dtype=np.uint8)
@@ -439,7 +423,7 @@ boolean_matrix = image > 128
 # Convert to 1s and 0s (optional, if needed explicitly as int)
 binary_image = boolean_matrix.astype(np.uint8)
 
-skeleton = jun_ma(binary_image)
+skeleton = ma_ren(binary_image)
 
 skeleton = (skeleton * 255).astype(np.uint8)
 

@@ -7,3 +7,6 @@
 [submodule "mcp/thirdparty/opencv/opencv"]
 	path = mcp/thirdparty/opencv/opencv
 	url = https://github.com/opencv/opencv.git
+[submodule "mcp/thirdparty/easy_profile/easy_profile"]
+	path = mcp/thirdparty/easy_profiler/easy_profiler
+	url = https://github.com/yse/easy_profiler.git

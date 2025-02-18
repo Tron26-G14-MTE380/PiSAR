@@ -12,7 +12,7 @@ struct CameraCalibrationData
     double skew;
 
     [[nodiscard]]
-    inline constexpr Eigen::Matrix3d get_transformation(const Eigen::Vector2i &image_size_px) const
+    inline Eigen::Matrix3d get_transformation(const Eigen::Vector2i &image_size_px) const
     {
         const Eigen::Vector2d scale = image_size_px.cast<double>().cwiseQuotient(calibration_img_size_px.cast<double>());
     
@@ -32,7 +32,7 @@ struct CameraCalibrationData
     }
     
     [[nodiscard]]
-    inline constexpr Eigen::Matrix3d get_inverse_transformation(const Eigen::Vector2i &image_size_px) const
+    inline Eigen::Matrix3d get_inverse_transformation(const Eigen::Vector2i &image_size_px) const
     {
         return get_transformation(image_size_px).inverse();
     }

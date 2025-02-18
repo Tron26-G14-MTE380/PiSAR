@@ -17,7 +17,7 @@ private:
     Eigen::Matrix3d m_inverse_world_to_image_transformation;
 
 public:
-    inline constexpr HomographySizedProjection(
+    inline HomographySizedProjection(
         const Eigen::Vector3d cam_position, 
         const Eigen::Matrix3d& inverse_world_to_camera_transformation,
         const Eigen::Matrix3d& camera_instrinsic_matrix
@@ -27,7 +27,7 @@ public:
     {
     }
 
-    inline constexpr HomographySizedProjection(
+    inline HomographySizedProjection(
         const Eigen::Vector3d cam_position, 
         const Eigen::Matrix3d& inverse_world_to_camera_transformation,
         const CameraCalibrationData& cam_calib, 
@@ -36,7 +36,7 @@ public:
     {
     }
 
-    inline constexpr HomographySizedProjection(
+    inline HomographySizedProjection(
         const CameraTransform& cam_transform, 
         const Eigen::Matrix3d& axis_mapping,
         const Eigen::Matrix3d& camera_instrinsic_matrix
@@ -48,7 +48,7 @@ public:
     {
     }
 
-    inline constexpr HomographySizedProjection(
+    inline HomographySizedProjection(
         const CameraTransform cam_transform, 
         const Eigen::Matrix3d& axis_mapping,
         const CameraCalibrationData& cam_calib, 
@@ -58,7 +58,7 @@ public:
     }
     
     [[nodiscard]]
-    constexpr Eigen::Vector2d project(const Eigen::Vector2i& pixel_coord) const
+    inline Eigen::Vector2d project(const Eigen::Vector2i& pixel_coord) const
     {
         const Eigen::Vector3i pixel_homogeneous = pixel_coord.homogeneous();
         const Eigen::Vector3d world_homogeneous = m_inverse_world_to_image_transformation * pixel_homogeneous.cast<double>();
@@ -67,8 +67,7 @@ public:
         return world_homogeneous.head<2>() * zc + m_camera_position.head<2>();
     }
 
-    [[nodiscard]]
-    constexpr void project(const std::span<const Eigen::Vector2i> pixel_coords, const std::span<Eigen::Vector2d> world_coords) const
+    inline void project(const std::span<const Eigen::Vector2i> pixel_coords, const std::span<Eigen::Vector2d> world_coords) const
     {
         for (int i = 0; i < pixel_coords.size(); ++i)
         {
@@ -84,7 +83,7 @@ private:
     CameraCalibrationData m_cam_calibration;
 
 public:
-    inline constexpr HomographyProjection(
+    inline HomographyProjection(
         const CameraTransform& cam_transform, 
         const Eigen::Matrix3d& axis_mapping,
         const CameraCalibrationData cam_calib
@@ -98,7 +97,7 @@ public:
     }
 
     [[nodiscard]]
-    constexpr inline HomographySizedProjection for_image(const Eigen::Vector2i& image_size_px) const
+    inline HomographySizedProjection for_image(const Eigen::Vector2i& image_size_px) const
     {
         return HomographySizedProjection(
             m_camera_position,

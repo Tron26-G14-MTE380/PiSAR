@@ -15,4 +15,5 @@ ExternalProject_Add(
         -DBUILD_TESTS=OFF
         -DBUILD_DOCS=OFF
         -DBUILD_PERF_TESTS=OFF
+        -DBUILD_opencv_java=OFF
 )
