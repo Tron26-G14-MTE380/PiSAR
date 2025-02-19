@@ -41,3 +41,6 @@ __pycache__/
 # cmake
 build/
 install/
+
+# easy_profiler
+*.prof

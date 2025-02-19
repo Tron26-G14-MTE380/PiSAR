@@ -5,7 +5,7 @@
 #include "pisar/vision/path_simplification.h"
 
 #include <opencv2/opencv.hpp>
-#include <eigen/Dense>
+#include <Eigen/Dense>
 #include <easy/profiler.h>
 
 #include <span>

@@ -596,9 +596,9 @@ static inline bool shouldDeletePixelPostProcessing(const cv::Mat& img, int r, in
 
 static void postProcessing(cv::Mat& img)
 {
-    for (int r = 3; r <= img.rows - 2; ++r)
+    for (int r = 2; r < img.rows - 2; ++r)
     {
-        for (int c = 3; c <= img.cols - 2; ++c)
+        for (int c = 2; c < img.cols - 2; ++c)
         {
             if (shouldDeletePixelPostProcessing(img, r, c))
             {
@@ -615,9 +615,9 @@ static void thinningMaRenIterativeImpl(cv::Mat& img)
     while (true)
     {
         bool flag = false;
-        for (int r = 3; r <= img.rows - 2; ++r)
+        for (int r = 2; r < img.rows - 2; ++r)
         {
-            for (int c = 3; c <= img.cols - 2; ++c)
+            for (int c = 2; c < img.cols - 2; ++c)
             {
                 if (shouldDeletePixel(img, r, c))
                 {
@@ -675,11 +675,11 @@ public:
         std::vector<std::thread> workers;
         workers.reserve(m_num_threads);
 
-        int totalRows = m_image.rows - 4;  // Exclude first 3 and last 2 rows
-        int rowsPerThread = totalRows / m_num_threads;
-        int remainder = totalRows % m_num_threads;
+        const int totalRows = m_image.rows - 4;  // Exclude first 2 and last 2 rows
+        const int rowsPerThread = totalRows / m_num_threads;
+        const int remainder = totalRows % m_num_threads;
 
-        int start_row = 3; // Begin at row 3
+        int start_row = 2; // Begin at row index 2
         for (int i = 0; i < m_num_threads; ++i) 
         {
             int end_row = start_row + rowsPerThread + (i < remainder ? 1 : 0); // Distribute remainder
@@ -711,7 +711,7 @@ private:
 
             for (int r = start_row; r < end_row; ++r) 
             {
-                for (int c = 3; c <= m_image.cols - 2; ++c) 
+                for (int c = 2; c < m_image.cols - 2; ++c) 
                 {
                     if (shouldDeletePixel(m_image, r, c)) 
                     {
@@ -775,10 +775,10 @@ void thinningMaRenParallel(cv::InputArray img, cv::OutputArray output)
     // Enforce the range of the input image to be in between 0 - 255
     processed /= 255;
 
-    const auto num_threads = static_cast<unsigned>(img.rows()/48);
+    // TODO: Find a better way to set threads based on host processors but lets hardcode 4 for now (rpi5 has 4 cores)
 
     cv::Mat output_img;
-    auto thinning = MaRenParallelThinning(num_threads);
+    auto thinning = MaRenParallelThinning(4);
     thinning.run(processed, output_img);
 
     output_img *= 255;

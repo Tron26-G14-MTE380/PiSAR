@@ -15,5 +15,7 @@ ExternalProject_Add(
         -DBUILD_TESTS=OFF
         -DBUILD_DOCS=OFF
         -DBUILD_PERF_TESTS=OFF
-        -DBUILD_opencv_java=OFF
+        -DOPENCV_WORLD=OFF
+        -DBUILD_LIST=core,imgproc,features2d,video,videoio,calib3d,highgui,imgcodecs,flann
+        -DWITH_GTK=ON
 )
