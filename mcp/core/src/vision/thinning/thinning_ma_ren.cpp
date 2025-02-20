@@ -531,6 +531,12 @@ static inline bool checkTemplateM(const std::bitset<20> neighbors)
     return (neighbors & mask) == pattern;
 }
 
+constexpr std::array<bool (*)(const std::bitset<20>), 10> kpExtraDeletionTemplateCheckers = {
+    checkTemplateD, checkTemplateE, checkTemplateF, checkTemplateG, checkTemplateH, 
+    checkTemplateI, checkTemplateJ, checkTemplateK, checkTemplateL, checkTemplateM
+};
+
+
 static bool shouldDeletePixel(const cv::Mat& img, int r, int c)
 {
     const bool foreground = img.at<uint8_t>(r, c);
@@ -555,12 +561,7 @@ static bool shouldDeletePixel(const cv::Mat& img, int r, int c)
     else if (A == 2 && (B == 4 || B == 5))
     {
         const std::bitset<20> neighbors = getPackedNeighbors(img, cv::Point{c, r});
-        const std::array<bool (*)(const std::bitset<20>), 10> extra_deletion_template_checkers = {
-            checkTemplateD, checkTemplateE, checkTemplateF, checkTemplateG, checkTemplateH, 
-            checkTemplateI, checkTemplateJ, checkTemplateK, checkTemplateL, checkTemplateM
-        };
-
-        for (auto deletion_template_checker : extra_deletion_template_checkers)
+        for (auto deletion_template_checker : kpExtraDeletionTemplateCheckers)
         {
             if (deletion_template_checker(neighbors))
             {
@@ -649,7 +650,7 @@ private:
     cv::Mat m_new_image;                                ///< Updated image after each iteration
     int m_num_threads;                                  ///< Number of worker threads
     std::atomic<bool> m_deleted;                        ///< Flag to check if any pixel was deleted
-    std::atomic<bool> m_stop;                    ///< Flag to check if any pixel was deleted
+    std::atomic<bool> m_stop;                           ///< Flag to check if any pixel was deleted
     std::barrier<std::function<void()>> m_barrier;      ///< Synchronization barrier for iterations
 
 public:

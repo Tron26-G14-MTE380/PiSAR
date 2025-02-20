@@ -126,12 +126,12 @@ void displayDebug(const cv::Mat debug_canvas)
     cv::imshow("Debug Data", debug_canvas);
     const int key = cv::waitKey(1);  // Small delay to allow window to refresh
 
-    // if (key == 27 || cv::getWindowProperty("Debug Data", cv::WND_PROP_VISIBLE) < 1)  // ESC key or window closed
-    // {
-    //     std::cout << "Debug window closed. Exiting program." << std::endl;
-    //     cv::destroyAllWindows();
-    //     std::terminate();
-    // }
+    if (key == 27 || cv::getWindowProperty("Debug Data", cv::WND_PROP_VISIBLE) <= 0)  // ESC key or window closed
+    {
+        std::cout << "Debug window closed. Exiting program." << std::endl;
+        cv::destroyAllWindows();
+        std::terminate();
+    }
 }
  
 #include <chrono>
