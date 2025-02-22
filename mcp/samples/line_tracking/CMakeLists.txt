@@ -13,7 +13,12 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-#add_subdirectory(../../thirdparty thirdparty)
+set(pisar_build_opencv ON)
+set(pisar_build_eigen ON)
+set(pisar_build_easy_profiler ON)
+include(${CMAKE_CURRENT_LIST_DIR}/../../../thirdparty/import.cmake)
+include_directories(${OpenCV_INCLUDE_DIRS})
+
 add_subdirectory(../../core pisar_core)
 
 add_executable(${PROJECT_NAME})

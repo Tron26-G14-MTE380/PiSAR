@@ -1,12 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 
-include(${CMAKE_CURRENT_LIST_DIR}/../thirdparty/import.cmake)
+project(pisar_core CXX)
 
 find_package(OpenCV REQUIRED)
 find_package (Eigen3 3.4 REQUIRED NO_MODULE)
 find_package(easy_profiler REQUIRED)
-
-include_directories(${OpenCV_INCLUDE_DIRS})
 
 add_library(pisar_core STATIC)
 

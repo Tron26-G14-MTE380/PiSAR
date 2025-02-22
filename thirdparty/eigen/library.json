@@ -1,0 +1,25 @@
+{
+    "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
+    "name": "Eigen",
+    "version": "3.4.0",
+    "description": "Eigen is a C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.",
+    "authors": [
+        {
+            "name": "Eigen Team",
+            "email": "eigen-core-team@lists.tuxfamily.org",
+            "url": "https://eigen.tuxfamily.org"
+        }
+    ],
+    "license": "MPL-2.0",
+    "dependencies": [],
+    "build": {
+        "includeDir": "Eigen",
+        "srcFilter": [
+            "+<Eigen/*.h>",
+            "+<Eigen/*.hpp>",
+            "+<unsupported/*.h>",
+            "+<unsupported/*.hpp>"
+        ],
+        "srcDir": "Eigen"
+    }
+}
