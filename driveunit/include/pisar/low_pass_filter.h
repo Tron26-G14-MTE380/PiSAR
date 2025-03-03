@@ -30,7 +30,7 @@ public:
     }
 
     /// @brief Get the filter output
-    [[nodiscard]] inline constexpr const T& getOutput() const
+    [[nodiscard]] inline T& getOutput()
     {
         return m_output;
     }

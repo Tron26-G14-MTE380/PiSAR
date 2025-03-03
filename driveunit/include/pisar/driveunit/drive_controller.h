@@ -32,6 +32,18 @@ public:
                     const float wheel_base, const float accel = 0.5f, const float decel = 0.8f);
 
     /**
+     * @brief Initializes the drive controller
+     *
+     */
+    inline void initialize()
+    {
+        m_left_motor.initialize();
+        m_right_motor.initialize();
+        m_left_profile.reset();
+        m_right_profile.reset();
+    }
+
+    /**
      * @brief Drives the robot using tank-style controls.
      *
      * @param left_speed The left wheel speed (-1.0 to 1.0).

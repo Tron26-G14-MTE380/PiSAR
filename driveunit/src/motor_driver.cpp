@@ -1,5 +1,7 @@
 #include "pisar/driveunit/motor_driver.h"
 
+#include <Arduino.h>
+
 #include "hardware/clocks.h"
 
 #include <algorithm>

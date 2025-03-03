@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
-
 #include "hardware/pwm.h"
 #include "hardware/gpio.h"
 

@@ -17,6 +17,61 @@ struct KinematicPose
 {
     Eigen::Vector2f position;
     float orientation;
+
+    /// @brief Default constructor (initializes to zero).
+    constexpr KinematicPose() noexcept : position(Eigen::Vector2f::Zero()), orientation(0.0f) {}
+
+    /// @brief Constructor with values.
+    constexpr KinematicPose(const Eigen::Vector2f& pos, float orient) noexcept
+        : position(pos), orientation(orient) {}
+
+    /** @name Arithmetic Operators */
+    ///@{
+
+    /// @brief Adds another pose (element-wise).
+    [[nodiscard]] constexpr KinematicPose operator+(const KinematicPose& other) const noexcept
+    {
+        return {position + other.position, orientation + other.orientation};
+    }
+
+    /// @brief Subtracts another pose (element-wise).
+    [[nodiscard]] constexpr KinematicPose operator-(const KinematicPose& other) const noexcept
+    {
+        return {position - other.position, orientation - other.orientation};
+    }
+
+    /// @brief Adds another pose to this one (element-wise).
+    constexpr KinematicPose& operator+=(const KinematicPose& other) noexcept
+    {
+        position += other.position;
+        orientation += other.orientation;
+        return *this;
+    }
+
+    /// @brief Subtracts another pose from this one (element-wise).
+    constexpr KinematicPose& operator-=(const KinematicPose& other) noexcept
+    {
+        position -= other.position;
+        orientation -= other.orientation;
+        return *this;
+    }
+
+    ///@}
+
+    /** @name Comparison Operators */
+    ///@{
+
+    /// @brief Checks equality with another KinematicPose.
+    [[nodiscard]] constexpr bool operator==(const KinematicPose& other) const noexcept
+    {
+        return position.isApprox(other.position) && std::abs(orientation - other.orientation) < 1e-6f;
+    }
+
+    /// @brief Checks inequality with another KinematicPose.
+    [[nodiscard]] constexpr bool operator!=(const KinematicPose& other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 using KinematicPoseRecord = HistoryRecord<KinematicPose>;
@@ -61,13 +116,13 @@ public:
         }
 
         const auto [before_idx, after_idx] = surroundingRecords(time);
+        const auto& before = m_history[before_idx];
+        const auto& after = m_history[after_idx];
+
         if (before_idx == after_idx)
         {
             return before; // No valid interpolation, return nearest
         }
-
-        const auto& before = m_history[before_idx];
-        const auto& after = m_history[after_idx];
 
         // Determine which timestamp is closer
         if ((time - before.timestamp) <= (after.timestamp - time))
@@ -107,7 +162,7 @@ public:
     {
         if (m_history.empty())
         {
-            return {0, {Eigen::Vector2f::Zero(), 0.0f}};
+            return {Eigen::Vector2f::Zero(), 0.0f};
         }
 
         // Early return if time is before/after the stored range
@@ -122,14 +177,15 @@ public:
         }
 
         const auto [before_idx, after_idx] = surroundingRecords(time);
+        const auto& before = m_history[before_idx];
+        const auto& after = m_history[after_idx];
+
         if (before_idx == after_idx)
         {
             return before; // No valid interpolation, return nearest
         }
 
-        const auto& before = m_history[before_idx];
-        const auto& after = m_history[after_idx];
-
+        const float alpha = static_cast<float>(time - before.timestamp) / static_cast<float>(after.timestamp - before.timestamp);
         return {
             interpPosition(before.value.position, after.value.position, alpha),
             interpOrienation(before.value.orientation, after.value.orientation, alpha)
@@ -145,7 +201,7 @@ public:
     {
         if (m_history.empty())
         {
-            return {0, {Eigen::Vector2f::Zero(), 0.0f}};
+            return Eigen::Vector2f::Zero();
         }
 
         // Early return if time is before/after the stored range
@@ -160,14 +216,15 @@ public:
         }
 
         const auto [before_idx, after_idx] = surroundingRecords(time);
+        const auto& before = m_history[before_idx];
+        const auto& after = m_history[after_idx];
+
         if (before_idx == after_idx)
         {
             return before; // No valid interpolation, return nearest
         }
 
-        const auto& before = m_history[before_idx];
-        const auto& after = m_history[after_idx];
-
+        const float alpha = static_cast<float>(time - before.timestamp) / static_cast<float>(after.timestamp - before.timestamp);
         return interpPosition(before.value.position, after.value.position, alpha);
     }
 
@@ -180,7 +237,7 @@ public:
     {
         if (m_history.empty())
         {
-            return {0, {Eigen::Vector2f::Zero(), 0.0f}};
+            return 0.0f;
         }
 
         // Early return if time is before/after the stored range
@@ -195,14 +252,15 @@ public:
         }
 
         const auto [before_idx, after_idx] = surroundingRecords(time);
+        const auto& before = m_history[before_idx];
+        const auto& after = m_history[after_idx];
+
         if (before_idx == after_idx)
         {
             return before; // No valid interpolation, return nearest
         }
 
-        const auto& before = m_history[before_idx];
-        const auto& after = m_history[after_idx];
-
+        const float alpha = static_cast<float>(time - before.timestamp) / static_cast<float>(after.timestamp - before.timestamp);
         return interpOrienation(before.value.orientation, after.value.orientation, alpha);
     }
 
@@ -215,8 +273,7 @@ public:
     {
         for (auto& pose_record : m_history)
         {
-            pose_record.value.position -= ref.position;
-            post_record.value.orientation -= ref.orientation;
+            pose_record.value -= ref;
         }
     }
 

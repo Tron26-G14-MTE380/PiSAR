@@ -1,4 +1,7 @@
 #include "pisar/driveunit/drive_controller.h"
+
+#include <Arduino.h>
+
 #include <cmath>
 #include <algorithm>
 
