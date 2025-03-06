@@ -1,18 +1,24 @@
 #pragma once
 
-#include "driveunit_interface/message.h"
+#include "pisar/driveunit_interface/message.h"
 
 #include <Eigen/Dense>
 
+#include <chrono>
+
 namespace pisar::driveunit_interface {
+
+
+constexpr size_t kSpiSpeed = 10'000'000;
 
 struct DefaultResponse { bool ack; };
 
 // Heartbeat
 struct HeartbeatRequest {};
 
-struct HeartbeatResponse {
-    uint32_t time_alive_ms;
+struct HeartbeatResponse
+{
+    std::chrono::duration<uint32_t, std::milli> time_alive;
 };
 
 // Commands
@@ -21,7 +27,7 @@ struct CommandIdle {};
 
 struct CommandFollowTrajectory
 {
-    float reference_time;
+    std::chrono::duration<float> reference_time;
     std::vector<Eigen::Vector2f> trajectory;
 };
 

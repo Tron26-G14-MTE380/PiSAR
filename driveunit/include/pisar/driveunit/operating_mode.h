@@ -1,8 +1,10 @@
 #pragma once
 
-#include "facility.h"
+#include "pisar/driveunit/facility.h"
 
 #include <variant>
+#include <span>
+#include <chrono>
 
 namespace pisar::driveunit {
 
@@ -59,52 +61,16 @@ public:
 
 class OperatingModeIdle : public OperatingMode<OperatingModeIdle>
 {
+private:
+    RobotFacility& m_facility;
+
 public:
+    OperatingModeIdle(RobotFacility& facility);
     inline void onEnterImpl() {}
     [[nodiscard]] inline bool updateImpl() { return false; }
     inline void onExitImpl() {}
 };
 
-/**
- * @brief Manages the active operating mode of the driveunit.
- */
-template<typename... TOperatingModes>
-class OperatingModeManager
-{
-private:
-    std::variant<OperatingModeIdle, TOperatingModes...> m_current_mode;
-
-public:
-    OperatingModeManager() : m_current_mode(OperatingModeIdle{}) {}
-
-    /**
-     * @brief Switches to a new operating mode with custom parameters.
-     * @tparam TMode The new operating mode type.
-     * @tparam TArgs Types of arguments for mode construction.
-     * @param args Arguments to construct the mode.
-     */
-    template<typename TMode, typename... TArgs>
-    void switchMode(TArgs&&... args)
-    {
-        std::visit([](auto& mode) { mode.onExit(); }, m_current_mode);
-        m_current_mode.template emplace<TMode>(std::forward<TArgs>(args)...);
-        std::visit([](auto& mode) { mode.onEnter(); }, m_current_mode);
-    }
-
-    /**
-     * @brief Runs the update loop for the current mode.
-     *        If the mode is finished, it transitions back to Idle mode.
-     */
-    void update()
-    {
-        const bool finished = std::visit([](auto& mode) { return mode.update(); }, m_current_mode);
-
-        if (finished)
-        {
-            switchMode<OperatingModeIdle>(); // Default to Idle when a mode finishes
-        }
-    }
-};
 
 // Actual operating modes here
 
@@ -112,9 +78,24 @@ class OperatingModeFollowTrajectory : public OperatingMode<OperatingModeFollowTr
 {
 private:
     RobotFacility& m_facility;
+    std::vector<Eigen::Vector2f> m_trajectory;
 
 public:
-    OperatingModeFollowTrajectory(RobotFacility& facility);
+    OperatingModeFollowTrajectory(
+        RobotFacility& facility, std::span<Eigen::Vector2f> trajectory, std::chrono::duration<float> reference_time);
+    void onEnterImpl();
+    [[nodiscard]] bool updateImpl();
+    void onExitImpl();
+};
+
+class OperatingModeRotate: public OperatingMode<OperatingModeFollowTrajectory>
+{
+private:
+    RobotFacility& m_facility;
+    float m_rotation_deg;
+
+public:
+    OperatingModeRotate(RobotFacility& facility, float rotation_deg);
     void onEnterImpl();
     [[nodiscard]] bool updateImpl();
     void onExitImpl();

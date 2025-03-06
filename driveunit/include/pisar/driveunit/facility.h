@@ -11,13 +11,14 @@ namespace pisar::driveunit
 /**
  * @brief Manages hardware interfaces for the driveunit, including motors, IMU, and pose estimation.
  */
-template<std::size_t tkPoseHistorySize>
 class RobotFacility
 {
 private:
+    static constexpr size_t kPoseHistorySize = 128;
+
     DifferentialDriveController& m_drive_controller;
     Imu& m_imu;
-    ImuPlanarKinematicTracker<tkPoseHistorySize>& m_kinematic_tracker;
+    ImuPlanarKinematicTracker<kPoseHistorySize> m_kinematic_tracker;
 
     Mutex m_drive_mutex;
     Mutex m_imu_mutex;
@@ -31,10 +32,9 @@ public:
      */
     inline RobotFacility(
         DifferentialDriveController& drive_controller,
-        Imu& imu,
-        ImuPlanarKinematicTracker<tkPoseHistorySize>& kinematic_tracker
+        Imu& imu
     )
-        : m_drive_controller(drive_controller), m_imu(imu), m_kinematic_tracker(kinematic_tracker)
+        : m_drive_controller(drive_controller), m_imu(imu), m_kinematic_tracker(imu.getSampleTime())
     {
     }
 
@@ -70,7 +70,7 @@ public:
     }
 
     /// @brief Gets a reference to the robot kinematic tracker.
-    inline ImuPlanarKinematicTracker<tkPoseHistorySize>& getKinematicTracker()
+    inline ImuPlanarKinematicTracker<kPoseHistorySize>& getKinematicTracker()
     {
         return m_kinematic_tracker;
     }
@@ -93,8 +93,9 @@ public:
      */
     void updateKinematicTracker()
     {
-        std::chrono::microseconds sample_time = 0;
-        std::chrono::microseconds time_stamp = 0;
+        using namespace std::chrono_literals;
+        std::chrono::microseconds sample_time = 0us;
+        std::chrono::microseconds time_stamp = 0us;
         std::array<Imu::Data, 128> imu_data;
         size_t data_samples = 0;
 

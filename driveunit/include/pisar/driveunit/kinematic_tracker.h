@@ -100,7 +100,7 @@ public:
         m_current_state.pose.position += m_current_state.velocity * m_sample_time.count();
 
         // Store updated state
-        m_pose_history.addRecord(timestamp, m_current_state);
+        m_pose_history.addRecord(timestamp, m_current_state.pose);
     }
 
     /**
