@@ -235,28 +235,21 @@ public:
      */
     [[nodiscard]] constexpr bool push(const T& value) noexcept
     {
-        if constexpr (tkOverwrite)
+        if (m_size == kCapacity)
         {
-            if (m_size == kCapacity)
+            if constexpr (tkOverwrite)
             {
-                m_head = (m_head + 1) % kCapacity; // Move head forward when overwriting
+                pop(); // Remove the oldest element when overwriting is enabled
             }
             else
             {
-                ++m_size;
-            }
-        }
-        else
-        {
-            if (m_size == kCapacity)
-            {
                 return false; // Queue is full
             }
-            ++m_size;
         }
 
         m_buffer[m_tail] = value;
         m_tail = (m_tail + 1) % kCapacity;
+        ++m_size;
         return true;
     }
 
@@ -267,17 +260,13 @@ public:
      */
     [[nodiscard]] constexpr bool push(T&& value) noexcept
     {
-        if constexpr (tkOverwrite)
+        if (m_size == kCapacity)
         {
-            if (m_size == kCapacity)
+            if constexpr (tkOverwrite)
             {
-                m_head = (m_head + 1) % kCapacity; // Move head forward when overwriting
-                --m_size;
+                pop(); // Remove the oldest element when overwriting is enabled
             }
-        }
-        else
-        {
-            if (m_size == kCapacity)
+            else
             {
                 return false; // Queue is full
             }

@@ -5,6 +5,8 @@
 #include <cmath>
 #include <algorithm>
 
+static constexpr float kCurvatureRadiusSpinThreshold = 1e-5;
+
 namespace pisar::driveunit
 {
 
@@ -36,24 +38,16 @@ void DifferentialDriveController::arcadeDrive(const float forward, const float r
 
 void DifferentialDriveController::curvatureDrive(const float speed, const float curvature, const bool allow_reverse)
 {
-    if (std::abs(curvature) < 1e-5)
+    const float radius = 1.0f / curvature; // Convert curvature to radius
+
+    if (std::abs(radius) < kCurvatureRadiusSpinThreshold)
     {
         tankDrive(speed, speed);
         return;
     }
 
-    float left_speed, right_speed;
-
-    if (curvature > 0)
-    {
-        left_speed = speed;
-        right_speed = speed * (1.0f - std::abs(curvature));
-    }
-    else
-    {
-        left_speed = speed * (1.0f - std::abs(curvature));
-        right_speed = speed;
-    }
+    float left_speed = speed * ((radius - m_wheel_base / 2) / radius);
+    float right_speed = speed * ((radius + m_wheel_base / 2) / radius);
 
     if (allow_reverse && speed < 0.0f)
     {
@@ -73,7 +67,7 @@ void DifferentialDriveController::rotate(const float angular_velocity)
 
 void DifferentialDriveController::driveArc(const float radius, const float speed)
 {
-    if (std::abs(radius) < 1e-5)
+    if (std::abs(radius) < kCurvatureRadiusSpinThreshold)
     {
         rotate(speed); // If radius is too small, just rotate in place
         return;
@@ -103,9 +97,9 @@ void DifferentialDriveController::driveArc(const float radius, const float speed
 
 void DifferentialDriveController::update()
 {
-    const uint32_t current_time_us = micros();
-    const float left_speed = m_left_profile.update(current_time_us);
-    const float right_speed = m_right_profile.update(current_time_us);
+    const std::chrono::microseconds current_time = static_cast<std::chrono::microseconds>(micros());
+    const float left_speed = m_left_profile.update(current_time);
+    const float right_speed = m_right_profile.update(current_time);
 
     m_left_motor.setSpeed(left_speed);
     m_right_motor.setSpeed(right_speed);

@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <algorithm>
+#include <chrono>
 
 namespace pisar {
 
@@ -16,11 +17,11 @@ public:
      * @brief Construct the low pass filter.
      *
      * @param cutoff_freq The LPF cutoff frequency.
-     * @param delta_time_s The sample time between inputs.
+     * @param delta_time The sample time between inputs.
      */
-    inline constexpr LowPassFilter(float cutoff_freq, float delta_time_s) :
+    inline constexpr LowPassFilter(float cutoff_freq, std::chrono::duration<float> delta_time) :
         m_output(0),
-	    m_e_pow(std::clamp(1 - std::exp(-delta_time_s * 2 * std::numbers::pi_v<float> * cutoff_freq), 0.0f, 1.0f))
+	    m_e_pow(std::clamp(1 - std::exp(-delta_time.count() * 2 * std::numbers::pi_v<float> * cutoff_freq), 0.0f, 1.0f))
     {}
 
     /**

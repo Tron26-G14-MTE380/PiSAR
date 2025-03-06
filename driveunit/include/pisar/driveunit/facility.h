@@ -1,10 +1,9 @@
 #pragma once
 
-#include "pisar/driveunit/drive_controller.h"
-#include "pisar/driveunit/imu.h"
 #include "pisar/driveunit/kinematic_tracker.h"
-
-#include "CoreMutex.h"
+#include "pisar/driveunit/imu.h"
+#include "pisar/driveunit/drive_controller.h"
+#include "pisar/driveunit/sync.h"
 
 namespace pisar::driveunit
 {
@@ -20,9 +19,9 @@ private:
     Imu& m_imu;
     ImuPlanarKinematicTracker<tkPoseHistorySize>& m_kinematic_tracker;
 
-    mutex_t m_drive_mutex;
-    mutex_t m_imu_mutex;
-    mutex_t m_kinematic_tracker_mutex;
+    Mutex m_drive_mutex;
+    Mutex m_imu_mutex;
+    Mutex m_kinematic_tracker_mutex;
 
 public:
     /**
@@ -32,8 +31,8 @@ public:
      */
     inline RobotFacility(
         DifferentialDriveController& drive_controller,
-        Imu imu,
-        ImuPlanarKinematicTracker<tkPoseHistorySize> kinematic_tracker
+        Imu& imu,
+        ImuPlanarKinematicTracker<tkPoseHistorySize>& kinematic_tracker
     )
         : m_drive_controller(drive_controller), m_imu(imu), m_kinematic_tracker(kinematic_tracker)
     {
@@ -53,7 +52,7 @@ public:
     }
 
     /// @brief Gets a refernce to the robot motor controller mutex primitive.
-    inline mutex_t& getMotorControllerMutex()
+    inline Mutex& getMotorControllerMutex()
     {
         return m_drive_mutex;
     }
@@ -65,7 +64,7 @@ public:
     }
 
     /// @brief Gets a refernce to the robot IMU sensor mutex primitive.
-    inline mutex_t& getImuMutex()
+    inline Mutex& getImuMutex()
     {
         return m_imu_mutex;
     }
@@ -77,7 +76,7 @@ public:
     }
 
     /// @brief Gets a refernce to the kinematic tracker mutex primitive.
-    inline mutex_t& getKinematicTrackerMutex()
+    inline Mutex& getKinematicTrackerMutex()
     {
         return m_kinematic_tracker_mutex;
     }
@@ -85,7 +84,7 @@ public:
     /// @brief Updates the drive controller.
     void updateDriveController()
     {
-        CoreMutex lock(m_drive_mutex);
+        Lock<Mutex> lock(m_drive_mutex);
         m_drive_controller.update();
     }
 
@@ -94,17 +93,17 @@ public:
      */
     void updateKinematicTracker()
     {
-        uint32_t sample_time_us = 0;
-        uint64_t time_stamp_us = 0;
+        std::chrono::microseconds sample_time = 0;
+        std::chrono::microseconds time_stamp = 0;
         std::array<Imu::Data, 128> imu_data;
         size_t data_samples = 0;
 
-        CoreMutex lock(m_kinematic_tracker_mutex);
+        Lock<Mutex> lock(m_kinematic_tracker_mutex);
 
         {
-            CoreMutex lock(m_imu_mutex);
-            sample_time_us = m_imu.getSampleTimeUs();
-            time_stamp_us = micros(); // Get current timestamp
+            Lock<Mutex> lock(m_imu_mutex);
+            sample_time = m_imu.getSampleTime();
+            time_stamp = static_cast<std::chrono::microseconds>(micros()); // Get current timestamp
             data_samples = m_imu.readFifo(std::span(imu_data));
         }
 
@@ -113,7 +112,7 @@ public:
             m_kinematic_tracker.onImuReading(
                 imu_data[i].accel_data,
                 imu_data[i].gyro_data,
-                time_stamp_us - (data_samples - 1 - i) * sample_time_us
+                time_stamp - (data_samples - 1 - i) * sample_time
             );
         }
     }

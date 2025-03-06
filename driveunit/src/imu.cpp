@@ -1,8 +1,10 @@
 #include "pisar/driveunit/imu.h"
-
 #include "pisar/circular_queue.h"
+#include "pisar/driveunit/logging.h"
 
 #include <vector>
+
+using namespace std::chrono_literals;
 
 namespace pisar::driveunit
 {
@@ -10,7 +12,7 @@ namespace pisar::driveunit
 
 Imu::Imu(SPIClass &spi, uint8_t cs_pin, uint16_t sample_rate) :
     m_sample_rate(sample_rate),
-    m_sample_time_us(1'000'000.0f / sample_rate),
+    m_sample_time(static_cast<std::chrono::microseconds::rep>(1'000'000.0f / sample_rate)),
     m_imu(&spi, cs_pin)
 {
 }
@@ -20,50 +22,50 @@ void Imu::initialize()
 {
     if (m_imu.begin() != LSM6DSO_OK)
     {
-        Serial.println("Failed to initialize LSM6DSO via SPI!");
+        PISAR_LOG_ERROR("Failed to initialize LSM6DSO via SPI!");
         return;
     }
 
     if (m_imu.Set_X_FS(2) != LSM6DSO_OK)
     {
-        Serial.println("Failed to set accelerometer range!");
+        PISAR_LOG_ERROR("Failed to set accelerometer range!");
         return;
     }
 
     if (m_imu.Set_X_ODR(m_sample_rate) != LSM6DSO_OK) // Maps to 833 Hz
     {
-        Serial.println("Failed to set accelerometer data rate!");
+        PISAR_LOG_ERROR("Failed to set accelerometer data rate!");
         return;
     }
 
     if (m_imu.Set_G_FS(125) != LSM6DSO_OK)
     {
-        Serial.println("Failed to set gryoscope range!");
+        PISAR_LOG_ERROR("Failed to set gyroscope range!");
         return;
     }
 
     if (m_imu.Set_G_ODR(m_sample_rate) != LSM6DSO_OK) // Maps to 833 Hz
     {
-        Serial.println("Failed to set gyroscope data rate!");
+        PISAR_LOG_ERROR("Failed to set gyroscope data rate!");
         return;
     }
 
     // Setup onboard fifo
     if (m_imu.Set_FIFO_Mode(LSM6DSO_STREAM_MODE) != LSM6DSO_OK)
     {
-        Serial.println("Failed to set IMU fifo mode!");
+        PISAR_LOG_ERROR("Failed to set IMU fifo mode!");
         return;
     }
 
     if (m_imu.Set_FIFO_X_BDR(m_sample_rate) != LSM6DSO_OK)
     {
-        Serial.println("Failed to set accelerometer FIFO batch rate!");
+        PISAR_LOG_ERROR("Failed to set accelerometer FIFO batch rate!");
         return;
     }
 
     if (m_imu.Set_FIFO_G_BDR(m_sample_rate) != LSM6DSO_OK)
     {
-        Serial.println("Failed to set gryoscope FIFO batch rate!");
+        PISAR_LOG_ERROR("Failed to set gryoscope FIFO batch rate!");
         return;
     }
 }
@@ -87,8 +89,17 @@ void Imu::initialize()
         uint8_t tag = 0;
         uint8_t data[6];
 
-        m_imu.Get_FIFO_Tag(&tag); // TODO ERROR CHECK
-        m_imu.Get_FIFO_Data(data); // TOOD ERROR CHECK
+        if(m_imu.Get_FIFO_Tag(&tag) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to get FIFO tag");
+            return 0;
+        }
+
+        if(m_imu.Get_FIFO_Data(data) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to get FIFO data");
+            return 0;
+        }
 
         const Eigen::Vector3<DataRawValueT> raw_data {
             ((int16_t)data[1] << 8) | data[0],
@@ -105,7 +116,7 @@ void Imu::initialize()
                 output[samples_read++].emplace<GyroDataRaw>(raw_data);
                 break;
             default:
-                Serial.println("Unknown tag");
+                PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);
                 break;
         }
     }
@@ -131,20 +142,32 @@ void Imu::initialize()
         uint8_t tag = 0;
         Eigen::Vector3<DataValueT> data;
 
-        m_imu.Get_FIFO_Tag(&tag); // TODO ERROR CHECK
+        if(m_imu.Get_FIFO_Tag(&tag) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to get FIFO tag");
+            return 0;
+        }
 
         switch(tag)
         {
             case LSM6DSO_XL_NC_TAG:
-                m_imu.Get_FIFO_X_Axes(data.data()); // TODO ERROR CHECK
+                if (m_imu.Get_FIFO_X_Axes(data.data()) != LSM6DSO_OK)
+                {
+                    PISAR_LOG_ERROR("Failed to get FIFO accelerometer data");
+                    return 0;
+                }
                 output[samples_read++].emplace<AccelData>(data);
                 break;
             case LSM6DSO_GYRO_NC_TAG:
-                m_imu.Get_FIFO_G_Axes(data.data()); // TODO ERROR CHECK
+                if (m_imu.Get_FIFO_G_Axes(data.data()) != LSM6DSO_OK)
+                {
+                    PISAR_LOG_ERROR("Failed to get FIFO gyro data");
+                    return 0;
+                }
                 output[samples_read++].emplace<GyroData>(data);
                 break;
             default:
-                Serial.println("Unknown tag");
+                PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);
                 break;
         }
     }
@@ -162,10 +185,10 @@ void Imu::initialize()
 
     size_t data_samples = 0;
 
-    CircularQueue<std::pair<AccelData, uint32_t>, 32> accel_buffer;
-    CircularQueue<std::pair<GyroData, uint32_t>, 32> gyro_buffer;
+    CircularQueue<std::pair<AccelData, std::chrono::microseconds>, 32> accel_buffer;
+    CircularQueue<std::pair<GyroData, std::chrono::microseconds>, 32> gyro_buffer;
 
-    uint32_t timestamp_us = 0;
+    std::chrono::microseconds timestamp = 0ms;
 
     // Read all available FIFO samples
     while((data_samples + accel_buffer.size() + gyro_buffer.size()) < output.size() && samples_available)
@@ -173,25 +196,37 @@ void Imu::initialize()
         uint8_t tag = 0;
         Eigen::Vector3<DataValueT> data;
 
-        m_imu.Get_FIFO_Tag(&tag); // TODO ERROR CHECK
+        if(m_imu.Get_FIFO_Tag(&tag) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to get FIFO tag");
+            return 0;
+        }
 
         switch(tag)
         {
             case LSM6DSO_XL_NC_TAG:
-                m_imu.Get_FIFO_X_Axes(data.data()); // TODO ERROR CHECK
-                accel_buffer.push({AccelData{data}, timestamp_us});
+                if (m_imu.Get_FIFO_X_Axes(data.data()) != LSM6DSO_OK)
+                {
+                    PISAR_LOG_ERROR("Failed to get FIFO accelerometer data");
+                    return 0;
+                }
+                accel_buffer.push({AccelData{data}, timestamp});
                 break;
             case LSM6DSO_GYRO_NC_TAG:
-                m_imu.Get_FIFO_G_Axes(data.data()); // TODO ERROR CHECK
-                gyro_buffer.push({GyroData{data}, timestamp_us});
+                if (m_imu.Get_FIFO_G_Axes(data.data()) != LSM6DSO_OK)
+                {
+                    PISAR_LOG_ERROR("Failed to get FIFO gyro data");
+                    return 0;
+                }
+                gyro_buffer.push({GyroData{data}, timestamp});
                 break;
             default:
-                Serial.println("Unknown tag");
+                PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);
                 break;
         }
 
         samples_available--;
-        timestamp_us += m_sample_time_us;
+        timestamp += m_sample_time;
 
         // Try to pair samples based on timestamps
         while (!accel_buffer.empty() && !gyro_buffer.empty())

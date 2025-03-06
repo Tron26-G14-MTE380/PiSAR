@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pisar/driveunit/logging.h"
+
 #include <Eigen/Dense>
 
 #include <SPI.h>
@@ -9,6 +11,7 @@
 #include <span>
 #include <variant>
 #include <vector>
+#include <chrono>
 
 namespace pisar::driveunit
 {
@@ -42,9 +45,9 @@ public:
     };
 
 private:
-    uint16_t m_sample_rate;     ///< Sample rate.
-    uint32_t m_sample_time_us;  ///< Sample time.
-    LSM6DSOSensor m_imu;        ///< Underlying imu sensor driver.
+    uint16_t m_sample_rate;                     ///< Sample rate.
+    std::chrono::microseconds m_sample_time;    ///< Sample time.
+    LSM6DSOSensor m_imu;                        ///< Underlying imu sensor driver.
 
 public:
 
@@ -60,7 +63,7 @@ public:
     ~Imu();
 
     [[nodiscard]] inline constexpr uint16_t getSampleRate() { return m_sample_rate; }
-    [[nodiscard]] inline constexpr uint32_t getSampleTimeUs() { return m_sample_time_us; }
+    [[nodiscard]] inline constexpr std::chrono::microseconds getSampleTime() { return m_sample_time; }
 
     /// @brief Initializes the Imu sensor.
     void initialize();
@@ -69,7 +72,12 @@ public:
     bool accelDataReady()
     {
         uint8_t ready = false;
-        m_imu.Get_X_DRDY_Status(&ready); // TODO ERROR CHECK
+        if (m_imu.Get_X_DRDY_Status(&ready) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to get accelerometer ready status!");
+            return false;
+        }
+
         return ready;
     }
 
@@ -77,7 +85,11 @@ public:
     bool gyroDataReady()
     {
         uint8_t ready = false;
-        m_imu.Get_G_DRDY_Status(&ready); // TODO ERROR CHECK
+        if (m_imu.Get_G_DRDY_Status(&ready) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to get gyroscope ready status!");
+            return false;
+        }
         return ready;
     }
 
@@ -88,7 +100,11 @@ public:
     [[nodiscard]] inline AccelDataRaw readAccelRaw()
     {
         AccelDataRaw data;
-        m_imu.Get_X_AxesRaw(data.values.data()); // TODO ERROR CHECK
+        if (m_imu.Get_X_AxesRaw(data.values.data()) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to read raw accelerometer data");
+            return {};
+        }
         return data;
     }
 
@@ -99,7 +115,11 @@ public:
     [[nodiscard]] inline AccelData readAccel()
     {
         AccelData data;
-        m_imu.Get_X_Axes(data.values.data()); // TODO ERROR CHECK
+        if (m_imu.Get_X_Axes(data.values.data()) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to read accelerometer data");
+            return {};
+        }
         return data;
     }
 
@@ -110,7 +130,11 @@ public:
     [[nodiscard]] inline GyroDataRaw readGyroRaw()
     {
         GyroDataRaw data;
-        m_imu.Get_G_AxesRaw(data.values.data()); // TODO ERROR CHECK
+        if (m_imu.Get_G_AxesRaw(data.values.data()) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to read raw gyroscope data");
+            return {};
+        }
         return data;
     }
 
@@ -121,7 +145,11 @@ public:
     [[nodiscard]] inline GyroData readGyro()
     {
         GyroData data;
-        m_imu.Get_G_Axes(data.values.data()); // TODO ERROR CHECK
+        if (m_imu.Get_G_Axes(data.values.data()) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to read gyroscope data");
+            return {};
+        }
         return data;
     }
 
@@ -146,7 +174,11 @@ public:
     [[nodiscard]] inline uint16_t fifoSamplesAvailable()
     {
         uint16_t samples_available = 0;
-        m_imu.Get_FIFO_Num_Samples(&samples_available); // TODO ERROR CHECK
+        if (m_imu.Get_FIFO_Num_Samples(&samples_available) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed get number of FIFO samples available.");
+            return {};
+        }
         return samples_available;
     }
 

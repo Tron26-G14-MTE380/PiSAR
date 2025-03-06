@@ -27,11 +27,15 @@ struct KinematicState
 template<std::size_t tkPoseHistorySize>
 class ImuPlanarKinematicTracker
 {
+public:
+    using TimestampRepT = std::chrono::microseconds;
+    using PoseHistoryT = PoseHistory<TimestampRepT, tkPoseHistorySize>;
+
 private:
-    float m_sample_time_us;
-    uint64_t m_last_update_time_us;                                 ///< Timestamp of last update.
-    KinematicState m_current_state;
-    PoseHistory<tkPoseHistorySize> m_pose_history;                  ///< Tracks the pose history.
+    TimestampRepT m_sample_time;                                    ///< IMU sampling time.
+    TimestampRepT m_last_update_time;                               ///< Timestamp of last update.
+    KinematicState m_current_state;                                 ///< The current kinematic state of the robot.
+    PoseHistoryT m_pose_history;                                    ///< Tracks the pose history.
 
     LowPassFilter<decltype(Imu::AccelData::values)> m_accel_filter; ///< Accelerometer data digital low pass filter.
     LowPassFilter<decltype(Imu::GyroData::values)> m_gyro_filter;   ///< Gyroscope data digital low pass filter.
@@ -40,11 +44,11 @@ private:
 
 public:
     /**
-     * @brief Constructs a PoseEstimator.
+     * @brief Constructs a ImuPlanarKinematicTracker.
      */
-    constexpr ImuPlanarKinematicTracker(float sample_time_us) :
-        m_sample_time_us(sample_time_us),
-        m_last_update_time_us(0),
+    constexpr ImuPlanarKinematicTracker(TimestampRepT sample_time) :
+        m_sample_time(sample_time),
+        m_last_update_time(0),
         m_current_state {
             .pose = KinematicPose{Eigen::Vector2f::Zero(), 0.0f},
             .velocity = Eigen::Vector2f::Zero(),
@@ -52,8 +56,8 @@ public:
             .acceleration = Eigen::Vector2f::Zero()
         },
         m_pose_history(),
-        m_accel_filter(15, sample_time_us),
-        m_gyro_filter(15, sample_time_us),
+        m_accel_filter(15, sample_time),
+        m_gyro_filter(15, sample_time),
         m_madgwick_filter()
         {}
 
@@ -64,20 +68,16 @@ public:
      * @brief Updates the internal kinematic state estimates using new IMU data.
      *
      * @param data The new accelerometer and gyroscope data reading.
-     * @param timestamp_us The imu data timestamp.
+     * @param timestamp The imu data timestamp.
      */
-    void onImuReading(const Imu::AccelData& accel_data, const Imu::GyroData& gyro_data, uint64_t timestamp_us)
+    void onImuReading(const Imu::AccelData& accel_data, const Imu::GyroData& gyro_data, TimestampRepT timestamp)
     {
-        if (m_last_update_time_us == 0)
+        if (m_last_update_time.count() == 0)
         {
-            m_last_update_time_us = timestamp_us;
-            m_madgwick_filter.begin(1.0f / m_sample_time_us);
+            m_last_update_time = timestamp;
+            m_madgwick_filter.begin(1.0f / m_sample_time.count());
             return; // Skip first update
         }
-
-        // Compute time delta (dt)
-        const float dt = static_cast<float>(timestamp_us - m_last_update_time_us) * 1e-6f;
-        m_last_update_time_us = timestamp_us;
 
         // --- APPLY LOW-PASS FILTERS TO ACCEL & GYRO ---
         const auto filtered_accel_data = m_accel_filter.update(accel_data.values);
@@ -94,13 +94,13 @@ public:
         m_current_state.pose.orientation = m_madgwick_filter.getYawRadians(); // Extract yaw from quaternion
 
         // --- INTEGRATE VELOCITY ---
-        m_current_state.velocity += filtered_accel_data.cast<float>() * dt;
+        m_current_state.velocity += filtered_accel_data.cast<float>() * m_sample_time.count();
 
         // --- INTEGRATE POSITION ---
-        m_current_state.pose.position += m_current_state.velocity * dt;
+        m_current_state.pose.position += m_current_state.velocity * m_sample_time.count();
 
         // Store updated state
-        m_pose_history.addRecord(timestamp_us, m_current_state);
+        m_pose_history.addRecord(timestamp, m_current_state);
     }
 
     /**
@@ -136,7 +136,7 @@ public:
     }
 
     /// @brief Gets the pose (position and orientation) history with respect to the reference.
-    [[nodiscard]] inline constexpr const PoseHistory<tkPoseHistorySize>& getPoseHistory() const noexcept
+    [[nodiscard]] inline constexpr const PoseHistoryT& getPoseHistory() const noexcept
     {
         return m_pose_history;
     }
@@ -172,9 +172,9 @@ public:
     }
 
     /// @brief The timestamp of the last update.
-    [[nodiscard]] inline constexpr uint64_t getLastUpdateTimeUs() const noexcept
+    [[nodiscard]] inline constexpr TimestampRepT getLastUpdateTime() const noexcept
     {
-        return m_last_update_time_us;
+        return m_last_update_time;
     }
 };
 

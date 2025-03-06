@@ -8,10 +8,10 @@
 
 namespace pisar::driveunit {
 
-template<typename TData>
+template<typename TTimeStampRep, typename TData>
 struct HistoryRecord
 {
-    uint64_t timestamp;
+    TTimeStampRep timestamp;
     TData value;
 };
 
@@ -76,12 +76,16 @@ struct KinematicPose
     }
 };
 
-using KinematicPoseRecord = HistoryRecord<KinematicPose>;
+template<typename TTimeStampRep>
+using KinematicPoseRecord = HistoryRecord<TTimeStampRep, KinematicPose>;
 
-template <std::size_t tkCapacity>
+template <typename TTimeStampRep, std::size_t tkCapacity>
 class PoseHistory {
+public:
+    using PoseRecordT = KinematicPoseRecord<TTimeStampRep>;
+
 private:
-    CircularQueue<KinematicPoseRecord, tkCapacity, true> m_history; ///< Circular queue storing pose history.
+    CircularQueue<PoseRecordT, tkCapacity, true> m_history; ///< Circular queue storing pose history.
 
 public:
     /**
@@ -89,7 +93,7 @@ public:
      * @param timestamp The timestamp of the pose.
      * @param pose The kinematic pose to store.
      */
-    constexpr void addRecord(uint64_t timestamp, const KinematicPose& pose) noexcept
+    constexpr void addRecord(TTimeStampRep timestamp, const KinematicPose& pose) noexcept
     {
         m_history.push({timestamp, pose});
     }
@@ -99,7 +103,7 @@ public:
      * @param time The target timestamp.
      * @return The closest history record.
      */
-    [[nodiscard]] constexpr std::optional<KinematicPoseRecord> recordAtNearest(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<PoseRecordT> recordAtNearest(TTimeStampRep time) const noexcept
     {
         if (m_history.empty())
         {
@@ -140,7 +144,7 @@ public:
      * @param time The target timestamp.
      * @return The pose of the closest record in time.
      */
-    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> poseAtNearest(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> poseAtNearest(TTimeStampRep time) const noexcept
     {
         const auto record = recordAtNearest(time);
         if (record)
@@ -158,7 +162,7 @@ public:
      * @param time The target timestamp.
      * @return The position of the closest record in time.
      */
-    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> positionAtNearest(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> positionAtNearest(TTimeStampRep time) const noexcept
     {
         const auto record = recordAtNearest(time);
         if (record)
@@ -176,7 +180,7 @@ public:
      * @param time The target timestamp.
      * @return The orientation of the closest record in time.
      */
-    [[nodiscard]] constexpr std::optional<float> orientationAtNearest(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<float> orientationAtNearest(TTimeStampRep time) const noexcept
     {
         const auto record = recordAtNearest(time);
         if (record)
@@ -194,7 +198,7 @@ public:
      * @param time The target timestamp.
      * @return The interpolated kinematic pose record.
      */
-    [[nodiscard]] constexpr std::optional<KinematicPose> poseAtLinInterp(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<KinematicPose> poseAtLinInterp(TTimeStampRep time) const noexcept
     {
         if (m_history.empty())
         {
@@ -233,7 +237,7 @@ public:
      * @param time The target timestamp.
      * @return The interpolated position.
      */
-    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> positionAtLinInterp(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> positionAtLinInterp(TTimeStampRep time) const noexcept
     {
         if (m_history.empty())
         {
@@ -269,7 +273,7 @@ public:
      * @param time The target timestamp.
      * @return The interpolated orientation in radians.
      */
-    [[nodiscard]] constexpr std::optional<float> orientationAtLinInterp(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<float> orientationAtLinInterp(TTimeStampRep time) const noexcept
     {
         if (m_history.empty())
         {
@@ -338,7 +342,7 @@ private:
      * @return A pair of indices (before, after) that bound the given time.
      *         If time is out of range, both indices will be the nearest available.
      */
-    [[nodiscard]] constexpr std::pair<std::size_t, std::size_t> surroundingRecords(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::pair<std::size_t, std::size_t> surroundingRecords(TTimeStampRep time) const noexcept
     {
         if (m_history.size() < 2)
         {
