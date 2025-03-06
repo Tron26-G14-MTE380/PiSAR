@@ -6,6 +6,17 @@ find_package(OpenCV REQUIRED)
 find_package (Eigen3 3.4 REQUIRED NO_MODULE)
 find_package(easy_profiler REQUIRED)
 
+# Detect if building on Raspberry Pi
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_NAME MATCHES "Linux")
+    message(STATUS "Building for Raspberry Pi: Enabling wiringPi")
+    find_library(WIRINGPI_LIB wiringPi)
+    set(PISAR_CORE_BUILD_RASPBERRY_PI TRUE)
+else()
+    message(STATUS "Not on Raspberry Pi: Skipping wiringPi")
+    set(PISAR_CORE_BUILD_RASPBERRY_PI FALSE)
+endif()
+
+
 add_library(pisar_core STATIC)
 
 target_include_directories(pisar_core
@@ -27,6 +38,11 @@ target_link_libraries(pisar_core
     ${OpenCV_LIBS}
     easy_profiler
 )
+
+# Link wiringPi only if on Raspberry Pi
+if(PISAR_CORE_BUILD_RASPBERRY_PI)
+    target_link_libraries(pisar_core ${WIRINGPI_LIB})
+endif()
 
 set_target_properties(pisar_core PROPERTIES
     CXX_STANDARD 20

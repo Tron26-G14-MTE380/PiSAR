@@ -27,7 +27,8 @@ private:
     THandler& m_handler;                                    ///< Message handler.
     UBaseType_t m_task_priority;                            ///< Internal task priority.
     TaskHandle_t m_task_handle;                             ///< FreeRTOS task handle for processing.
-    SemaphoreHandle_t m_data_ready_semaphore;               ///< Semaphore for signaling data reception.
+    BinarySemaphore m_data_ready_semaphore;                 ///< Semaphore for signaling data reception.
+    BinarySemaphore m_response_pending;                     ///< Semaphore to signal when a response message is pending.
 
     std::array<std::byte, tkRecvBufferSize> m_recv_buffer;  ///< Buffer for incoming messages.
     std::array<std::byte, tkSendBufferSize> m_send_buffer;  ///< Buffer for outgoing responses.
@@ -42,8 +43,7 @@ public:
     explicit TransportInterface(SPISlaveClass& spi, THandler& handler, UBaseType_t task_priority)
         : m_spi(spi), m_handler(handler), m_task_priority(task_priority), m_task_handle(nullptr)
     {
-        m_data_ready_semaphore = xSemaphoreCreateBinary();
-        configASSERT(m_data_ready_semaphore != nullptr);
+        m_response_pending.unlock();
     }
 
     /**
@@ -52,16 +52,18 @@ public:
     void initialize()
     {
         // Spawn the processing task
-        xTaskCreate(
-            taskEntry, "SPI_Processing", 2048, this, m_task_priority, &m_task_handle
-        );
+        if (xTaskCreate(taskEntry, "SPI_Processing", 2048, this, m_task_priority, &m_task_handle) != pdPASS)
+        {
+            PISAR_LOG_ERROR("Failed to create SPI processing task");
+            return;
+        }
 
         // Capture `this` in lambda to avoid needing a singleton
         m_spi.onDataRecv([this](uint8_t* data, size_t len) { this->onDataReceived(data, len); });
         m_spi.onDataSent([this]() { this->onDataSent(); });
 
-        // Set default response
-        prepareDefaultResponse();
+        // Set default response.
+        transmit(driveunit_interface::DefaultResponse(), false);
 
         // Start SPI slave
         m_spi.begin(SPISettings(driveunit_interface::kSpiSpeed, MSBFIRST, SPI_MODE0));
@@ -87,7 +89,7 @@ private:
         while (true)
         {
             // Wait until SPI ISR signals data reception
-            if (xSemaphoreTake(m_data_ready_semaphore, portMAX_DELAY) == pdTRUE)
+            if (m_data_ready_semaphore.lock())
             {
                 processMessage();
             }
@@ -110,12 +112,12 @@ private:
         }
 
         // Handle the message
-        const size_t response_size = m_handler.handleMessage(packet.value(), std::span<std::byte>(m_send_buffer));
+        const auto response  = m_handler.handleMessage(packet.value());
 
-        // Set the response in SPI buffer
-        if (response_size > 0)
+        // Send the response
+        if (response)
         {
-            m_spi.setData(reinterpret_cast<uint8_t*>(m_send_buffer.data()), response_size);
+            transmit(response.value(), true);
         }
     }
 
@@ -130,8 +132,16 @@ private:
         {
             return;
         }
+
+        // If we are waiting for response to get clocked out then we just ignore the transaction
+        if (m_response_pending.countIsr() == 0) // 0 means not available
+        {
+            return;  // Ignore incoming data if the previous response is still being read
+        }
+
+
         memcpy(m_recv_buffer.data(), data, len);
-        xSemaphoreGiveFromISR(m_data_ready_semaphore, nullptr);  // Signal processing task
+        m_data_ready_semaphore.unlockIsr();
     }
 
     /**
@@ -139,16 +149,75 @@ private:
      */
     void onDataSent()
     {
-        prepareDefaultResponse();
+        // We automatically clear the response pending flag when data is sent.
+        m_response_pending.unlockIsr();
+
+        // Set default response.
+        transmitIsr(driveunit_interface::DefaultResponse(), false);
     }
 
-    /**
-     * @brief Sets a default response in the send buffer.
-     */
-    inline void prepareDefaultResponse()
+    inline void transmit(driveunit_interface::Response response_msg, bool ignore_messages_until_sent)
     {
-        strcpy(m_send_buffer.data(), "ACK");
-        m_spi.setData(reinterpret_cast<uint8_t*>(m_send_buffer.data()), strlen(m_send_buffer.data()));
+        driveunit_interface::PacketEncoder<driveunit_interface::Response> encoder;
+
+        // Encode directly into m_send_buffer at offset 1 (leaving space for size byte)
+        auto encoded = encoder.encode(response_msg, std::span(m_send_buffer).subspan(1));
+        if (encoded)
+        {
+            if (ignore_messages_until_sent)
+            {
+                if (m_response_pending.lock() == false)
+                {
+                    return; // Ignore transmission if the last response hasn't been fully read
+                }
+            }
+            else
+            {
+                if (m_response_pending.count() == 0)
+                {
+                    return; // Ignore transmission if the last response hasn't been fully read
+                }
+            }
+
+            m_send_buffer[0] = static_cast<std::byte>(encoded->size()); // Store size in first byte
+            m_spi.setData(reinterpret_cast<uint8_t*>(m_send_buffer.data()), encoded.value().size() + 1);
+        }
+        else
+        {
+            PISAR_LOG_ERROR("Failed to encode response");
+        }
+    }
+
+    inline void transmitIsr(driveunit_interface::Response response_msg, bool ignore_messages_until_sent)
+    {
+        driveunit_interface::PacketEncoder<driveunit_interface::Response> encoder;
+
+        // Encode directly into m_send_buffer at offset 1 (leaving space for size byte)
+        auto encoded = encoder.encode(response_msg, std::span(m_send_buffer).subspan(1));
+        if (encoded)
+        {
+            if (ignore_messages_until_sent)
+            {
+                if (m_response_pending.lockIsr() == false)
+                {
+                    return; // Ignore transmission if the last response hasn't been fully read
+                }
+            }
+            else
+            {
+                if (m_response_pending.countIsr() == 0)
+                {
+                    return; // Ignore transmission if the last response hasn't been fully read
+                }
+            }
+
+            m_send_buffer[0] = static_cast<std::byte>(encoded->size()); // Store size in first byte
+            m_spi.setData(reinterpret_cast<uint8_t*>(m_send_buffer.data()), encoded.value().size() + 1);
+        }
+        else
+        {
+            PISAR_LOG_ERROR("Failed to encode response");
+        }
     }
 };
 

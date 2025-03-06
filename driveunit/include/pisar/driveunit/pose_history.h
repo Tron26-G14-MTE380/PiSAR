@@ -15,35 +15,35 @@ struct HistoryRecord
     TData value;
 };
 
-struct KinematicPose
+struct  KinematicPose
 {
     Eigen::Vector2f position;
     float orientation;
 
     /// @brief Default constructor (initializes to zero).
-    constexpr KinematicPose() noexcept : position(Eigen::Vector2f::Zero()), orientation(0.0f) {}
+    KinematicPose() noexcept : position(Eigen::Vector2f::Zero()), orientation(0.0f) {}
 
     /// @brief Constructor with values.
-    constexpr KinematicPose(const Eigen::Vector2f& pos, float orient) noexcept
+    KinematicPose(const Eigen::Vector2f& pos, float orient) noexcept
         : position(pos), orientation(orient) {}
 
     /** @name Arithmetic Operators */
     ///@{
 
     /// @brief Adds another pose (element-wise).
-    [[nodiscard]] constexpr KinematicPose operator+(const KinematicPose& other) const noexcept
+    [[nodiscard]] KinematicPose operator+(const KinematicPose& other) const noexcept
     {
         return {position + other.position, orientation + other.orientation};
     }
 
     /// @brief Subtracts another pose (element-wise).
-    [[nodiscard]] constexpr KinematicPose operator-(const KinematicPose& other) const noexcept
+    [[nodiscard]] KinematicPose operator-(const KinematicPose& other) const noexcept
     {
         return {position - other.position, orientation - other.orientation};
     }
 
     /// @brief Adds another pose to this one (element-wise).
-    constexpr KinematicPose& operator+=(const KinematicPose& other) noexcept
+    KinematicPose& operator+=(const KinematicPose& other) noexcept
     {
         position += other.position;
         orientation += other.orientation;
@@ -51,7 +51,7 @@ struct KinematicPose
     }
 
     /// @brief Subtracts another pose from this one (element-wise).
-    constexpr KinematicPose& operator-=(const KinematicPose& other) noexcept
+    KinematicPose& operator-=(const KinematicPose& other) noexcept
     {
         position -= other.position;
         orientation -= other.orientation;
@@ -64,13 +64,13 @@ struct KinematicPose
     ///@{
 
     /// @brief Checks equality with another KinematicPose.
-    [[nodiscard]] constexpr bool operator==(const KinematicPose& other) const noexcept
+    [[nodiscard]] bool operator==(const KinematicPose& other) const noexcept
     {
         return position.isApprox(other.position) && std::abs(orientation - other.orientation) < 1e-6f;
     }
 
     /// @brief Checks inequality with another KinematicPose.
-    [[nodiscard]] constexpr bool operator!=(const KinematicPose& other) const noexcept
+    [[nodiscard]] bool operator!=(const KinematicPose& other) const noexcept
     {
         return !(*this == other);
     }

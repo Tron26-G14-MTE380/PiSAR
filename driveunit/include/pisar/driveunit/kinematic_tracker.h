@@ -37,8 +37,8 @@ private:
     KinematicState m_current_state;                                 ///< The current kinematic state of the robot.
     PoseHistoryT m_pose_history;                                    ///< Tracks the pose history.
 
-    LowPassFilter<decltype(Imu::AccelData::values)> m_accel_filter; ///< Accelerometer data digital low pass filter.
-    LowPassFilter<decltype(Imu::GyroData::values)> m_gyro_filter;   ///< Gyroscope data digital low pass filter.
+    LowPassFilter<Eigen::Vector3f> m_accel_filter;                  ///< Accelerometer data digital low pass filter.
+    LowPassFilter<Eigen::Vector3f> m_gyro_filter;                   ///< Gyroscope data digital low pass filter.
 
     Madgwick m_madgwick_filter;                                     ///< Madgwick filter for orientation estimation.
 
@@ -80,11 +80,11 @@ public:
         }
 
         // --- APPLY LOW-PASS FILTERS TO ACCEL & GYRO ---
-        const auto filtered_accel_data = m_accel_filter.update(accel_data.values);
-        const auto filtered_gyro_data = m_gyro_filter.update(gyro_data.values);
+        const auto filtered_accel_data = m_accel_filter.update(accel_data.values.cast<float>());
+        const auto filtered_gyro_data = m_gyro_filter.update(gyro_data.values.cast<float>());
 
         m_current_state.angular_velocity = filtered_gyro_data.z();
-        m_current_state.acceleration = filtered_accel_data;
+        m_current_state.acceleration = filtered_accel_data.head<2>(); // Take X and Z
 
         // --- UPDATE ORIENTATION USING MADGWICK FILTER ---
         m_madgwick_filter.updateIMU(
@@ -94,7 +94,7 @@ public:
         m_current_state.pose.orientation = m_madgwick_filter.getYawRadians(); // Extract yaw from quaternion
 
         // --- INTEGRATE VELOCITY ---
-        m_current_state.velocity += filtered_accel_data.cast<float>() * m_sample_time.count();
+        m_current_state.velocity += m_current_state.acceleration * m_sample_time.count();
 
         // --- INTEGRATE POSITION ---
         m_current_state.pose.position += m_current_state.velocity * m_sample_time.count();
