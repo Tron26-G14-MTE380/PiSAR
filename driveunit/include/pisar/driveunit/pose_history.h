@@ -4,6 +4,8 @@
 
 #include <Eigen/Dense>
 
+#include <optional>
+
 namespace pisar::driveunit {
 
 template<typename TData>
@@ -97,11 +99,11 @@ public:
      * @param time The target timestamp.
      * @return The closest history record.
      */
-    [[nodiscard]] constexpr KinematicPoseRecord recordAtNearest(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<KinematicPoseRecord> recordAtNearest(uint64_t time) const noexcept
     {
         if (m_history.empty())
         {
-            return {0, {Eigen::Vector2f::Zero(), 0.0f}};
+            return std::nullopt;
         }
 
         // Early return if time is before/after the stored range
@@ -134,13 +136,39 @@ public:
     }
 
     /**
+     * @brief Retrieves the pose at the nearest timestamp.
+     * @param time The target timestamp.
+     * @return The pose of the closest record in time.
+     */
+    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> poseAtNearest(uint64_t time) const noexcept
+    {
+        const auto record = recordAtNearest(time);
+        if (record)
+        {
+            return record.value.value;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+    }
+
+    /**
      * @brief Retrieves the position at the nearest timestamp.
      * @param time The target timestamp.
      * @return The position of the closest record in time.
      */
-    [[nodiscard]] constexpr Eigen::Vector2f positionAtNearest(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> positionAtNearest(uint64_t time) const noexcept
     {
-        return recordAtNearest(time).value.position;
+        const auto record = recordAtNearest(time);
+        if (record)
+        {
+            return record.value.value.position;
+        }
+        else
+        {
+            return std::nullopt;
+        }
     }
 
     /**
@@ -148,9 +176,17 @@ public:
      * @param time The target timestamp.
      * @return The orientation of the closest record in time.
      */
-    [[nodiscard]] constexpr float orientationAtNearest(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<float> orientationAtNearest(uint64_t time) const noexcept
     {
-        return recordAtNearest(time).value.orientation;
+        const auto record = recordAtNearest(time);
+        if (record)
+        {
+            return record.value.value.orientation;
+        }
+        else
+        {
+            return std::nullopt;
+        }
     }
 
     /**
@@ -158,11 +194,11 @@ public:
      * @param time The target timestamp.
      * @return The interpolated kinematic pose record.
      */
-    [[nodiscard]] constexpr KinematicPose poseAtLinInterp(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<KinematicPose> poseAtLinInterp(uint64_t time) const noexcept
     {
         if (m_history.empty())
         {
-            return {Eigen::Vector2f::Zero(), 0.0f};
+            return std::nullopt;
         }
 
         // Early return if time is before/after the stored range
@@ -197,11 +233,11 @@ public:
      * @param time The target timestamp.
      * @return The interpolated position.
      */
-    [[nodiscard]] constexpr Eigen::Vector2f positionAtLinInterp(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> positionAtLinInterp(uint64_t time) const noexcept
     {
         if (m_history.empty())
         {
-            return Eigen::Vector2f::Zero();
+            return std::nullopt;
         }
 
         // Early return if time is before/after the stored range
@@ -233,11 +269,11 @@ public:
      * @param time The target timestamp.
      * @return The interpolated orientation in radians.
      */
-    [[nodiscard]] constexpr float orientationAtLinInterp(uint64_t time) const noexcept
+    [[nodiscard]] constexpr std::optional<float> orientationAtLinInterp(uint64_t time) const noexcept
     {
         if (m_history.empty())
         {
-            return 0.0f;
+            return std::nullopt;
         }
 
         // Early return if time is before/after the stored range

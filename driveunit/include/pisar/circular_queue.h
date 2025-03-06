@@ -7,6 +7,45 @@ namespace pisar {
 
 template <typename T, std::size_t tkCapacity, bool tkOverwrite = false>
 class CircularQueue {
+public:
+    /// The capacity of the circular queue
+    static constexpr std::size_t kCapacity = tkCapacity;
+
+    template<bool tkIsConst>
+    class Iterator {
+    private:
+        using QueueType = std::conditional_t<tkIsConst, const CircularQueue, CircularQueue>;
+        using ValueType = std::conditional_t<tkIsConst, const T, T>;
+
+        QueueType* m_p_queue;
+        std::size_t m_index;
+        std::size_t m_count;
+
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = ValueType;
+        using difference_type = std::ptrdiff_t;
+        using pointer = ValueType*;
+        using reference = ValueType&;
+
+        Iterator(QueueType* queue, std::size_t index, std::size_t count)
+            : m_p_queue(queue), m_index(index), m_count(count) {}
+
+        bool operator!=(const Iterator& other) const { return m_count != other.m_count; }
+
+        Iterator& operator++()
+        {
+            m_index = (m_index + 1) % kCapacity;
+            ++m_count;
+            return *this;
+        }
+
+        reference operator*() const { return m_p_queue->m_buffer[m_index]; }
+    };
+
+    using IteratorType = Iterator<false>;
+    using ConstIteratorType = Iterator<true>;
+
 private:
     std::array<T, tkCapacity> m_buffer; ///< The underlying array buffer for the queue.
     std::size_t m_head;                 ///< The index of the front element.
@@ -14,8 +53,6 @@ private:
     std::size_t m_size;                 ///< The number of elements in the queue.
 
 public:
-    /// The capacity of the circular queue
-    static constexpr std::size_t kCapacity = tkCapacity;
 
     /**
      * @brief Default constructor, initializes the queue as empty.
@@ -28,7 +65,7 @@ public:
      */
     constexpr CircularQueue(const CircularQueue& other)
     {
-        std::copy(other.begin(), other.end(), begin());
+        std::copy(other.begin(), other.begin() + std::min(other.size(), kCapacity), this->m_buffer.begin());
         m_head = other.m_head;
         m_tail = other.m_tail;
         m_size = other.m_size;
@@ -53,7 +90,7 @@ public:
         if (this != &other)
         {
             clear();
-            std::copy(other.begin(), other.end(), begin());
+            std::copy(other.begin(), other.begin() + std::min(other.size(), kCapacity), this->m_buffer.begin());
             m_head = other.m_head;
             m_tail = other.m_tail;
             m_size = other.m_size;
@@ -141,25 +178,25 @@ public:
      * @brief Returns an iterator to the beginning of the queue.
      * @return A pointer to the first element of the queue.
      */
-    constexpr T* begin() noexcept { return &m_buffer[m_head]; }
+    constexpr IteratorType begin() noexcept { return IteratorType(this, m_head, 0); }
 
     /**
      * @brief Returns a const iterator to the beginning of the queue.
      * @return A const pointer to the first element of the queue.
      */
-    constexpr const T* begin() const noexcept { return &m_buffer[m_head]; }
+    constexpr ConstIteratorType begin() const noexcept { return ConstIteratorType(this, m_head, 0); }
 
     /**
      * @brief Returns an iterator to the end of the queue.
      * @return A pointer to the position after the last element of the queue.
      */
-    constexpr T* end() noexcept { return &m_buffer[m_tail]; }
+    constexpr IteratorType end() noexcept { return IteratorType(this, m_tail, m_size);  }
 
     /**
      * @brief Returns a const iterator to the end of the queue.
      * @return A const pointer to the position after the last element of the queue.
      */
-    constexpr const T* end() const noexcept { return &m_buffer[m_tail]; }
+    constexpr ConstIteratorType end() const noexcept { return ConstIteratorType(this, m_tail, m_size); }
 
     /**
      * @brief Accesses an element in the queue by index.
@@ -203,7 +240,10 @@ public:
             if (m_size == kCapacity)
             {
                 m_head = (m_head + 1) % kCapacity; // Move head forward when overwriting
-                --m_size;
+            }
+            else
+            {
+                ++m_size;
             }
         }
         else
@@ -212,11 +252,11 @@ public:
             {
                 return false; // Queue is full
             }
+            ++m_size;
         }
 
         m_buffer[m_tail] = value;
         m_tail = (m_tail + 1) % kCapacity;
-        ++m_size;
         return true;
     }
 

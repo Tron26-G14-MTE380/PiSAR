@@ -51,7 +51,7 @@ public:
      */
     inline constexpr float update(uint32_t current_time_us)
     {
-        const float delta_time = (m_last_update_time_us - current_time_us) / 1'000'000.0f;
+        const float delta_time = (current_time_us - m_last_update_time_us) / 1'000'000.0f;
 
         const float delta_speed = (m_target_speed - m_current_speed);
         if (delta_speed == 0)
