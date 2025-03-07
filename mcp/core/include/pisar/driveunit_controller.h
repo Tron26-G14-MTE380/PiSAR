@@ -45,7 +45,7 @@ public:
         std::scoped_lock lock(m_mutex);
 
         // Encode the request directly into a buffer
-        std::array<std::byte, 256> send_buffer{};
+        std::array<std::byte, driveunit_interface::kMaxEncodedRequestSize> send_buffer{};
         driveunit_interface::PacketEncoder<driveunit_interface::Request> encoder;
         auto encoded = encoder.encode(driveunit_interface::Request(request), std::span(send_buffer));
 
@@ -70,12 +70,12 @@ public:
         }
 
         // Step 2: Read the full response
-        std::vector<std::byte> response_buffer(response_size, std::byte(0));
+        std::array<std::byte, driveunit_interface::kMaxEncodedRequestSize> response_buffer;
         wiringPiSPIDataRW(m_spi_channel, reinterpret_cast<uint8_t*>(response_buffer.data()), response_buffer.size());
 
         // Decode response
         driveunit_interface::PacketDecoder<driveunit_interface::Response> decoder;
-        auto response = decoder.decode(std::span(response_buffer));
+        auto response = decoder.decode(std::span(response_buffer, response_size));
 
         if (!response)
         {

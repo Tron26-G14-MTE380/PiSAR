@@ -20,39 +20,49 @@ namespace pisar::driveunit {
  * @tparam tkSendBufferSize size of the SPI send buffer.
  * @tparam THandler The message handler type.
  */
-template <size_t tkRecvBufferSize, size_t tkSendBufferSize, typename THandler>
+template <typename THandler>
 class TransportInterface {
 private:
     SPISlaveClass& m_spi;                                   ///< SPI slave instance.
     THandler& m_handler;                                    ///< Message handler.
-    UBaseType_t m_task_priority;                            ///< Internal task priority.
     TaskHandle_t m_task_handle;                             ///< FreeRTOS task handle for processing.
     BinarySemaphore m_data_ready_semaphore;                 ///< Semaphore for signaling data reception.
     BinarySemaphore m_response_pending;                     ///< Semaphore to signal when a response message is pending.
 
-    std::array<std::byte, tkRecvBufferSize> m_recv_buffer;  ///< Buffer for incoming messages.
-    std::array<std::byte, tkSendBufferSize> m_send_buffer;  ///< Buffer for outgoing responses.
+    /// @brief Buffer for incoming messages.
+    std::array<std::byte, driveunit_interface::kMaxEncodedRequestSize> m_recv_buffer;
+
+     /// @brief Buffer for outgoing responses.
+    std::array<std::byte, driveunit_interface::kMaxEncodedResponseSize> m_send_buffer;
 
 public:
     /**
      * @brief Constructs an SPI slave interface.
      * @param spi Reference to the SPI slave instance.
      * @param handler Reference to the message handler.
-     * @param task_priority Priority of the processing task.
      */
-    explicit TransportInterface(SPISlaveClass& spi, THandler& handler, UBaseType_t task_priority)
-        : m_spi(spi), m_handler(handler), m_task_priority(task_priority), m_task_handle(nullptr)
+    explicit TransportInterface(SPISlaveClass& spi, THandler& handler)
+        : m_spi(spi), m_handler(handler), m_task_handle(nullptr)
     {
-        m_response_pending.unlock();
     }
 
     /**
      * @brief Initializes SPI as a slave device.
+     *
+     * @param task_priority Priority of the processing task
      */
-    void initialize()
+    void initialize(UBaseType_t task_priority)
     {
+        if (task_priority < 0 || task_priority > configMAX_PRIORITIES)
+        {
+            PISAR_LOG_ERROR("Task priority %u is out of range");
+            return; // TODO ERROR CODE
+        }
+
+        m_response_pending.unlock();
+
         // Spawn the processing task
-        if (xTaskCreate(taskEntry, "SPI_Processing", 2048, this, m_task_priority, &m_task_handle) != pdPASS)
+        if (xTaskCreate(taskEntry, "SPI_Processing", 2048, this, task_priority, &m_task_handle) != pdPASS)
         {
             PISAR_LOG_ERROR("Failed to create SPI processing task");
             return;
@@ -67,8 +77,6 @@ public:
 
         // Start SPI slave
         m_spi.begin(SPISettings(driveunit_interface::kSpiSpeed, MSBFIRST, SPI_MODE0));
-
-        PISAR_LOG_INFO("SPI Slave Initialized");
     }
 
 private:
@@ -128,7 +136,7 @@ private:
      */
     void onDataReceived(uint8_t* data, size_t len)
     {
-        if (len > tkRecvBufferSize)
+        if (len > m_recv_buffer.size())
         {
             return;
         }

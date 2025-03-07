@@ -11,13 +11,12 @@
     "license": "MIT",
     "dependencies": [],
     "build": {
-        "includeDir": "zpp_bits",
+        "includeDir": ".",
         "srcFilter": [
-          "+<src/*.cpp>",   
+          "+<src/*.cpp>",
           "+<include/*.h>",
           "+<include/*.hpp>"
         ],
         "srcDir": "zpp_bits"
     }
 }
-  

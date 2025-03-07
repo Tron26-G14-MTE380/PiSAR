@@ -16,7 +16,7 @@
 
 // maximum length of formatted log message
 #ifndef PISAR_DRIVEUNIT_LOGGING_MAX_MESSAGE_LENGTH
-#define PISAR_DRIVEUNIT_LOGGING_MAX_MESSAGE_LENGTH 256
+#define PISAR_DRIVEUNIT_LOGGING_MAX_MESSAGE_LENGTH 512
 #endif
 
 namespace pisar::driveunit {

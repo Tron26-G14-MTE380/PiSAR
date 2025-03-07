@@ -20,7 +20,7 @@ public:
      * @param delta_time The sample time between inputs.
      */
     inline constexpr LowPassFilter(float cutoff_freq, std::chrono::duration<float> delta_time) :
-        m_output(0),
+        m_output{},
 	    m_e_pow(std::clamp(1 - std::exp(-delta_time.count() * 2 * std::numbers::pi_v<float> * cutoff_freq), 0.0f, 1.0f))
     {}
 

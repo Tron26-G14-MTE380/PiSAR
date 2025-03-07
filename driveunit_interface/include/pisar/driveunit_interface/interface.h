@@ -12,7 +12,7 @@ namespace std::chrono {
  * @brief Serialization support for std::chrono::duration<T, Ratio>
  */
 template <typename TRep, typename TRatio>
-constexpr auto serialize(auto &archive, const std::chrono::duration<TRep, TRatio> &duration) 
+constexpr auto serialize(auto &archive, const std::chrono::duration<TRep, TRatio> &duration)
 {
     return archive(duration.count());
 }
@@ -31,7 +31,7 @@ template <typename Matrix> concept CIsEigenMatrix = detail::EigenMatrix<Matrix>:
 namespace Eigen {
 /**
  * @brief Serialization support for Eigen::Matrix<T, Rows, Cols>.
- * 
+ *
  * Taken from https://github.com/eyalz800/zpp_bits/issues/149.
  */
 template <typename Matrix>
@@ -68,16 +68,18 @@ constexpr auto serialize(auto & archive, Matrix& matrix) requires pisar::driveun
 namespace pisar::driveunit_interface {
 
 constexpr size_t kSpiSpeed = 10'000'000;
+constexpr size_t kMaxEncodedRequestSize = 256;
+constexpr size_t kMaxEncodedResponseSize = 256;
 
-struct DefaultResponse 
-{ 
+struct DefaultResponse
+{
     using serialize = zpp::bits::members<1>;
 
-    bool ack; 
+    bool ack;
 };
 
 // Heartbeat
-struct HeartbeatRequest 
+struct HeartbeatRequest
 {
     using serialize = zpp::bits::members<0>;
 };
@@ -91,7 +93,7 @@ struct HeartbeatResponse
 
 // Commands
 
-struct CommandIdle 
+struct CommandIdle
 {
     using serialize = zpp::bits::members<0>;
 };

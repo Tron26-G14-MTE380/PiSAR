@@ -9,10 +9,9 @@ using namespace std::chrono_literals;
 namespace pisar::driveunit
 {
 
-
 Imu::Imu(SPIClass &spi, uint8_t cs_pin, uint16_t sample_rate) :
     m_sample_rate(sample_rate),
-    m_sample_time(static_cast<std::chrono::microseconds::rep>(1'000'000.0f / sample_rate)),
+    m_sample_time(static_cast<std::chrono::microseconds::rep>(1E6f / sample_rate)),
     m_imu(&spi, cs_pin)
 {
 }

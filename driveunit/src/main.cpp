@@ -24,19 +24,29 @@ OperatingModeIdle createDefaultMode()
 }
 
 using OperatingModeManagerT = OperatingModeManager<OperatingModeIdle, OperatingModeFollowTrajectory, OperatingModeRotate>;
-OperatingModeManagerT operating_mode_manager(createDefaultMode, 10);
+OperatingModeManagerT operating_mode_manager(createDefaultMode);
 
 MessageHandler message_handler(facility, operating_mode_manager);
-TransportInterface<256, 256, decltype(message_handler)> transport_interface(SPISlave, message_handler, 10);
-
+TransportInterface<decltype(message_handler)> transport_interface(SPISlave, message_handler);
 
 void setup()
 {
+    Serial.begin(115200);
+    initLogging(LogLevel::kInfo);
 
+    facility.initialize();
+    PISAR_LOG_INFO("Robot facility initialized");
+
+    operating_mode_manager.initialize(5);
+    PISAR_LOG_INFO("Operating mode manager initialized");
+
+    transport_interface.initialize(6);
+    PISAR_LOG_INFO("Transport interface initialized");
 }
 
 void loop()
 {
-
+    PISAR_LOG_INFO("Hello World!");
+    delay(1000);
 }
 

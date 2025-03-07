@@ -62,10 +62,10 @@ public:
 class OperatingModeIdle : public OperatingMode<OperatingModeIdle>
 {
 private:
-    RobotFacility& m_facility;
+    std::reference_wrapper<RobotFacility> m_facility;
 
 public:
-    OperatingModeIdle(RobotFacility& facility);
+    OperatingModeIdle(RobotFacility& facility) : m_facility(facility) {}
     inline void onEnterImpl() {}
     [[nodiscard]] inline bool updateImpl() { return false; }
     inline void onExitImpl() {}
@@ -77,28 +77,33 @@ public:
 class OperatingModeFollowTrajectory : public OperatingMode<OperatingModeFollowTrajectory>
 {
 private:
-    RobotFacility& m_facility;
+    std::reference_wrapper<RobotFacility> m_facility;
     std::vector<Eigen::Vector2f> m_trajectory;
+    std::chrono::duration<float> m_ref_time;
 
 public:
     OperatingModeFollowTrajectory(
-        RobotFacility& facility, std::span<Eigen::Vector2f> trajectory, std::chrono::duration<float> reference_time);
-    void onEnterImpl();
-    [[nodiscard]] bool updateImpl();
-    void onExitImpl();
+        RobotFacility& facility,
+        const std::span<const Eigen::Vector2f> trajectory,
+        const std::chrono::duration<float> reference_time
+    ) : m_facility(facility), m_trajectory(trajectory.begin(), trajectory.end()), m_ref_time(reference_time) {}
+    void onEnterImpl() {}
+    [[nodiscard]] bool updateImpl() { return true; }
+    void onExitImpl() {}
 };
 
-class OperatingModeRotate: public OperatingMode<OperatingModeFollowTrajectory>
+class OperatingModeRotate: public OperatingMode<OperatingModeRotate>
 {
 private:
-    RobotFacility& m_facility;
+    std::reference_wrapper<RobotFacility> m_facility;
     float m_rotation_deg;
 
 public:
-    OperatingModeRotate(RobotFacility& facility, float rotation_deg);
-    void onEnterImpl();
-    [[nodiscard]] bool updateImpl();
-    void onExitImpl();
+    OperatingModeRotate(RobotFacility& facility, float rotation_deg) :
+        m_facility(facility), m_rotation_deg(rotation_deg) {}
+    void onEnterImpl() {}
+    [[nodiscard]] bool updateImpl() { return true; }
+    void onExitImpl() {}
 };
 
 }

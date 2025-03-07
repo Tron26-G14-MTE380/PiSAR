@@ -62,14 +62,14 @@ public:
     /// @brief Destructor
     ~Imu();
 
-    [[nodiscard]] inline constexpr uint16_t getSampleRate() { return m_sample_rate; }
-    [[nodiscard]] inline constexpr std::chrono::microseconds getSampleTime() { return m_sample_time; }
+    [[nodiscard]] inline uint16_t getSampleRate() { return m_sample_rate; }
+    [[nodiscard]] inline std::chrono::microseconds getSampleTime() { return m_sample_time; }
 
     /// @brief Initializes the Imu sensor.
     void initialize();
 
     /// @brief Returns whether data is ready.
-    bool accelDataReady()
+    [[nodiscard]] inline bool accelDataReady()
     {
         uint8_t ready = false;
         if (m_imu.Get_X_DRDY_Status(&ready) != LSM6DSO_OK)
@@ -82,7 +82,7 @@ public:
     }
 
     /// @brief Returns whether data is ready.
-    bool gyroDataReady()
+    [[nodiscard]] inline bool gyroDataReady()
     {
         uint8_t ready = false;
         if (m_imu.Get_G_DRDY_Status(&ready) != LSM6DSO_OK)

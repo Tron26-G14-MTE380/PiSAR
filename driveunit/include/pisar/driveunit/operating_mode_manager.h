@@ -1,5 +1,9 @@
 #pragma once
 
+#include "pisar/utilities/type_info.h"
+
+#include "Arduino.h"
+
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -17,7 +21,6 @@ class OperatingModeManager {
 private:
     using ModeT = std::variant<TDefaultMode, TOperatingModes...>;
 
-    UBaseType_t m_task_priority;
     std::function<TDefaultMode()> m_default_mode_factory;               ///< Factory function for default mode
     ModeT m_current_mode;                                               ///< Active mode.
     QueueHandle_t m_mode_queue;                                         ///< Queue for pending mode changes
@@ -28,20 +31,27 @@ public:
      * @brief Constructs an OperatingModeManager and starts its execution task.
      * @param task_priority The priority for the mode update task.
      */
-    explicit OperatingModeManager(std::function<TDefaultMode()> default_mode_factory, UBaseType_t task_priority) :
-        m_task_priority(task_priority), m_default_mode_factory(default_mode_factory),
-        m_current_mode(default_mode_factory()), m_task_handle(nullptr)
+    explicit OperatingModeManager(std::function<TDefaultMode()> default_mode_factory) :
+        m_default_mode_factory(default_mode_factory), m_current_mode(default_mode_factory()), m_task_handle(nullptr)
     {}
 
     /// @brief Initialize the operating mode manager and run thread loop.
-    void initialize()
+    void initialize(UBaseType_t task_priority)
     {
+        if (task_priority < 0 || task_priority > configMAX_PRIORITIES)
+        {
+            PISAR_LOG_ERROR("Task priority %u is out of range");
+            return; // TODO ERROR CODE
+        }
+
         m_mode_queue = xQueueCreate(1, sizeof(ModeT));
         configASSERT(m_mode_queue != nullptr);
 
-        xTaskCreate(
-            taskEntry, "Mode_Manager", 2048, this, m_task_priority, &m_task_handle
-        );
+        if (xTaskCreate(taskEntry, "Mode_Manager", 512, this, task_priority, &m_task_handle) != pdPASS)
+        {
+            PISAR_LOG_ERROR("Failed to create operating mode manager task!");
+            return; // TODO ERROR CODE
+        }
     }
 
     /**
@@ -106,7 +116,7 @@ private:
      */
     static void taskEntry(void* param)
     {
-        static_cast<OperatingModeManager*>(param)->taskLoop();
+        reinterpret_cast<OperatingModeManager*>(param)->taskLoop();
     }
 
     /**
@@ -117,10 +127,10 @@ private:
         while (true)
         {
             // If new mode is available and pending, switch to it
-            ModeT next_mode;
+            ModeT next_mode = m_default_mode_factory();
             if (xQueueReceive(m_mode_queue, &next_mode, 0) == pdTRUE) // Non-blocking receive
             {
-                switchModeImpl(next_mode);
+                switchModeImpl(std::move(next_mode));
             }
 
             // Run current mode
@@ -148,9 +158,9 @@ private:
     template<typename TMode, typename... TArgs>
     void switchModeImpl(TArgs&&... args)
     {
-        std::visit([](auto& mode) { mode.onExit(); }, m_current_mode);
+        exitMode();
         m_current_mode.template emplace<TMode>(std::forward<TArgs>(args)...);
-        std::visit([](auto& mode) { mode.onEnter(); }, m_current_mode);
+        enterMode();
     }
 
     /**
@@ -163,9 +173,31 @@ private:
      */
     void switchModeImpl(ModeT&& next_mode)
     {
-        std::visit([](auto& mode) { mode.onExit(); }, m_current_mode);
+        exitMode();
         m_current_mode = std::move(next_mode);
+        enterMode();
+    }
+
+    /// @brief Enter the current mode.
+    inline void enterMode()
+    {
+        PISAR_LOG_DEBUG("Entering mode %s", getModeName().data());
         std::visit([](auto& mode) { mode.onEnter(); }, m_current_mode);
+    }
+
+    /// @brief Exit the current mode.
+    inline void exitMode()
+    {
+        PISAR_LOG_DEBUG("Exiting mode %s", getModeName().data());
+        std::visit([](auto& mode) { mode.onExit(); }, m_current_mode);
+    }
+
+    /// @brief Get the current mode's name
+    inline std::string_view getModeName()
+    {
+        return std::visit([](const auto& value) -> std::string_view {
+            return utilities::TypeName<std::decay_t<decltype(value)>>::value;
+        }, m_current_mode);
     }
 };
 
