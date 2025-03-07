@@ -31,6 +31,7 @@ private:
 
     /// @brief Buffer for incoming messages.
     std::array<std::byte, driveunit_interface::kMaxEncodedRequestSize> m_recv_buffer;
+    size_t m_recv_buffer_size;
 
      /// @brief Buffer for outgoing responses.
     std::array<std::byte, driveunit_interface::kMaxEncodedResponseSize> m_send_buffer;
@@ -42,7 +43,7 @@ public:
      * @param handler Reference to the message handler.
      */
     explicit TransportInterface(SPISlaveClass& spi, THandler& handler)
-        : m_spi(spi), m_handler(handler), m_task_handle(nullptr)
+        : m_spi(spi), m_handler(handler), m_task_handle(nullptr), m_recv_buffer_size(0)
     {
     }
 
@@ -76,7 +77,7 @@ public:
         transmit(driveunit_interface::DefaultResponse(), false);
 
         // Start SPI slave
-        m_spi.begin(SPISettings(driveunit_interface::kSpiSpeed, MSBFIRST, SPI_MODE0));
+        m_spi.begin(SPISettings(driveunit_interface::kSpiSpeed, MSBFIRST, SPI_MODE1));
     }
 
 private:
@@ -111,11 +112,13 @@ private:
     {
         // Decode the received message
         driveunit_interface::PacketDecoder<driveunit_interface::Request> decoder;
-        auto packet = decoder.decode(std::span<const std::byte>(m_recv_buffer));
+        auto packet = decoder.decode(std::span<const std::byte>(m_recv_buffer.data(), m_recv_buffer_size));
+
+        Serial.printf("Got %u bytes\n", m_recv_buffer_size);
 
         if (!packet.has_value())
         {
-            PISAR_LOG_ERROR("Failed to decode SPI message.");
+            //PISAR_LOG_ERROR("Failed to decode SPI message.");
             return;
         }
 
@@ -147,8 +150,8 @@ private:
             return;  // Ignore incoming data if the previous response is still being read
         }
 
-
         memcpy(m_recv_buffer.data(), data, len);
+        m_recv_buffer_size = len;
         m_data_ready_semaphore.unlockIsr();
     }
 
