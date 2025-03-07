@@ -3,10 +3,19 @@ project(OpenCV_Local)
 
 include(ExternalProject)
 
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    set(extra_cmake_args)
+else()
+    set(extra_cmake_args -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
+endif()
+
+
+
 ExternalProject_Add(
     opencv
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/opencv  # Use the actual submodule
     CMAKE_ARGS
+        ${extra_cmake_args}
         -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_CXX_STANDARD=20
         -DBUILD_SHARED_LIBS=OFF

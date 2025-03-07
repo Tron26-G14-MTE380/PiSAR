@@ -7,11 +7,15 @@
 #include "pisar/driveunit_interface/interface.h"
 #include "pisar/driveunit_controller.h"  // Your SPI master class
 
+#include <wiringPi.h>
+
 using namespace pisar::driveunit_interface;
 using namespace pisar::mcp;
 
 int main()
 {
+    wiringPiSetup(); // Initializes wiringPi using wiringPi's simlified number system.
+
     // Initialize SPI on channel 0
     DriveunitController controller(0);
 
@@ -28,6 +32,8 @@ int main()
         std::cerr << "❌ Failed to receive heartbeat!" << std::endl;
     }
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
     // 2️⃣ Test Idle Command
     if (controller.sendIdleCommand())
     {
@@ -37,6 +43,8 @@ int main()
     {
         std::cerr << "❌ Idle command failed!" << std::endl;
     }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     // 3️⃣ Test Rotation Command
     float rotation_degrees = 90.0f; // Rotate 90 degrees CCW
@@ -48,6 +56,9 @@ int main()
     {
         std::cerr << "❌ Rotate command failed!" << std::endl;
     }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
 
     // 4️⃣ Test Trajectory Command
     std::vector<Eigen::Vector2f> trajectory = {
@@ -63,6 +74,8 @@ int main()
     {
         std::cerr << "❌ Trajectory command failed!" << std::endl;
     }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     std::cout << "SPI Test Complete!" << std::endl;
     return 0;

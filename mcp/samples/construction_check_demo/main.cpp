@@ -5,18 +5,23 @@
 
 #include <easy/profiler.h>
 
+#include <wiringPi.h>
+
 #include <numbers>
 #include <iostream>
 #include <ranges>
 #include <algorithm>
 #include <span>
+#include <chrono>
 
 
 using namespace pisar::mcp;
 
 constexpr bool kDebug = false;
-constexpr bool kProfile = false;
 constexpr uint64_t kProfileTimeMs = 10000;
+
+constexpr int kLeftMotorControlPin = 10;
+constexpr int kRightMotorControlPin = 9;
 
 const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> kTapeHsvThresholds = {
     std::make_pair(cv::Scalar(0, 120, 70), cv::Scalar(10, 255, 255)),
@@ -42,6 +47,79 @@ const CameraCalibrationData kCameraCalibration {
 };
 
 const HomographyProjection kProjection = HomographyProjection(kCameraTransform, kAxisMapping, kCameraCalibration);
+
+cv::Mat createHomographyProjectionVisualization(int width, int height, const HomographySizedProjection& projection, const std::vector<Eigen::Vector2d>& trajectory)
+{
+    // Create a blank image
+    cv::Mat visualization = cv::Mat::zeros(height, width, CV_8UC3);
+
+    // Step 1: Generate a grid of points for visualization
+    std::vector<Eigen::Vector2i> camera_view_grid_image_points;
+    for (int i = 0; i < 10; ++i)
+    {
+        for (int j = 0; j < 10; ++j)
+        {
+            double u = i * (width / 9.0);
+            double v = j * (height / 9.0);
+            camera_view_grid_image_points.emplace_back(static_cast<int>(u), static_cast<int>(v));
+        }
+    }
+
+    // Project the grid into world space
+    std::vector<Eigen::Vector2d> camera_view_grid_world_points = projection.project(std::span(camera_view_grid_image_points));
+
+    // Combine trajectory and projected grid points for world bounds computation
+    std::vector<Eigen::Vector2d> all_world_points = trajectory;
+    all_world_points.insert(all_world_points.end(), camera_view_grid_world_points.begin(), camera_view_grid_world_points.end());
+
+    // Find world bounds
+    double X_min = std::numeric_limits<double>::max(), X_max = std::numeric_limits<double>::lowest();
+    double Y_min = std::numeric_limits<double>::max(), Y_max = std::numeric_limits<double>::lowest();
+
+    for (const auto& pt : all_world_points) {
+        X_min = std::min(X_min, pt.x());
+        X_max = std::max(X_max, pt.x());
+        Y_min = std::min(Y_min, pt.y());
+        Y_max = std::max(Y_max, pt.y());
+    }
+
+    // Compute scale factors
+    double world_x_range = X_max - X_min;
+    double world_y_range = Y_max - Y_min;
+    double world_to_image_scale_factor_x = width / world_x_range;
+    double world_to_image_scale_factor_y = height / world_y_range;
+    double world_to_image_scale_factor = std::min(world_to_image_scale_factor_x, world_to_image_scale_factor_y);
+
+    // Function to convert world points to image space
+    auto worldToImageFixed = [&](const std::vector<Eigen::Vector2d>& world_points) {
+        std::vector<cv::Point2f> image_points;
+        for (const auto& pt : world_points) {
+            float x_scaled = static_cast<float>(pt.x() * world_to_image_scale_factor + width / 2);
+            float y_scaled = static_cast<float>(height - (pt.y() * world_to_image_scale_factor));
+            image_points.emplace_back(x_scaled, y_scaled);
+        }
+        return image_points;
+    };
+
+    // Convert points to image space
+    std::vector<cv::Point2f> image_grid_points = worldToImageFixed(camera_view_grid_world_points);
+    std::vector<cv::Point2f> image_trajectory = worldToImageFixed(trajectory);
+
+    // Draw grid points
+    for (const auto& pt : image_grid_points) {
+        cv::circle(visualization, pt, 1, cv::Scalar(255, 255, 255), -1);
+    }
+
+    // Draw trajectory
+    for (size_t i = 0; i < image_trajectory.size(); ++i) {
+        cv::circle(visualization, image_trajectory[i], 3, cv::Scalar(0, 0, 255), -1); // Red points
+        if (i > 0) {
+            cv::line(visualization, image_trajectory[i - 1], image_trajectory[i], cv::Scalar(0, 0, 255), 2);
+        }
+    }
+
+    return visualization;
+}
 
 cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& debug_images, int max_size = 640, int grid_padding = 10)
 {
@@ -120,83 +198,6 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& de
     return grid_canvas;
 }
 
-
-cv::Mat createHomographyProjectionVisualization(HomographySizedProjection& projection, std::vector<Eigen::Vector2d> trajectory)
-{
-    int width = projection.getImageWidth();
-    int height = projection.getImageHeight();
-
-    // Create a blank image
-    cv::Mat visualization = cv::Mat::zeros(height, width, CV_8UC3);
-
-    // Step 1: Generate a grid of points for visualization
-    std::vector<Eigen::Vector2d> camera_view_grid_image_points;
-    for (int i = 0; i < 10; ++i)
-    {
-        for (int j = 0; j < 10; ++j)
-        {
-            double u = i * (width / 9.0);
-            double v = j * (height / 9.0);
-            camera_view_grid_image_points.emplace_back(u, v);
-        }
-    }
-
-    // Project the grid into world space
-    std::vector<Eigen::Vector2d> camera_view_grid_world_points = projection.project(camera_view_grid_image_points);
-
-    // Combine trajectory and projected grid points for world bounds computation
-    std::vector<Eigen::Vector2d> all_world_points = trajectory;
-    all_world_points.insert(all_world_points.end(), camera_view_grid_world_points.begin(), camera_view_grid_world_points.end());
-
-    // Find world bounds
-    double X_min = std::numeric_limits<double>::max(), X_max = std::numeric_limits<double>::lowest();
-    double Y_min = std::numeric_limits<double>::max(), Y_max = std::numeric_limits<double>::lowest();
-
-    for (const auto& pt : all_world_points) {
-        X_min = std::min(X_min, pt.x());
-        X_max = std::max(X_max, pt.x());
-        Y_min = std::min(Y_min, pt.y());
-        Y_max = std::max(Y_max, pt.y());
-    }
-
-    // Compute scale factors
-    double world_x_range = X_max - X_min;
-    double world_y_range = Y_max - Y_min;
-    double world_to_image_scale_factor_x = width / world_x_range;
-    double world_to_image_scale_factor_y = height / world_y_range;
-    double world_to_image_scale_factor = std::min(world_to_image_scale_factor_x, world_to_image_scale_factor_y);
-
-    // Function to convert world points to image space
-    auto worldToImageFixed = [&](const std::vector<Eigen::Vector2d>& world_points) {
-        std::vector<cv::Point2f> image_points;
-        for (const auto& pt : world_points) {
-            float x_scaled = static_cast<float>(pt.x() * world_to_image_scale_factor + width / 2);
-            float y_scaled = static_cast<float>(height - (pt.y() * world_to_image_scale_factor));
-            image_points.emplace_back(x_scaled, y_scaled);
-        }
-        return image_points;
-    };
-
-    // Convert points to image space
-    std::vector<cv::Point2f> image_grid_points = worldToImageFixed(camera_view_grid_world_points);
-    std::vector<cv::Point2f> image_trajectory = worldToImageFixed(trajectory);
-
-    // Draw grid points
-    for (const auto& pt : image_grid_points) {
-        cv::circle(visualization, pt, 1, cv::Scalar(255, 255, 255), -1);
-    }
-
-    // Draw trajectory
-    for (size_t i = 0; i < image_trajectory.size(); ++i) {
-        cv::circle(visualization, image_trajectory[i], 3, cv::Scalar(0, 0, 255), -1); // Red points
-        if (i > 0) {
-            cv::line(visualization, image_trajectory[i - 1], image_trajectory[i], cv::Scalar(0, 0, 255), 2);
-        }
-    }
-
-    return visualization;
-}
-
 void displayDebug(const cv::Mat debug_canvas)
 {
     // Show the composite debug display
@@ -211,18 +212,61 @@ void displayDebug(const cv::Mat debug_canvas)
     }
 }
 
-#include <chrono>
+void runRobot(std::vector<Eigen::Vector2d> trajectory)
+{
+    const float firstPointLength = trajectory[0].norm();
+    const float lastPointLength = trajectory[1].norm();
+
+    // Take closest end of the trajectory as start
+    if (lastPointLength < firstPointLength)
+    {
+        std::reverse(trajectory.begin(), trajectory.end()); // Reverses the vector in place
+    }
+
+    double x = trajectory[0].x();
+    double y = trajectory[0].y();
+
+    // Threshold to ignore tiny x deviations
+    constexpr double kThreshold = 0.1;
+
+    // Determine motor control
+    bool left_motor_on = false;
+    bool right_motor_on = false;
+
+    if (x > kThreshold) {
+        // Turn right: Stop left motor, Run right motor
+        left_motor_on = false;
+        right_motor_on = true;
+    } else if (x < -kThreshold) {
+        // Turn left: Run left motor, Stop right motor
+        left_motor_on = true;
+        right_motor_on = false;
+    } else {
+        // Move forward: Run both motors
+        left_motor_on = true;
+        right_motor_on = true;
+    }
+
+    const char* left_status = (left_motor_on ? "on" : "off");
+    const char* right_status = (right_motor_on ? "on" : "off");
+    std::cout << "Left: " << left_status << ", Right: " << right_status << std::endl;
+
+    // Apply to GPIO
+    digitalWrite(kLeftMotorControlPin, left_motor_on ? HIGH : LOW);
+    digitalWrite(kRightMotorControlPin, right_motor_on ? HIGH : LOW);
+}
+
 
 int main()
 {
-    if constexpr(kProfile)
-    {
-        EASY_PROFILER_ENABLE;
-    }
-
     RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
     auto line_tracker = LineTracker<kDebug>(std::span(kTapeHsvThresholds));
     const auto sized_projection = kProjection.for_image({640, 480});
+
+    wiringPiSetup();  // Initialize WiringPi
+    wiringPiSetupGpio();
+    pinMode(kLeftMotorControlPin, OUTPUT);
+    pinMode(kRightMotorControlPin, OUTPUT);
 
     video_source.start({640, 480});
 
@@ -253,23 +297,13 @@ int main()
                 std::make_pair("Filtered Skeleton", debug_data.filtered_skeleton),
                 std::make_pair("Trajectory", debug_data.trajectory),
                 std::make_pair("Simplified Trajectory", debug_data.simplified_trajectory),
-                std::make_pair("Homography Projection", createHomographyProjectionVisualization(sized_projection, world_trajectory))
+                std::make_pair("Trajectory Homography Projection", createHomographyProjectionVisualization(640, 480, sized_projection, world_trajectory))
             };
 
             displayDebug(createDebugCanvas(debug_image_map));
         }
 
-        if constexpr (kProfile)
-        {
-            const auto end = std::chrono::high_resolution_clock::now(); // end time
-            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(); // Convert to milliseconds
-
-            if (elapsed > kProfileTimeMs)
-            {
-                profiler::dumpBlocksToFile("profile.prof");
-                break;
-            }
-        }
+        runRobot(world_trajectory);
     }
 
     video_source.stop();

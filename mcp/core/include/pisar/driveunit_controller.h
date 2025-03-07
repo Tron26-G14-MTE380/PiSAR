@@ -29,7 +29,7 @@ public:
     inline explicit DriveunitController(int spi_channel)
         : m_spi_channel(spi_channel)
     {
-        wiringPiSPISetup(spi_channel, driveunit_interface::kSpiSpeed);
+        wiringPiSPISetupMode(spi_channel, driveunit_interface::kSpiSpeed, 1);
     }
 
     /**
@@ -58,7 +58,12 @@ public:
         std::vector<uint8_t> tx_data(reinterpret_cast<uint8_t*>(encoded->data()),
                                      reinterpret_cast<uint8_t*>(encoded->data()) + encoded->size());
 
-        wiringPiSPIDataRW(m_spi_channel, tx_data.data(), tx_data.size());
+        int ret = wiringPiSPIDataRW(m_spi_channel, tx_data.data(), tx_data.size());
+        if (ret < 0)
+        {
+            std::cout << "Error transmitting SPI data: " << errno << std::endl;
+            return std::nullopt;
+        }
 
         // Step 1: Read response size (1 byte)
         uint8_t response_size = 0;
@@ -75,7 +80,7 @@ public:
 
         // Decode response
         driveunit_interface::PacketDecoder<driveunit_interface::Response> decoder;
-        auto response = decoder.decode(std::span(response_buffer, response_size));
+        auto response = decoder.decode(std::span(response_buffer.data(), response_size));
 
         if (!response)
         {

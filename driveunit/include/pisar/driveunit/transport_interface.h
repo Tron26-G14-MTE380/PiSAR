@@ -112,13 +112,11 @@ private:
     {
         // Decode the received message
         driveunit_interface::PacketDecoder<driveunit_interface::Request> decoder;
-        auto packet = decoder.decode(std::span<const std::byte>(m_recv_buffer.data(), m_recv_buffer_size));
-
-        Serial.printf("Got %u bytes\n", m_recv_buffer_size);
+        auto packet = decoder.decode(std::span<const std::byte>(m_recv_buffer));
 
         if (!packet.has_value())
         {
-            //PISAR_LOG_ERROR("Failed to decode SPI message.");
+            PISAR_LOG_ERROR("Failed to decode SPI message.");
             return;
         }
 

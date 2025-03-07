@@ -18,30 +18,30 @@ private:
 
 public:
     inline HomographySizedProjection(
-        const Eigen::Vector3d cam_position, 
+        const Eigen::Vector3d cam_position,
         const Eigen::Matrix3d& inverse_world_to_camera_transformation,
         const Eigen::Matrix3d& camera_instrinsic_matrix
-    ) : 
-        m_camera_position(cam_position), 
+    ) :
+        m_camera_position(cam_position),
         m_inverse_world_to_image_transformation(inverse_world_to_camera_transformation * camera_instrinsic_matrix.inverse())
     {
     }
 
     inline HomographySizedProjection(
-        const Eigen::Vector3d cam_position, 
+        const Eigen::Vector3d cam_position,
         const Eigen::Matrix3d& inverse_world_to_camera_transformation,
-        const CameraCalibrationData& cam_calib, 
+        const CameraCalibrationData& cam_calib,
         const Eigen::Vector2i& image_size_px
-    ) : HomographySizedProjection(cam_position, inverse_world_to_camera_transformation, cam_calib.get_inverse_transformation(image_size_px))
+    ) : HomographySizedProjection(cam_position, inverse_world_to_camera_transformation, cam_calib.get_transformation(image_size_px))
     {
     }
 
     inline HomographySizedProjection(
-        const CameraTransform& cam_transform, 
+        const CameraTransform& cam_transform,
         const Eigen::Matrix3d& axis_mapping,
         const Eigen::Matrix3d& camera_instrinsic_matrix
-    ) : 
-        m_camera_position(cam_transform.position), 
+    ) :
+        m_camera_position(cam_transform.position),
         m_inverse_world_to_image_transformation((
             camera_instrinsic_matrix * axis_mapping * cam_transform.tilt.toRotationMatrix()
         ).inverse())
@@ -49,14 +49,14 @@ public:
     }
 
     inline HomographySizedProjection(
-        const CameraTransform cam_transform, 
+        const CameraTransform cam_transform,
         const Eigen::Matrix3d& axis_mapping,
-        const CameraCalibrationData& cam_calib, 
+        const CameraCalibrationData& cam_calib,
         const Eigen::Vector2i& image_size_px
-    ) : HomographySizedProjection(cam_transform, axis_mapping, cam_calib.get_inverse_transformation(image_size_px))
+    ) : HomographySizedProjection(cam_transform, axis_mapping, cam_calib.get_transformation(image_size_px))
     {
     }
-    
+
     [[nodiscard]]
     inline Eigen::Vector2d project(const Eigen::Vector2i& pixel_coord) const
     {
@@ -84,11 +84,11 @@ private:
 
 public:
     inline HomographyProjection(
-        const CameraTransform& cam_transform, 
+        const CameraTransform& cam_transform,
         const Eigen::Matrix3d& axis_mapping,
         const CameraCalibrationData cam_calib
-    ) : 
-        m_camera_position(cam_transform.position), 
+    ) :
+        m_camera_position(cam_transform.position),
         m_inverse_world_to_camera_transformation((
             axis_mapping * cam_transform.tilt.toRotationMatrix()
         ).inverse()),
