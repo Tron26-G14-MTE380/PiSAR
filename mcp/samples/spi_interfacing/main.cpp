@@ -13,12 +13,12 @@ using namespace pisar::mcp;
 int main()
 {
     // Initialize SPI on channel 0
-    DriveUnitSPI spi_master(0);
+    DriveunitController controller(0);
 
     std::cout << "Starting SPI Communication Test..." << std::endl;
 
     // 1️⃣ Test Heartbeat
-    auto heartbeat = spi_master.sendHeartbeat();
+    auto heartbeat = controller.sendHeartbeat();
     if (heartbeat)
     {
         std::cout << "✅ Heartbeat received. Time alive: " << heartbeat->time_alive.count() << " ms" << std::endl;
@@ -29,7 +29,7 @@ int main()
     }
 
     // 2️⃣ Test Idle Command
-    if (spi_master.sendIdleCommand())
+    if (controller.sendIdleCommand())
     {
         std::cout << "✅ Idle command acknowledged." << std::endl;
     }
@@ -40,7 +40,7 @@ int main()
 
     // 3️⃣ Test Rotation Command
     float rotation_degrees = 90.0f; // Rotate 90 degrees CCW
-    if (spi_master.sendRotateCommand(rotation_degrees))
+    if (controller.sendRotateCommand(rotation_degrees))
     {
         std::cout << "✅ Rotate command acknowledged." << std::endl;
     }
@@ -55,7 +55,7 @@ int main()
     };
     auto reference_time = std::chrono::duration<float>(2.5f); // Execute over 2.5 seconds
 
-    if (spi_master.sendTrajectoryCommand(reference_time, trajectory))
+    if (controller.sendTrajectoryCommand(reference_time, trajectory))
     {
         std::cout << "✅ Trajectory command acknowledged." << std::endl;
     }

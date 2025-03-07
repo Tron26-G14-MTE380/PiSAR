@@ -7,7 +7,6 @@ ExternalProject_Add(
     opencv
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/opencv  # Use the actual submodule
     CMAKE_ARGS
-        -DCMAKE_INSTALL_PREFIX=${PISAR_THIRDPARTY_INSTALL_DIR}
         -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_CXX_STANDARD=20
         -DBUILD_SHARED_LIBS=OFF
@@ -22,4 +21,5 @@ ExternalProject_Add(
         -DBUILD_JAVA=OFF
         -DBUILD_opencv_python2=OFF
         -DBUILD_opencv_python3=OFF
+    INSTALL_COMMAND cmake --install .
 )

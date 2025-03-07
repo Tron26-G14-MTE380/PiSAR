@@ -11,8 +11,6 @@ namespace pisar::driveunit_interface {
  * @tparam Ts The set of possible commands that the message can be.
  */
 template<typename... Ts>
-class MessageSet : public std::variant<Ts...> {
-    using std::variant<Ts...>::variant;
-};
+using MessageSet = std::variant<Ts...>;
 
 }

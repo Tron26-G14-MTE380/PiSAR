@@ -16,6 +16,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(pisar_build_opencv ON)
 set(pisar_build_eigen ON)
 set(pisar_build_easy_profiler ON)
+set(pisar_build_zpp_bits ON)
 include(${CMAKE_CURRENT_LIST_DIR}/../../../thirdparty/import.cmake)
 
 add_subdirectory(../../core pisar_core)

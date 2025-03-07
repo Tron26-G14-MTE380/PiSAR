@@ -28,7 +28,7 @@ endif()
 
 # Run cmake configure step
 execute_process(
-    COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_LIST_DIR} -B "${PISAR_THIRDPARTY_BUILD_DIR}" -G "${CMAKE_GENERATOR}" ${PISAR_THIRDPARTY_CMAKE_COMMAND_LINE_FLAGS}
+    COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_LIST_DIR} -B "${PISAR_THIRDPARTY_BUILD_DIR}" -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=${PISAR_THIRDPARTY_INSTALL_DIR} ${PISAR_THIRDPARTY_CMAKE_COMMAND_LINE_FLAGS}
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     RESULT_VARIABLE CONFIGURE_RESULT
 )
@@ -51,6 +51,19 @@ execute_process(
 
 if(BUILD_RESULT)
     message(FATAL_ERROR "CMake build failed for mcp thirdparty libraries!")
+endif()
+
+message(STATUS "Installing mcp thirdparty libraries at ${PISAR_THIRDPARTY_INSTALL_DIR}.")
+
+# Run cmake install step
+execute_process(
+    COMMAND ${CMAKE_COMMAND} --install build/${CMAKE_BUILD_TYPE}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+    RESULT_VARIABLE INSTALL_RESULT
+)
+
+if(INSTALL_RESULT)
+    message(FATAL_ERROR "CMake install failed for mcp thirdparty libraries!")
 endif()
 
 foreach(module_name IN LISTS PISAR_THIRDPARTY_MODULES)

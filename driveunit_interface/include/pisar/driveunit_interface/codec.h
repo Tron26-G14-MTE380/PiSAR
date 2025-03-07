@@ -6,7 +6,7 @@
 #include <span>
 #include <variant>
 
-#include "zpp_bits.h"
+#include <zpp_bits/zpp_bits.h>
 
 namespace pisar::driveunit_interface {
 

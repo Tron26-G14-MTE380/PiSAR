@@ -6,6 +6,8 @@ find_package(OpenCV REQUIRED)
 find_package (Eigen3 3.4 REQUIRED NO_MODULE)
 find_package(easy_profiler REQUIRED)
 
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../driveunit_interface driveunit_interface)
+
 # Detect if building on Raspberry Pi
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_NAME MATCHES "Linux")
     message(STATUS "Building for Raspberry Pi: Enabling wiringPi")
@@ -34,14 +36,15 @@ target_sources(pisar_core
 
 target_link_libraries(pisar_core
     PUBLIC
-    Eigen3::Eigen
-    ${OpenCV_LIBS}
-    easy_profiler
+        Eigen3::Eigen
+        ${OpenCV_LIBS}
+        easy_profiler
+        pisar_driveunit_interface
 )
 
 # Link wiringPi only if on Raspberry Pi
 if(PISAR_CORE_BUILD_RASPBERRY_PI)
-    target_link_libraries(pisar_core ${WIRINGPI_LIB})
+    target_link_libraries(pisar_core PUBLIC ${WIRINGPI_LIB})
 endif()
 
 set_target_properties(pisar_core PROPERTIES

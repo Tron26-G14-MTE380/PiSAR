@@ -1,11 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
+
+include(GNUInstallDirs)
+
 project(zpp_bits LANGUAGES CXX)
 
 # Define the library target
 add_library(zpp_bits INTERFACE)
 target_include_directories(zpp_bits INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/zpp_bits>
-    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(zpp_bits INTERFACE cxx_std_17)
 
@@ -18,7 +21,7 @@ set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/zpp_bits)
 install(TARGETS zpp_bits EXPORT zpp_bitsTargets)
 
 # Install the headers
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/zpp_bits DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 # Install the package configuration files
 install(EXPORT zpp_bitsTargets

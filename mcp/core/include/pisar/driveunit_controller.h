@@ -29,7 +29,7 @@ public:
     inline explicit DriveunitController(int spi_channel)
         : m_spi_channel(spi_channel)
     {
-        wiringPiSPISetup(spi_channel, kSpiSpeed);
+        wiringPiSPISetup(spi_channel, driveunit_interface::kSpiSpeed);
     }
 
     /**
@@ -46,7 +46,7 @@ public:
 
         // Encode the request directly into a buffer
         std::array<std::byte, 256> send_buffer{};
-        PacketEncoder<driveunit_interface::Request> encoder;
+        driveunit_interface::PacketEncoder<driveunit_interface::Request> encoder;
         auto encoded = encoder.encode(driveunit_interface::Request(request), std::span(send_buffer));
 
         if (!encoded)
@@ -70,11 +70,11 @@ public:
         }
 
         // Step 2: Read the full response
-        std::vector<std::byte> response_buffer(response_size, 0);
+        std::vector<std::byte> response_buffer(response_size, std::byte(0));
         wiringPiSPIDataRW(m_spi_channel, reinterpret_cast<uint8_t*>(response_buffer.data()), response_buffer.size());
 
         // Decode response
-        PacketDecoder<driveunit_interface::Response> decoder;
+        driveunit_interface::PacketDecoder<driveunit_interface::Response> decoder;
         auto response = decoder.decode(std::span(response_buffer));
 
         if (!response)
@@ -97,7 +97,7 @@ public:
      */
     inline std::optional<driveunit_interface::HeartbeatResponse> sendHeartbeat()
     {
-        return sendRequest<driveunit_interface::HeartbeatRequest, driveunit_interface::HeartbeatResponse>(HeartbeatRequest{});
+        return sendRequest<driveunit_interface::HeartbeatRequest, driveunit_interface::HeartbeatResponse>(driveunit_interface::HeartbeatRequest{});
     }
 
     /**
@@ -106,7 +106,7 @@ public:
      */
     inline bool sendIdleCommand()
     {
-        auto response = sendRequest<driveunit_interface::CommandIdle, driveunit_interface::DefaultResponse>(CommandIdle{});
+        auto response = sendRequest<driveunit_interface::CommandIdle, driveunit_interface::DefaultResponse>(driveunit_interface::CommandIdle{});
         return response && response->ack;
     }
 
