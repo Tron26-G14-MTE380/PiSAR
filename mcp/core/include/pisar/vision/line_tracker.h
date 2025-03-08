@@ -3,6 +3,7 @@
 #include "pisar/vision/thinning.h"
 #include "pisar/vision/path_extraction.h"
 #include "pisar/vision/path_simplification.h"
+#include "pisar/vision/utils.h"
 
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>
@@ -17,30 +18,6 @@
 
 namespace pisar::mcp {
 
-
-/// @brief Computes the bounding box of nonzero pixels in a binary image.
-/// @param img Input binary image (8-bit, single-channel).
-/// @return Bounding box as cv::Rect.
-cv::Rect computeBoundingBox(const cv::Mat& img) {
-    CV_Assert(img.type() == CV_8UC1);
-
-    int min_x = 0, max_x = img.cols - 1, min_y = 0, max_y = img.rows - 1;
-
-    // Find first and last rows that contain nonzero pixels
-    while (min_y <= max_y && cv::countNonZero(img.row(min_y)) == 0) ++min_y;
-    while (max_y >= min_y && cv::countNonZero(img.row(max_y)) == 0) --max_y;
-
-    if (min_y > max_y) return cv::Rect(); // No nonzero pixels found
-
-    //return cv::Rect(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1); 
-
-    // Find first and last columns that contain nonzero pixels
-    cv::Mat roi = img.rowRange(min_y, max_y + 1);
-    while (min_x < img.cols && cv::countNonZero(roi.col(min_x)) == 0) ++min_x;
-    while (max_x < img.cols && cv::countNonZero(roi.col(max_x)) == 0) --max_x;
-
-    return cv::Rect(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1);
-}
 
 /**
  * @brief Extracts a fitted trajectory from a skeletonized path.
@@ -121,7 +98,7 @@ private:
         cv::Mat hsv, mask;
         cv::cvtColor(input, hsv, cv::COLOR_BGR2HSV);
         mask = cv::Mat::zeros(input.size(), CV_8U);
-    
+
         for (const auto& [lower, upper] : m_hsvMasks) {
             cv::Mat temp_mask;
             cv::inRange(hsv, lower, upper, temp_mask);
@@ -132,7 +109,7 @@ private:
         {
             m_debug.hsvFiltered = mask;
         }
-    
+
         return mask;
     }
 
@@ -150,14 +127,14 @@ private:
         // Pad to simulate an "extended line" --> thinning doesn't truncate or flatten tips
         cv::Mat padded_binary;
         cv::copyMakeBorder(binary_input, padded_binary, padding, padding, padding, padding, cv::BORDER_REPLICATE, cv::Scalar(0));
-    
+
         // Apply Zhang-Suen thinning
         cv::Mat skeleton;
         thinningMaRenParallel(padded_binary, skeleton);
 
         // Remove padding
         skeleton = skeleton(cv::Rect(padding, padding, skeleton.cols - 2 * padding, skeleton.rows - 2 * padding));
-    
+
         // Remove small connected components
         cv::Mat filtered_skeleton = filterComponents(skeleton);
 
@@ -166,7 +143,7 @@ private:
             m_debug.skeleton = skeleton;
             m_debug.filtered_skeleton = skeleton;
         }
-    
+
         return filtered_skeleton;
     }
 
@@ -196,11 +173,11 @@ private:
 
         cv::Mat labels, stats, centroids;
         int num_labels = cv::connectedComponentsWithStats(skeleton, labels, stats, centroids, 8);
-    
+
         if (num_labels <= 1) {
             return skeleton.clone();
         }
-    
+
         // Find the largest component (ignoring the background at index 0)
         int largest_idx = 1;
         int max_area = stats.at<int>(1, cv::CC_STAT_AREA);
@@ -211,10 +188,10 @@ private:
                 largest_idx = i;
             }
         }
-    
+
         cv::Mat largest_skeleton = cv::Mat::zeros(skeleton.size(), CV_8U);
         largest_skeleton.setTo(255, labels == largest_idx);
-    
+
         return largest_skeleton;
     }
 
@@ -245,20 +222,20 @@ private:
             m_debug.trajectory = cv::Mat::zeros(skeleton.size(), skeleton.type());
 
             // Draw points
-            for (const auto& pt : ordered_points) 
+            for (const auto& pt : ordered_points)
             {
                 cv::circle(m_debug.trajectory, cv::Point(pt.x(), pt.y()), 1, 255, cv::FILLED);
             }
 
             // Connect points with lines
-            for (size_t i = 1; i < ordered_points.size(); ++i) 
+            for (size_t i = 1; i < ordered_points.size(); ++i)
             {
                 const auto prev_pt = cv::Point(ordered_points[i - 1].x(), ordered_points[i - 1].y());
                 const auto current_pt = cv::Point(ordered_points[i].x(), ordered_points[i].y());
                 cv::line(m_debug.trajectory, prev_pt, current_pt, 255, 1);
             }
         }
-        
+
         const std::vector<Eigen::Vector2i> simplified_trajectory = simplifyPath(std::span(ordered_points), 3);
 
         if constexpr (tkDebug)
@@ -267,20 +244,20 @@ private:
             m_debug.simplified_trajectory = cv::Mat::zeros(skeleton.size(), skeleton.type());
 
             // Draw points
-            for (const auto& pt : simplified_trajectory) 
+            for (const auto& pt : simplified_trajectory)
             {
                 cv::circle(m_debug.simplified_trajectory, cv::Point(pt.x(), pt.y()), 3, 255, cv::FILLED);
             }
 
             // Connect points with lines
-            for (size_t i = 1; i < simplified_trajectory.size(); ++i) 
+            for (size_t i = 1; i < simplified_trajectory.size(); ++i)
             {
                 const auto prev_pt = cv::Point(simplified_trajectory[i - 1].x(), simplified_trajectory[i - 1].y());
                 const auto current_pt = cv::Point(simplified_trajectory[i].x(), simplified_trajectory[i].y());
                 cv::line(m_debug.simplified_trajectory, prev_pt, current_pt, 255, 1);
             }
         }
-    
+
         return simplified_trajectory;
     }
 };

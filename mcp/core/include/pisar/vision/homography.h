@@ -74,6 +74,18 @@ public:
             world_coords[i] = project(pixel_coords[i]);
         }
     }
+
+    [[nodiscard]] inline std::vector<Eigen::Vector2d> project(const std::span<const Eigen::Vector2i> pixel_coords) const
+    {
+        std::vector<Eigen::Vector2d> world_coords(pixel_coords.size(), Eigen::Vector2d::Zero());
+        project(pixel_coords, std::span(world_coords));
+        return world_coords;
+    }
+
+    [[nodiscard]] inline Eigen::Vector3d cameraPosition() const
+    {
+        return m_camera_position;
+    }
 };
 
 class HomographyProjection {
