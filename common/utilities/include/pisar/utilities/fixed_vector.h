@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <iterator>
 
-#include "utilities/assert.h"
+#include "pisar/utilities/assert.h"
 
 namespace pisar {
 
@@ -46,9 +46,9 @@ public:
      * @param count The number of elements to initialize.
      * @throw std::length_error If count exceeds tkCapacity.
      */
-    constexpr explicit FixedVector(size_type count) 
+    constexpr explicit FixedVector(size_type count)
     {
-        PISAR_ASSERT(count <= tkCapacity, std::length_error, "FixedVector: Exceeded capacity");
+        PISAR_ASSERT_BASIC_EXCEPTION(count <= tkCapacity, std::length_error, "FixedVector: Exceeded capacity");
         m_size = count;
         std::fill(begin(), begin() + count, T{});
     }
@@ -59,9 +59,9 @@ public:
      * @param value The value to assign to each element.
      * @throw std::length_error If count exceeds tkCapacity.
      */
-    constexpr FixedVector(size_type count, const T& value) 
+    constexpr FixedVector(size_type count, const T& value)
     {
-        PISAR_ASSERT(count <= tkCapacity, std::length_error, "FixedVector: Exceeded capacity");
+        PISAR_ASSERT_BASIC_EXCEPTION(count <= tkCapacity, std::length_error, "FixedVector: Exceeded capacity");
         m_size = count;
         std::fill(begin(), begin() + count, value);
     }
@@ -71,9 +71,9 @@ public:
      * @param init The initializer list.
      * @throw std::length_error If init.size() exceeds tkCapacity.
      */
-    constexpr FixedVector(std::initializer_list<T> init) 
+    constexpr FixedVector(std::initializer_list<T> init)
     {
-        PISAR_ASSERT(init.size() <= tkCapacity, std::length_error, "FixedVector: Exceeded capacity");
+        PISAR_ASSERT_BASIC_EXCEPTION(init.size() <= tkCapacity, std::length_error, "FixedVector: Exceeded capacity");
         std::copy(init.begin(), init.end(), begin());
         m_size = init.size();
     }
@@ -82,35 +82,35 @@ public:
      * @brief Returns the number of elements in the FixedVector.
      * @return The number of elements.
      */
-    [[nodiscard]] constexpr inline size_type size() const noexcept 
-    { 
-        return m_size; 
+    [[nodiscard]] constexpr inline size_type size() const noexcept
+    {
+        return m_size;
     }
 
     /**
      * @brief Returns the maximum capacity of the FixedVector.
      * @return The maximum number of elements that can be stored.
      */
-    [[nodiscard]] constexpr inline size_type capacity() const noexcept 
-    { 
-        return tkCapacity; 
+    [[nodiscard]] constexpr inline size_type capacity() const noexcept
+    {
+        return tkCapacity;
     }
 
     /**
      * @brief Checks if the FixedVector is empty.
      * @return True if empty, false otherwise.
      */
-    [[nodiscard]] constexpr inline bool empty() const noexcept 
-    { 
-        return m_size == 0; 
+    [[nodiscard]] constexpr inline bool empty() const noexcept
+    {
+        return m_size == 0;
     }
 
     /**
      * @brief Clears the FixedVector, setting its size to zero.
      */
-    constexpr inline void clear() noexcept 
-    { 
-        m_size = 0; 
+    constexpr inline void clear() noexcept
+    {
+        m_size = 0;
     }
 
     /**
@@ -119,9 +119,9 @@ public:
      * @return Reference to the element.
      * @throw std::out_of_range If index is out of range.
      */
-    constexpr inline reference at(size_type index) 
+    constexpr inline reference at(size_type index)
     {
-        PISAR_ASSERT(index < m_size, std::out_of_range, "FixedVector::at: Index out of range");
+        PISAR_ASSERT_BASIC_EXCEPTION(index < m_size, std::out_of_range, "FixedVector::at: Index out of range");
         return m_data[index];
     }
 
@@ -131,9 +131,9 @@ public:
      * @return Const reference to the element.
      * @throw std::out_of_range If index is out of range.
      */
-    constexpr inline const_reference at(size_type index) const 
+    constexpr inline const_reference at(size_type index) const
     {
-        PISAR_ASSERT(index < m_size, std::out_of_range, "FixedVector::at: Index out of range");
+        PISAR_ASSERT_BASIC_EXCEPTION(index < m_size, std::out_of_range, "FixedVector::at: Index out of range");
         return m_data[index];
     }
 
@@ -142,9 +142,9 @@ public:
      * @param index The index of the element.
      * @return Reference to the element.
      */
-    constexpr inline reference operator[](size_type index) noexcept 
-    { 
-        return m_data[index]; 
+    constexpr inline reference operator[](size_type index) noexcept
+    {
+        return m_data[index];
     }
 
     /**
@@ -152,45 +152,45 @@ public:
      * @param index The index of the element.
      * @return Const reference to the element.
      */
-    constexpr inline const_reference operator[](size_type index) const noexcept 
-    { 
-        return m_data[index]; 
+    constexpr inline const_reference operator[](size_type index) const noexcept
+    {
+        return m_data[index];
     }
 
     /**
      * @brief Returns an iterator to the beginning of the FixedVector.
      * @return Iterator to the first element.
      */
-    constexpr inline iterator begin() noexcept 
-    { 
-        return m_data.begin(); 
+    constexpr inline iterator begin() noexcept
+    {
+        return m_data.begin();
     }
 
     /**
      * @brief Returns a const iterator to the beginning of the FixedVector.
      * @return Const iterator to the first element.
      */
-    constexpr inline const_iterator begin() const noexcept 
-    { 
-        return m_data.begin(); 
+    constexpr inline const_iterator begin() const noexcept
+    {
+        return m_data.begin();
     }
 
     /**
      * @brief Returns an iterator to the end of the FixedVector.
      * @return Iterator to one past the last element.
      */
-    constexpr inline iterator end() noexcept 
-    { 
-        return m_data.begin() + m_size; 
+    constexpr inline iterator end() noexcept
+    {
+        return m_data.begin() + m_size;
     }
 
     /**
      * @brief Returns a const iterator to the end of the FixedVector.
      * @return Const iterator to one past the last element.
      */
-    constexpr inline const_iterator end() const noexcept 
-    { 
-        return m_data.begin() + m_size; 
+    constexpr inline const_iterator end() const noexcept
+    {
+        return m_data.begin() + m_size;
     }
 
     /**
@@ -198,9 +198,9 @@ public:
      * @return Reference to the first element.
      * @throw std::out_of_range If the FixedVector is empty.
      */
-    constexpr inline reference front() 
+    constexpr inline reference front()
     {
-        PISAR_ASSERT(!empty(), std::out_of_range, "FixedVector::front: Empty vector");
+        PISAR_ASSERT_BASIC_EXCEPTION(!empty(), std::out_of_range, "FixedVector::front: Empty vector");
         return m_data[0];
     }
 
@@ -209,9 +209,9 @@ public:
      * @return Const reference to the first element.
      * @throw std::out_of_range If the FixedVector is empty.
      */
-    constexpr inline const_reference front() const 
+    constexpr inline const_reference front() const
     {
-        PISAR_ASSERT(!empty(), std::out_of_range, "FixedVector::front: Empty vector");
+        PISAR_ASSERT_BASIC_EXCEPTION(!empty(), std::out_of_range, "FixedVector::front: Empty vector");
         return m_data[0];
     }
 
@@ -220,9 +220,9 @@ public:
      * @return Reference to the last element.
      * @throw std::out_of_range If the FixedVector is empty.
      */
-    constexpr inline reference back() 
+    constexpr inline reference back()
     {
-        PISAR_ASSERT(!empty(), std::out_of_range, "FixedVector::back: Empty vector");
+        PISAR_ASSERT_BASIC_EXCEPTION(!empty(), std::out_of_range, "FixedVector::back: Empty vector");
         return m_data[m_size - 1];
     }
 
@@ -231,9 +231,9 @@ public:
      * @return Const reference to the last element.
      * @throw std::out_of_range If the FixedVector is empty.
      */
-    constexpr inline const_reference back() const 
+    constexpr inline const_reference back() const
     {
-        PISAR_ASSERT(!empty(), std::out_of_range, "FixedVector::back: Empty vector");
+        PISAR_ASSERT_BASIC_EXCEPTION(!empty(), std::out_of_range, "FixedVector::back: Empty vector");
         return m_data[m_size - 1];
     }
 
@@ -242,9 +242,9 @@ public:
      * @param value The value to add.
      * @throw std::length_error If the FixedVector is already at full capacity.
      */
-    constexpr inline void push_back(const T& value) 
+    constexpr inline void push_back(const T& value)
     {
-        PISAR_ASSERT(m_size < tkCapacity, std::length_error, "FixedVector::push_back: Exceeded capacity");
+        PISAR_ASSERT_BASIC_EXCEPTION(m_size < tkCapacity, std::length_error, "FixedVector::push_back: Exceeded capacity");
         m_data[m_size++] = value;
     }
 
@@ -253,9 +253,9 @@ public:
      * @param value The value to add (moved).
      * @throw std::length_error If the FixedVector is already at full capacity.
      */
-    constexpr inline void push_back(T&& value) 
+    constexpr inline void push_back(T&& value)
     {
-        PISAR_ASSERT(m_size < tkCapacity, std::length_error, "FixedVector::push_back: Exceeded capacity");
+        PISAR_ASSERT_BASIC_EXCEPTION(m_size < tkCapacity, std::length_error, "FixedVector::push_back: Exceeded capacity");
         m_data[m_size++] = std::move(value);
     }
 
@@ -263,9 +263,9 @@ public:
      * @brief Removes the last element from the FixedVector.
      * @throw std::out_of_range If the FixedVector is empty.
      */
-    constexpr inline void pop_back() 
+    constexpr inline void pop_back()
     {
-        PISAR_ASSERT(!empty(), std::out_of_range, "FixedVector::pop_back: Empty vector");
+        PISAR_ASSERT_BASIC_EXCEPTION(!empty(), std::out_of_range, "FixedVector::pop_back: Empty vector");
         --m_size;
     }
 
@@ -276,10 +276,10 @@ public:
      * @return Iterator pointing to the inserted element.
      * @throw std::length_error If the FixedVector is already at full capacity.
      */
-    constexpr iterator insert(iterator pos, const T& value) 
+    constexpr iterator insert(iterator pos, const T& value)
     {
-        PISAR_ASSERT(m_size < tkCapacity, std::length_error, "FixedVector::insert: Exceeded capacity");
-        PISAR_ASSERT(pos >= begin() && pos <= end(), std::out_of_range, "FixedVector::insert: Invalid iterator");
+        PISAR_ASSERT_BASIC_EXCEPTION(m_size < tkCapacity, std::length_error, "FixedVector::insert: Exceeded capacity");
+        PISAR_ASSERT_BASIC_EXCEPTION(pos >= begin() && pos <= end(), std::out_of_range, "FixedVector::insert: Invalid iterator");
 
         size_type index = std::distance(begin(), pos);
         std::move_backward(begin() + index, end(), end() + 1);
@@ -294,9 +294,9 @@ public:
      * @return Iterator to the next element after the erased one.
      * @throw std::out_of_range If pos is out of range.
      */
-    constexpr iterator erase(iterator pos) 
+    constexpr iterator erase(iterator pos)
     {
-        PISAR_ASSERT(pos >= begin() && pos < end(), std::out_of_range, "FixedVector::erase: Invalid iterator");
+        PISAR_ASSERT_BASIC_EXCEPTION(pos >= begin() && pos < end(), std::out_of_range, "FixedVector::erase: Invalid iterator");
 
         std::move(pos + 1, end(), pos);
         --m_size;
@@ -310,10 +310,10 @@ public:
      * @return Iterator to the next element after the erased range.
      * @throw std::out_of_range If first or last are out of range.
      */
-    constexpr iterator erase(iterator first, iterator last) 
+    constexpr iterator erase(iterator first, iterator last)
     {
-        PISAR_ASSERT(first >= begin() && first <= end(), std::out_of_range, "FixedVector::erase: Invalid iterator");
-        PISAR_ASSERT(last >= begin() && last <= end(), std::out_of_range, "FixedVector::erase: Invalid iterator");
+        PISAR_ASSERT_BASIC_EXCEPTION(first >= begin() && first <= end(), std::out_of_range, "FixedVector::erase: Invalid iterator");
+        PISAR_ASSERT_BASIC_EXCEPTION(last >= begin() && last <= end(), std::out_of_range, "FixedVector::erase: Invalid iterator");
 
         size_type count = std::distance(first, last);
         std::move(last, end(), first);
@@ -327,9 +327,9 @@ public:
      * @param value The value to initialize new elements with.
      * @throw std::length_error If new_size exceeds tkCapacity.
      */
-    constexpr void resize(size_type new_size, const T& value = T{}) 
+    constexpr void resize(size_type new_size, const T& value = T{})
     {
-        PISAR_ASSERT(new_size <= tkCapacity, std::length_error, "FixedVector::resize: Exceeded capacity");
+        PISAR_ASSERT_BASIC_EXCEPTION(new_size <= tkCapacity, std::length_error, "FixedVector::resize: Exceeded capacity");
 
         if (new_size > m_size) {
             std::fill(begin() + m_size, begin() + new_size, value);
@@ -341,7 +341,7 @@ public:
      * @brief Swaps the contents of this FixedVector with another FixedVector of the same capacity.
      * @param other The FixedVector to swap with.
      */
-    constexpr void swap(FixedVector& other) noexcept 
+    constexpr void swap(FixedVector& other) noexcept
     {
         std::swap_ranges(begin(), end(), other.begin());
         std::swap(m_size, other.m_size);
@@ -350,32 +350,32 @@ public:
     /**
      * @brief Comparison operators for FixedVector.
      */
-    [[nodiscard]] constexpr inline bool operator==(const FixedVector& other) const noexcept 
+    [[nodiscard]] constexpr inline bool operator==(const FixedVector& other) const noexcept
     {
         return m_size == other.m_size && std::equal(begin(), end(), other.begin());
     }
 
-    [[nodiscard]] constexpr inline bool operator!=(const FixedVector& other) const noexcept 
+    [[nodiscard]] constexpr inline bool operator!=(const FixedVector& other) const noexcept
     {
         return !(*this == other);
     }
 
-    [[nodiscard]] constexpr inline bool operator<(const FixedVector& other) const noexcept 
+    [[nodiscard]] constexpr inline bool operator<(const FixedVector& other) const noexcept
     {
         return std::lexicographical_compare(begin(), end(), other.begin(), other.end());
     }
 
-    [[nodiscard]] constexpr inline bool operator<=(const FixedVector& other) const noexcept 
+    [[nodiscard]] constexpr inline bool operator<=(const FixedVector& other) const noexcept
     {
         return !(other < *this);
     }
 
-    [[nodiscard]] constexpr inline bool operator>(const FixedVector& other) const noexcept 
+    [[nodiscard]] constexpr inline bool operator>(const FixedVector& other) const noexcept
     {
         return other < *this;
     }
 
-    [[nodiscard]] constexpr inline bool operator>=(const FixedVector& other) const noexcept 
+    [[nodiscard]] constexpr inline bool operator>=(const FixedVector& other) const noexcept
     {
         return !(*this < other);
     }

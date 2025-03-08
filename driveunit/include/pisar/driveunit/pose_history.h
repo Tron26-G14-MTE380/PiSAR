@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pisar/circular_queue.h"
+#include "pisar/utilities/circular_queue.h"
 
 #include <Eigen/Dense>
 

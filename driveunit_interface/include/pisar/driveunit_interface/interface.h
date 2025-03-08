@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pisar/driveunit_interface/message.h"
+#include "pisar/driveunit_interface/codec.h"
 
 #include <Eigen/Dense>
 #include <zpp_bits/zpp_bits.h>
@@ -68,8 +69,8 @@ constexpr auto serialize(auto & archive, Matrix& matrix) requires pisar::driveun
 namespace pisar::driveunit_interface {
 
 constexpr size_t kSpiSpeed = 10'000'000;
-constexpr size_t kMaxEncodedRequestSize = 256;
-constexpr size_t kMaxEncodedResponseSize = 256;
+constexpr size_t kMaxRequestPacketSize = 256;
+constexpr size_t kMaxResponsePacketSize = 64;
 
 struct DefaultResponse
 {
@@ -119,5 +120,16 @@ using CommandResponse = DefaultResponse;
 
 using Request = MessageSet<HeartbeatRequest, CommandRequest>;
 using Response = MessageSet<HeartbeatResponse, CommandResponse>;
+
+using RequestEncoder = PacketEncoder<Request, kMaxRequestPacketSize>;
+
+template<size_t tkPacketQueueSize>
+using RequestDecoder = PacketDecoder<Request, kMaxRequestPacketSize, tkPacketQueueSize>;
+
+
+using ResponseEncoder = PacketEncoder<Response, kMaxResponsePacketSize>;
+template<size_t tkPacketQueueSize>
+using ResponseDecoder = PacketDecoder<Response, kMaxResponsePacketSize, tkPacketQueueSize>;
+
 
 };

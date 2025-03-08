@@ -1,96 +1,128 @@
 #pragma once
 
+#include "pisar/driveunit_interface/slip.h"
+
 #include <cstdint>
-#include <cstring>
 #include <optional>
 #include <span>
-#include <variant>
-
 #include <zpp_bits/zpp_bits.h>
 
 namespace pisar::driveunit_interface {
 
-constexpr std::byte PACKET_HEADER = std::byte(0xAA);
-constexpr std::byte PACKET_FOOTER = std::byte(0xFF);
-
 /**
- * @brief Packet encoder used to encode packets.
- * 
- * @tparam TPacket The packet type to encode.
+ * @brief Packet encoder using zpp_bits and SLIP framing.
  */
-template<class TPacket>
+template<class TPacket, size_t tkMaxPacketSize>
 class PacketEncoder {
 public:
+    static constexpr size_t kMaxPacketSize = tkMaxPacketSize;
+    static constexpr size_t kMaxEncodedPacketSize = SlipEncoder::maxEncodedSize(kMaxPacketSize);
+
     /**
-     * @brief Encodes a given packet into a buffer.
-     * 
+     * @brief Encodes a packet into a user-provided buffer.
+     *
      * @param packet The packet to encode.
-     * @param encode_buffer The buffer to encode the packet into.
-     * @return constexpr std::optional<std::span<std::byte>> Span over the encoded buffer if successful otherwise nullopt. 
+     * @param encode_buffer The buffer to store encoded data.
+     * @return constexpr std::optional<std::span<std::byte>> Encoded span or nullopt on failure.
      */
-    inline constexpr std::optional<std::span<std::byte>> encode(
-        const TPacket& packet, const std::span<std::byte> encode_buffer
+    constexpr std::optional<std::span<std::byte>> encode(
+        const TPacket& packet, std::span<std::byte> encode_buffer
     )
     {
-        auto encoder = zpp::bits::out(encode_buffer);
-        
-        if (zpp::bits::failure(encoder(PACKET_HEADER)))
+        if (encode_buffer.size() < kMaxEncodedPacketSize)
         {
-            return std::nullopt;
+            return std::nullopt; // Ensure buffer is large enough.
         }
+
+        std::byte temp_buffer[tkMaxPacketSize]; // Temporary buffer for zpp_bits serialization
+        auto encoder = zpp::bits::out(temp_buffer);
 
         if (zpp::bits::failure(encoder(packet)))
         {
             return std::nullopt;
         }
 
-        if (zpp::bits::failure(encoder(PACKET_FOOTER)))
-        {
-            return std::nullopt;
-        }
-
-        return encoder.processed_data();
+        auto serialized_data = encoder.processed_data();
+        SlipEncoder slip;
+        return slip.encode(serialized_data, encode_buffer);
     }
 };
 
 
 /**
- * @brief Mesage encoder used to decode messages.
- * 
- * @tparam TPacket The packet type to decode.
+ * @brief Packet decoder with incremental SLIP decoding.
  */
-template<class TPacket>
+template<class TPacket, size_t tkMaxPacketSize, size_t tkPacketQueueSize>
 class PacketDecoder {
+private:
+    SlipDecoder<tkMaxPacketSize, tkPacketQueueSize> m_slip_decoder;
+
 public:
     /**
-     * @brief Decodes a given buffer to the packet. Message must be encoded using the @ref PacketEncoder.
-     * 
-     * @param encoded_buffer The buffer to decode the packet from. 
-     * @return constexpr std::optional<TPacket> The decoded packet if successful otherwise nullopt.
+     * @brief Submits a chunk of SLIP-encoded data for processing.
+     *
+     * @param input The incoming data chunk.
      */
-    inline constexpr std::optional<TPacket> decode(const std::span<const std::byte> encoded_buffer)
+    constexpr void submit(std::span<const std::byte> input)
     {
-        auto decoder = zpp::bits::in(encoded_buffer);
+        m_slip_decoder.submit(input);
+    }
 
-        std::byte header;
-        if (zpp::bits::failure(decoder(header)) || header != PACKET_HEADER)
-        {
-            return std::nullopt;
-        }
-        
-        TPacket decoded_packet;
-        if (zpp::bits::failure(decoder(decoded_packet)))
-        {
-            return std::nullopt;
-        }
-
-        std::byte footer;
-        if (zpp::bits::failure(decoder(footer)) || footer != PACKET_FOOTER)
+    /**
+     * @brief Queries for a fully decoded packet.
+     *
+     * @return std::optional<TPacket> The decoded packet or nullopt if no packet is ready.
+     */
+    constexpr std::optional<TPacket> query()
+    {
+        std::array<std::byte, tkMaxPacketSize> slip_buffer;
+        auto decoded_size = m_slip_decoder.query(std::span(slip_buffer));
+        if (!decoded_size)
         {
             return std::nullopt;
         }
 
-        return decoded_packet;
+        auto decoder = zpp::bits::in(std::span(slip_buffer.data(), decoded_size.value()));
+        TPacket packet;
+        if (zpp::bits::failure(decoder(packet)))
+        {
+            return std::nullopt;
+        }
+
+        return packet;
+    }
+
+    /// @brief Returns the number of assembled packets read to be queried.
+    [[nodiscard]] inline constexpr size_t packetsAvailable() const
+    {
+        return m_slip_decoder.packetsAvailable();
+    }
+
+    /**
+     * @brief Returns the number of errors detected since last reset.
+     *
+     * @return The error count.
+     */
+    [[nodiscard]] inline constexpr size_t errorCount() const
+    {
+        return m_slip_decoder.errorCount();
+    }
+
+    /**
+     * @brief Clears the error counter.
+     */
+    inline constexpr void clearErrors()
+    {
+        m_slip_decoder.clearErrors();
+    }
+
+    /**
+     * @brief Resets the decoder state.
+     */
+    inline constexpr void reset()
+    {
+        m_slip_decoder.reset();
     }
 };
-}
+
+} // namespace pisar::driveunit_interface

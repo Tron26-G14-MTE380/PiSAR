@@ -57,7 +57,7 @@ public:
     /**
      * @brief Default constructor, initializes the queue as empty.
      */
-    constexpr CircularQueue() noexcept : m_head(0), m_tail(0), m_size(0) {}
+    inline constexpr CircularQueue() noexcept : m_head(0), m_tail(0), m_size(0) {}
 
     /**
      * @brief Copy constructor, copies elements from another circular queue.
@@ -75,7 +75,7 @@ public:
      * @brief Move constructor, moves elements from another circular queue.
      * @param other The queue to move from.
      */
-    constexpr CircularQueue(CircularQueue&& other) noexcept
+    inline constexpr CircularQueue(CircularQueue&& other) noexcept
     {
         *this = std::move(other);
     }
@@ -85,7 +85,7 @@ public:
      * @param other The queue to copy from.
      * @return A reference to this queue.
      */
-    constexpr CircularQueue& operator=(const CircularQueue& other)
+    inline constexpr CircularQueue& operator=(const CircularQueue& other)
     {
         if (this != &other)
         {
@@ -103,7 +103,7 @@ public:
      * @param other The queue to move from.
      * @return A reference to this queue.
      */
-    constexpr CircularQueue& operator=(CircularQueue&& other) noexcept
+    inline constexpr CircularQueue& operator=(CircularQueue&& other) noexcept
     {
         if (this != &other)
         {
@@ -121,7 +121,7 @@ public:
      * @return A reference to the front element.
      * @note Does not throw exceptions; call only when queue is not empty.
      */
-    constexpr T& front() noexcept
+    inline constexpr T& front() noexcept
     {
         return m_buffer[m_head];
     }
@@ -131,7 +131,7 @@ public:
      * @return A const reference to the front element.
      * @note Does not throw exceptions; call only when queue is not empty.
      */
-    constexpr const T& front() const noexcept
+    inline constexpr const T& front() const noexcept
     {
         return m_buffer[m_head];
     }
@@ -141,7 +141,7 @@ public:
      * @return A reference to the back element.
      * @note Does not throw exceptions; call only when queue is not empty.
      */
-    constexpr T& back() noexcept
+    inline constexpr T& back() noexcept
     {
         return m_buffer[(m_tail == 0) ? kCapacity - 1 : m_tail - 1];
     }
@@ -151,7 +151,7 @@ public:
      * @return A const reference to the back element.
      * @note Does not throw exceptions; call only when queue is not empty.
      */
-    constexpr const T& back() const noexcept
+    inline constexpr const T& back() const noexcept
     {
         return m_buffer[(m_tail == 0) ? kCapacity - 1 : m_tail - 1];
     }
@@ -160,43 +160,49 @@ public:
      * @brief Checks if the queue is empty.
      * @return True if the queue is empty, false otherwise.
      */
-    constexpr bool empty() const noexcept { return m_size == 0; }
+    inline constexpr bool empty() const noexcept { return m_size == 0; }
+
+    /**
+     * @brief Checks if the queue is full.
+     * @return True if the queue is full, false otherwise.
+     */
+    inline constexpr bool full() const noexcept { return size() == capacity(); }
 
     /**
      * @brief Returns the number of elements in the queue.
      * @return The number of elements in the queue.
      */
-    constexpr std::size_t size() const noexcept { return m_size; }
+    inline constexpr std::size_t size() const noexcept { return m_size; }
 
     /**
      * @brief Returns the capacity of the queue.
      * @return The capacity of the queue.
      */
-    constexpr std::size_t capacity() const noexcept { return kCapacity; }
+    inline constexpr std::size_t capacity() const noexcept { return kCapacity; }
 
     /**
      * @brief Returns an iterator to the beginning of the queue.
      * @return A pointer to the first element of the queue.
      */
-    constexpr IteratorType begin() noexcept { return IteratorType(this, m_head, 0); }
+    inline constexpr IteratorType begin() noexcept { return IteratorType(this, m_head, 0); }
 
     /**
      * @brief Returns a const iterator to the beginning of the queue.
      * @return A const pointer to the first element of the queue.
      */
-    constexpr ConstIteratorType begin() const noexcept { return ConstIteratorType(this, m_head, 0); }
+    inline constexpr ConstIteratorType begin() const noexcept { return ConstIteratorType(this, m_head, 0); }
 
     /**
      * @brief Returns an iterator to the end of the queue.
      * @return A pointer to the position after the last element of the queue.
      */
-    constexpr IteratorType end() noexcept { return IteratorType(this, m_tail, m_size);  }
+    inline constexpr IteratorType end() noexcept { return IteratorType(this, m_tail, m_size);  }
 
     /**
      * @brief Returns a const iterator to the end of the queue.
      * @return A const pointer to the position after the last element of the queue.
      */
-    constexpr ConstIteratorType end() const noexcept { return ConstIteratorType(this, m_tail, m_size); }
+    inline constexpr ConstIteratorType end() const noexcept { return ConstIteratorType(this, m_tail, m_size); }
 
     /**
      * @brief Accesses an element in the queue by index.
@@ -204,7 +210,7 @@ public:
      * @return A reference to the element at the specified index.
      * @note Index is relative to the front of the queue.
      */
-    constexpr T& operator[](std::size_t index) noexcept
+    inline constexpr T& operator[](std::size_t index) noexcept
     {
         return m_buffer[(m_head + index) % kCapacity];
     }
@@ -215,7 +221,7 @@ public:
      * @return A const reference to the element at the specified index.
      * @note Index is relative to the front of the queue.
      */
-    constexpr const T& operator[](std::size_t index) const noexcept
+    inline constexpr const T& operator[](std::size_t index) const noexcept
     {
         return m_buffer[(m_head + index) % kCapacity];
     }
@@ -223,9 +229,37 @@ public:
     /**
      * @brief Clears the queue, removing all elements.
      */
-    constexpr void clear() noexcept
+    inline constexpr void clear() noexcept
     {
         m_head = m_tail = m_size = 0;
+    }
+
+    /**
+     * @brief Constructs an element in-place at the back of the queue.
+     *
+     * @tparam TArgs The types of the arguments for the constructor.
+     * @param args The arguments to forward to the constructor of T.
+     * @return True if the element was successfully added, false if the queue was full and overwriting is disabled.
+     */
+    template <typename... TArgs>
+    [[nodiscard]] constexpr bool emplace(TArgs&&... args) noexcept
+    {
+        if (m_size == kCapacity)
+        {
+            if constexpr (tkOverwrite)
+            {
+                pop(); // Remove the oldest element when overwriting is enabled
+            }
+            else
+            {
+                return false; // Queue is full
+            }
+        }
+
+        new (&m_buffer[m_tail]) T(std::forward<TArgs>(args)...);
+        m_tail = (m_tail + 1) % kCapacity;
+        ++m_size;
+        return true;
     }
 
     /**
@@ -300,7 +334,7 @@ public:
      * @param rhs The second queue.
      * @return True if the two queues have the same elements in the same order, false otherwise.
      */
-    friend constexpr bool operator==(const CircularQueue& lhs, const CircularQueue& rhs) noexcept
+    friend inline constexpr bool operator==(const CircularQueue& lhs, const CircularQueue& rhs) noexcept
     {
         if (lhs.size() != rhs.size()) return false;
         return std::equal(lhs.begin(), lhs.end(), rhs.begin());
@@ -312,7 +346,7 @@ public:
      * @param rhs The second queue.
      * @return True if the two queues differ, false if they are equal.
      */
-    friend constexpr bool operator!=(const CircularQueue& lhs, const CircularQueue& rhs) noexcept
+    friend inline constexpr bool operator!=(const CircularQueue& lhs, const CircularQueue& rhs) noexcept
     {
         return !(lhs == rhs);
     }

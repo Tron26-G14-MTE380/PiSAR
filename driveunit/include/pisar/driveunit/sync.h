@@ -100,10 +100,11 @@ public:
     }
 
     /// @brief Attempts to lock the semaphore from an ISR.
+    /// @param p_higher_priority_task_woken See pxHigherPriorityTaskWoken docs.
     /// @return `true` if the semaphore was acquired, `false` otherwise.
-    [[nodiscard]] inline bool lockIsr() noexcept
+    [[nodiscard]] inline bool lockIsr(BaseType_t* p_higher_priority_task_woken = nullptr) noexcept
     {
-        return xSemaphoreTakeFromISR(m_semaphore, nullptr) == pdTRUE;
+        return xSemaphoreTakeFromISR(m_semaphore, p_higher_priority_task_woken) == pdTRUE;
     }
 
     /**
@@ -125,9 +126,10 @@ public:
     }
 
     /// @brief Unlocks the semaphore from an ISR.
-    inline void unlockIsr() noexcept
+    /// @param p_higher_priority_task_woken See pxHigherPriorityTaskWoken docs.
+    inline void unlockIsr(BaseType_t* p_higher_priority_task_woken = nullptr) noexcept
     {
-        xSemaphoreGiveFromISR(m_semaphore, nullptr);
+        xSemaphoreGiveFromISR(m_semaphore, p_higher_priority_task_woken);
     }
 
     [[nodiscard]] UBaseType_t count() noexcept
@@ -137,7 +139,7 @@ public:
 
     [[nodiscard]] UBaseType_t countIsr() noexcept
     {
-        return uxSemaphoreGetCount(m_semaphore);
+        return uxSemaphoreGetCountFromISR(m_semaphore);
     }
 
     /// @brief Returns the native FreeRTOS handle.

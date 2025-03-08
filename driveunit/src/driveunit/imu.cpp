@@ -1,6 +1,6 @@
 #include "pisar/driveunit/imu.h"
-#include "pisar/circular_queue.h"
 #include "pisar/driveunit/logging.h"
+#include "pisar/utilities/circular_queue.h"
 
 #include <vector>
 
