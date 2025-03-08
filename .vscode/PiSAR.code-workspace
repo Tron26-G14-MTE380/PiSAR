@@ -11,7 +11,11 @@
 		{
 			"name": "mcp-line-tracking-demo",
 			"path": "../mcp/samples/line_tracking"
-		}
+		},
+		{
+			"name": "mcp-interface-codec-demo",
+			"path": "../mcp/samples/interface_codec"
+		},
 		{
 			"name": "driveunit",
 			"path": "../driveunit"
@@ -110,7 +114,9 @@
 			"hash_map": "cpp",
 			"valarray": "cpp",
 			"codecvt": "cpp",
-			"typeindex": "cpp"
+			"typeindex": "cpp",
+			"source_location": "cpp",
+			"alignedvector3": "cpp"
 		},
 		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json"
 	},

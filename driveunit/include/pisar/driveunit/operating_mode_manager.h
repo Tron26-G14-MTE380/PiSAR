@@ -196,7 +196,7 @@ private:
     inline std::string_view getModeName()
     {
         return std::visit([](const auto& value) -> std::string_view {
-            return utilities::TypeName<std::decay_t<decltype(value)>>::value;
+            return TypeName<std::decay_t<decltype(value)>>::value;
         }, m_current_mode);
     }
 };

@@ -6,6 +6,7 @@ find_package(OpenCV REQUIRED)
 find_package (Eigen3 3.4 REQUIRED NO_MODULE)
 find_package(easy_profiler REQUIRED)
 
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../common common)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../driveunit_interface driveunit_interface)
 
 # Detect if building on Raspberry Pi
@@ -41,6 +42,7 @@ target_link_libraries(pisar_core
         Eigen3::Eigen
         ${OpenCV_LIBS}
         easy_profiler
+        pisar_utilities
         pisar_driveunit_interface
 )
 

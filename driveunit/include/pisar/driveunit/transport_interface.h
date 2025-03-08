@@ -6,9 +6,16 @@
 #include "pisar/driveunit/rtos/stream_buffer.h"
 #include "pisar/driveunit/logging.h"
 
+#include "pisar/utilities/fixed_vector.h"
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <SPISlave.h>
+
+#include <hardware/spi.h>
+#include <hardware/gpio.h>
+#include <hardware/structs/iobank0.h>
+#include <hardware/irq.h>
 
 #include <FreeRTOS.h>
 #include <semphr.h>
@@ -27,7 +34,6 @@ private:
     SPISlaveClass& m_spi;                                   ///< SPI slave instance.
     THandler& m_handler;                                    ///< Message handler.
     TaskHandle_t m_task_handle;                             ///< FreeRTOS task handle for processing.
-    BinarySemaphore m_response_pending;                     ///< Semaphore to signal when a response message is pending.
 
     /// @brief Packet decoder.
     driveunit_interface::RequestDecoder<5> m_decoder;
@@ -35,8 +41,19 @@ private:
     /// @brief Input memory buffer for incoming requests. Store max 2 at a time before overflow.
     StaticStreamBuffer<2 * driveunit_interface::RequestEncoder::kMaxEncodedPacketSize> m_recv_buffer;
 
-     /// @brief Buffer for outgoing responses.
-    std::array<std::byte, driveunit_interface::ResponseEncoder::kMaxEncodedPacketSize> m_send_buffer;
+     /// @brief Buffer for outgoing responses. +1 for size byte
+    FixedVector<std::byte, driveunit_interface::ResponseEncoder::kMaxEncodedPacketSize + 1> m_send_buffer;
+    uint8_t m_default_send_byte;
+
+    size_t m_response_bytes_pending;
+
+    enum class SendState : uint8_t {
+        Initiated = 0,
+        Pending,
+        Completed
+    };
+
+    volatile SendState m_send_state;
 
 public:
     /**
@@ -45,7 +62,7 @@ public:
      * @param handler Reference to the message handler.
      */
     explicit TransportInterface(SPISlaveClass& spi, THandler& handler)
-        : m_spi(spi), m_handler(handler), m_task_handle(nullptr), m_recv_buffer()
+        : m_spi(spi), m_handler(handler), m_task_handle(nullptr), m_default_send_byte(0), m_response_bytes_pending(0), m_send_state(SendState::Completed)
     {
     }
 
@@ -58,11 +75,9 @@ public:
     {
         if (task_priority < 0 || task_priority > configMAX_PRIORITIES)
         {
-            PISAR_LOG_ERROR("Task priority %u is out of range");
+            PISAR_LOG_ERROR("Task priority %u is out of range", task_priority);
             return; // TODO ERROR CODE
         }
-
-        m_response_pending.unlock();
 
         // Spawn the processing task
         if (xTaskCreate(taskEntry, "SPI_Processing", 2048, this, task_priority, &m_task_handle) != pdPASS)
@@ -71,12 +86,12 @@ public:
             return;
         }
 
+        // Set default response.
+        onDataSent();
+
         // Capture `this` in lambda to avoid needing a singleton
         m_spi.onDataRecv([this](uint8_t* data, size_t len) { this->onDataReceived(data, len); });
         m_spi.onDataSent([this]() { this->onDataSent(); });
-
-        // Set default response.
-        sendResponse(driveunit_interface::DefaultResponse());
 
         // Start SPI slave
         m_spi.begin(SPISettings(driveunit_interface::kSpiSpeed, MSBFIRST, SPI_MODE1));
@@ -104,7 +119,13 @@ private:
                 std::array<std::byte, driveunit_interface::RequestEncoder::kMaxEncodedPacketSize> buffer;
 
                 // Wait until SPI ISR signals data reception
-                const size_t num_bytes = m_recv_buffer.receive(std::span(buffer));
+                const size_t num_bytes = readData(std::span(buffer));
+
+                for (int i = 0; i < num_bytes; ++i)
+                {
+                    Serial.printf("%x ", buffer[i]);
+                }
+                Serial.println();
 
                 // Decode the received message
                 m_decoder.submit(std::span(buffer.data(), num_bytes));
@@ -137,20 +158,19 @@ private:
 
         if (!response)
         {
+            PISAR_LOG_WARN("No response");
             return;
         }
 
-        if (m_response_pending.lock() == false)
+        const auto bytes_sent = sendResponse(response.value());
+        // Encode the response and send it
+        if (!bytes_sent)
         {
-            return; // Ignore transmission if the last response hasn't been fully read
+            PISAR_LOG_ERROR("Failed to send response!");
         }
 
-        // Encode the response and send it
-        if (sendResponse(driveunit_interface::DefaultResponse()) == false)
-        {
-            // Failed to encode or send, we have to unlock the pending flag
-            m_response_pending.unlock();
-        }
+        PISAR_LOG_DEBUG("Sent %u bytes", bytes_sent.value());
+        m_response_bytes_pending = bytes_sent.value() + 9;
     }
 
     /**
@@ -166,12 +186,6 @@ private:
             return;
         }
 
-        // If we are waiting for response to get clocked out then we just ignore the transaction
-        if (m_response_pending.countIsr() == 0) // 0 means not available
-        {
-            return;  // Ignore incoming data if the previous response is still being read
-        }
-
         BaseType_t higher_priority_task_woken = pdFALSE;
         m_recv_buffer.sendIsr(std::span(reinterpret_cast<std::byte*>(data), len), &higher_priority_task_woken);
 
@@ -183,19 +197,35 @@ private:
      */
     void onDataSent()
     {
-        BaseType_t higher_priority_task_woken = pdFALSE;
-        // We automatically clear the response pending flag when data is sent.
-        m_response_pending.unlockIsr(&higher_priority_task_woken);
-
-        if (m_response_pending.countIsr() == 0)
+        if (m_send_state == SendState::Initiated)
         {
-            return; // Ignore transmission if the last response hasn't been fully read
+            Serial.printf("Initiated data transfer for %u bytes: %u\n", m_send_buffer.size(), m_default_send_byte);
+            m_spi.setData(reinterpret_cast<uint8_t*>(m_send_buffer.data()), m_send_buffer.size());
+            m_send_state = SendState::Pending;
+            return;
         }
 
-        // Set default response.
-        sendResponse(driveunit_interface::DefaultResponse());
+        if (m_send_state == SendState::Pending)
+        {
+            Serial.printf("Completed data transfer\n");
+            m_send_state = SendState::Completed;
+        }
 
-        //portYIELD_FROM_ISR(higher_priority_task_woken);
+        // Only send default byte if nothing is pending
+        m_default_send_byte++;
+        m_spi.setData(&m_default_send_byte, 1);
+        Serial.printf("Sent %u\n", m_default_send_byte);
+    }
+
+    inline size_t readData(const std::span<std::byte> buffer)
+    {
+        if (m_response_bytes_pending)
+        {
+            size_t num_bytes = m_recv_buffer.receive(std::span(buffer.data(), m_response_bytes_pending));
+            m_response_bytes_pending = 0;
+        }
+
+        return m_recv_buffer.receive(std::span(buffer));
     }
 
     /**
@@ -204,21 +234,27 @@ private:
      * @param response_msg The response message to send.
      * @return true if successful otherwise false.
      */
-    inline bool sendResponse(driveunit_interface::Response response_msg)
+    inline std::optional<size_t> sendResponse(driveunit_interface::Response response_msg)
     {
+        m_send_buffer.resize(m_send_buffer.capacity());
+
         driveunit_interface::ResponseEncoder encoder;
-        const auto encoded_buffer = encoder.encode(response_msg, std::span(m_send_buffer).subspan(1));
+        const auto encoded_buffer = encoder.encode(response_msg, std::span(m_send_buffer.data(), m_send_buffer.size()).subspan(1));
         if (!encoded_buffer)
         {
             PISAR_LOG_ERROR("Failed to encode response");
-            return false;
+            return std::nullopt;
         }
 
         // First byte will contain the size of the packet
-        m_send_buffer[0] = encoded_buffer.value().size();
-        m_spi.setData(reinterpret_cast<uint8_t*>(m_send_buffer.data()), encoded_buffer.value().size() + 1);
+        m_send_buffer[0] = std::byte(static_cast<uint8_t>(encoded_buffer.value().size()));
+        m_send_buffer.resize(encoded_buffer.value().size() + 1);
 
-        return true;
+        portENTER_CRITICAL();
+        m_send_state = SendState::Initiated;
+        portEXIT_CRITICAL();
+
+        return m_send_buffer.size();
     }
 };
 

@@ -13,7 +13,7 @@
 #ifdef PISAR_EXCEPTIONS_ENABLED
     #define PISAR_ASSERT_EXCEPTION(assertion, exception, message) \
     {                                                       \
-        if ((assertion))                                    \
+        if (!(assertion))                                   \
         {                                                   \
             throw (exception);                              \
         }                                                   \

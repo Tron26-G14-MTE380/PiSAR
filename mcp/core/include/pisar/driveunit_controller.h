@@ -66,6 +66,12 @@ public:
             return std::nullopt;
         }
 
+        if (ret != tx_data.size())
+        {
+            std::cout << "Could not transmit all data: " << ret << std::endl;
+            return std::nullopt;
+        }
+
         // Step 1: Read response size (1 byte)
         uint8_t response_size = 0;
         wiringPiSPIDataRW(m_spi_channel, &response_size, 1);

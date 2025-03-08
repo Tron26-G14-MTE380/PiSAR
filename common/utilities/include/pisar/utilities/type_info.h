@@ -3,7 +3,7 @@
 #include <array>
 #include <string_view>
 
-namespace pisar::utilities {
+namespace pisar {
 
 namespace detail {
 
@@ -11,7 +11,7 @@ template <typename T>
 constexpr auto typeNameImpl() {
 #if defined(__clang__) || defined(__GNUC__)
     constexpr std::string_view function = __PRETTY_FUNCTION__;
-    constexpr std::string_view prefix = "constexpr auto pisar::utilities::detail::typeNameImpl() [with T = ";
+    constexpr std::string_view prefix = "constexpr auto pisar::detail::typeNameImpl() [with T = ";
     constexpr std::string_view suffix = "]";
 #else
 #error Unsupported compiler

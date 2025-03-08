@@ -1,6 +1,6 @@
 #pragma once
 
-namespace pisar::utilities {
+namespace pisar {
 
 template <typename... Ts>
 struct Overloaded : Ts...

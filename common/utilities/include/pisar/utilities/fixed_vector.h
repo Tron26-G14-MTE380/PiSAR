@@ -157,6 +157,18 @@ public:
         return m_data[index];
     }
 
+    /// @brief Returns a pointer to the internal data.
+    constexpr inline pointer data() noexcept
+    {
+        return m_data.data();
+    }
+
+    /// @brief Returns a pointer to the internal data.
+    constexpr inline const_pointer data() const noexcept
+    {
+        return m_data.data();
+    }
+
     /**
      * @brief Returns an iterator to the beginning of the FixedVector.
      * @return Iterator to the first element.

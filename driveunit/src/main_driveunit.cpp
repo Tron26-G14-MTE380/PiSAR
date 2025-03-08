@@ -31,8 +31,7 @@ TransportInterface<decltype(message_handler)> transport_interface(SPISlave, mess
 
 void setup()
 {
-    Serial.begin(115200);
-    initLogging(LogLevel::kInfo);
+    initLogging(115200, LogLevel::kDebug, true);
 
     SPISlave.setRX(16);
     SPISlave.setCS(17);
@@ -51,7 +50,7 @@ void setup()
 
 void loop()
 {
-    PISAR_LOG_INFO("Hello World!");
+    //PISAR_LOG_INFO("Hello World!");
     delay(2000);
 }
 

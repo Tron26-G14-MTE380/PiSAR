@@ -68,7 +68,7 @@ constexpr auto serialize(auto & archive, Matrix& matrix) requires pisar::driveun
 
 namespace pisar::driveunit_interface {
 
-constexpr size_t kSpiSpeed = 10'000'000;
+constexpr size_t kSpiSpeed = 1'000'000;
 constexpr size_t kMaxRequestPacketSize = 256;
 constexpr size_t kMaxResponsePacketSize = 64;
 

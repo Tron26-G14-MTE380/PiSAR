@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pisar/utilities/circular_queue.h"
 #include "pisar/utilities/fixed_vector.h"
 
 #include <cstdint>
@@ -35,7 +36,7 @@ public:
         const std::span<const std::byte> input, const std::span<std::byte> output_buffer
     )
     {
-        if (output_buffer.size() < maxEncodedSize(output_buffer.size()))
+        if (output_buffer.size() < maxEncodedSize(input.size()))
         {
             return std::nullopt; // Ensure buffer is large enough.
         }
@@ -85,17 +86,15 @@ public:
 template<size_t tkMaxPacketSize, size_t tkQueueCapacity>
 class SlipDecoder {
 public:
-    /// Maximum packet size to prevent buffer overflow.
     static constexpr size_t kMaxPacketSize = tkMaxPacketSize;
     static constexpr size_t kMaxEncodedPacketSize = SlipEncoder::maxEncodedSize(kMaxPacketSize);
-
-    /// Maximum number of packets stored in the queue.
     static constexpr size_t kQueueCapacity = tkQueueCapacity;
 
     enum class ErrorType {
         kBufferOverflow,
         kQueueFull,
-        kInvalidEscape
+        kInvalidEscape,
+        kFloatingByte
     };
 
 private:
@@ -107,10 +106,11 @@ private:
 
     /// State tracking
     bool m_escape;
+    bool m_in_packet;
     size_t m_error_count;
 
 public:
-    SlipDecoder() : m_escape(false), m_error_count(0) {}
+    SlipDecoder() : m_escape(false), m_in_packet(false), m_error_count(0) {}
 
     /**
      * @brief Submits a new chunk of data for decoding.
@@ -121,9 +121,25 @@ public:
     {
         for (std::byte byte : input)
         {
+            // Ignore all bytes until we receive a valid frame start (0xC0)
+            if (!m_in_packet)
+            {
+                if (byte == detail::kSlipEnd)
+                {
+                    m_in_packet = true;
+                    resetPacketBuffer();
+                }
+                else
+                {
+                    reportError(ErrorType::kFloatingByte);
+                }
+                continue;
+            }
+
             if (byte == detail::kSlipEnd)
             {
                 finalizePacket();
+                m_in_packet = false;  // Reset state for the next packet
                 continue;
             }
 
@@ -141,6 +157,7 @@ public:
                 {
                     reportError(ErrorType::kInvalidEscape);
                     resetPacketBuffer();
+                    m_in_packet = false;
                 }
                 m_escape = false;
             }
@@ -213,6 +230,7 @@ public:
         resetPacketBuffer();
         m_packet_queue.clear();
         m_escape = false;
+        m_in_packet = false;
         clearErrors();
     }
 
@@ -234,7 +252,7 @@ private:
      */
     constexpr void appendByte(std::byte byte)
     {
-        if (m_packet_buffer.size() < kMaxPacketSize)
+        if (m_packet_buffer.size() < m_packet_buffer.capacity())
         {
             m_packet_buffer.push_back(byte);
         }
@@ -242,6 +260,7 @@ private:
         {
             reportError(ErrorType::kBufferOverflow);
             resetPacketBuffer();
+            m_in_packet = false;
         }
     }
 

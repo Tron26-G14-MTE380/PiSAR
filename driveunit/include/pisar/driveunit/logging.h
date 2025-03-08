@@ -26,17 +26,40 @@ namespace pisar::driveunit {
  * @brief Defines different log levels for filtering log messages.
  */
 enum class LogLevel : uint8_t {
-    kDebug,
+    kDebug = 0,
     kInfo,
     kWarn,
     kError
 };
+
+inline constexpr std::string_view logLevelName(LogLevel level)
+{
+    switch (level)
+    {
+        case LogLevel::kDebug: return "DEBUG";
+        case LogLevel::kInfo: return "INFO";
+        case LogLevel::kWarn: return "WARN";
+        case LogLevel::kError: return "ERROR";
+        default: return "UNKNOWN";
+    }
+}
 
 namespace detail {
     inline constexpr std::string_view extractFilename(std::string_view path)
     {
         size_t pos = path.find_last_of("/\"");
         return (pos == std::string_view::npos) ? path : path.substr(pos + 1);
+    }
+
+    inline constexpr std::string_view extractFunctionName(std::string_view func_name)
+    {
+        // Find first '(' to cut off template parameters and return type
+        size_t pos = func_name.find('(');
+        if (pos != std::string_view::npos)
+        {
+            return func_name.substr(0, pos); // Keep only function name
+        }
+        return func_name;
     }
 }
 
@@ -51,7 +74,7 @@ struct SourceLocation {
 
     inline constexpr SourceLocation(std::source_location loc = std::source_location::current())
         : file_name(detail::extractFilename(loc.file_name())),
-          function_name(loc.function_name()),
+          function_name(detail::extractFunctionName(loc.function_name())),
           line(loc.line()),
           column(loc.column()) {}
 };
@@ -187,11 +210,20 @@ public:
         if (written > 0 && static_cast<size_t>(written) < buffer.size())
         {
             std::array<char, PISAR_DRIVEUNIT_LOGGING_MAX_MESSAGE_LENGTH> log_buffer{};
-            std::snprintf(log_buffer.data(), log_buffer.size(), "[%s:%s:%u:%u] %s",
-                          log_msg.msg.loc.file_name.data(), log_msg.msg.loc.function_name.data(),
-                          log_msg.msg.loc.line, log_msg.msg.loc.column, buffer.data());
+            std::snprintf(
+                log_buffer.data(), log_buffer.size(),
+                "[%.*s:%.*s:%u:%u][%s]: %s",
+                static_cast<int>(log_msg.msg.loc.file_name.size()), log_msg.msg.loc.file_name.data(),
+                static_cast<int>(log_msg.msg.loc.function_name.size()), log_msg.msg.loc.function_name.data(),
+                log_msg.msg.loc.line, log_msg.msg.loc.column,
+                logLevelName(log_msg.level).data(), buffer.data()
+            );
 
             m_output_fn(std::string_view(log_buffer.data()));
+        }
+        else
+        {
+            m_output_fn("LOGGING ERROR: Formatting failed\n"); // Debugging output
         }
     }
 
@@ -220,9 +252,22 @@ public:
     }
 };
 
+
+#if PISAR_DRIVEUNIT_LOGGING_ENABLED == 1
+
 extern Logger g_uart_logger;
 
-void initLogging(LogLevel level);
+void waitForSerialConnection();
+void initLogging(unsigned int baud, LogLevel level, bool wait_for_connection);
+
+#else
+
+// Inlined empty functions
+inline void waitForSerialConnection() {}
+inline void initLogging(unsigned int baud, LogLevel level, bool wait_for_connection) {}
+
+#endif
+
 }
 
 #if PISAR_DRIVEUNIT_LOGGING_ENABLED == 1

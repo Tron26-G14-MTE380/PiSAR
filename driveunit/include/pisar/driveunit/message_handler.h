@@ -27,28 +27,31 @@ public:
         const driveunit_interface::Request& request)
     {
         return std::visit(
-            utilities::Overloaded{
+            Overloaded{
                 [this](const driveunit_interface::CommandRequest& command) -> driveunit_interface::Response
                 {
                     return std::visit(
-                        utilities::Overloaded{
+                        Overloaded{
                             [this](const driveunit_interface::CommandIdle& command) -> driveunit_interface::Response
                             {
-                                m_operating_mode_manager.template switchMode<OperatingModeIdle>(m_robot_facility);
+                                PISAR_LOG_DEBUG("Got command 'Idle'");
+                                //m_operating_mode_manager.template switchMode<OperatingModeIdle>(m_robot_facility);
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },
 
                             [this](const driveunit_interface::CommandFollowTrajectory& command) -> driveunit_interface::Response
                             {
-                                m_operating_mode_manager.template switchMode<OperatingModeFollowTrajectory>(
-                                    m_robot_facility, std::span(command.trajectory), command.reference_time
-                                );
+                                PISAR_LOG_DEBUG("Got command 'Follow Trajectory'");
+                                //m_operating_mode_manager.template switchMode<OperatingModeFollowTrajectory>(
+                                //    m_robot_facility, std::span(command.trajectory), command.reference_time
+                                //);
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },
 
                             [this](const driveunit_interface::CommandRotate& command) -> driveunit_interface::Response
                             {
-                                m_operating_mode_manager.template switchMode<OperatingModeRotate>(m_robot_facility, command.rotation_deg);
+                                PISAR_LOG_DEBUG("Got command 'Rotate'");
+                                //m_operating_mode_manager.template switchMode<OperatingModeRotate>(m_robot_facility, command.rotation_deg);
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },
                         }, command
@@ -56,6 +59,7 @@ public:
                 },
                 [this](const driveunit_interface::HeartbeatRequest& command) -> driveunit_interface::Response
                 {
+                    PISAR_LOG_DEBUG("Got Request 'Heartbeat'");
                     return driveunit_interface::HeartbeatResponse {
                         static_cast<decltype(driveunit_interface::HeartbeatResponse::time_alive)>(millis())
                     };
