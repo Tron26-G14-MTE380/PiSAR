@@ -5,21 +5,28 @@
 #include <Eigen/Dense>
 
 #include "pisar/driveunit_interface/interface.h"
-#include "pisar/driveunit_controller.h"  // Your SPI master class
+#include "pisar/driveunit_controller.h"
 
 #include <wiringPi.h>
 
 using namespace pisar::driveunit_interface;
 using namespace pisar::mcp;
 
+std::string_view kUartDevice = "/dev/ttyAMA0";
+
 int main()
 {
     wiringPiSetup(); // Initializes wiringPi using wiringPi's simlified number system.
 
-    // Initialize SPI on channel 0
-    DriveunitController controller(0);
+    DriveunitController controller;
 
-    std::cout << "Starting SPI Communication Test..." << std::endl;
+    if (controller.open(kUartDevice) == false)
+    {
+        std::cerr << "Error opening UART device: " << kUartDevice << std::endl;
+        return 0;
+    }
+
+    std::cout << "Starting Communication Test..." << std::endl;
 
     // 1️⃣ Test Heartbeat
     auto heartbeat = controller.sendHeartbeat();
@@ -62,7 +69,10 @@ int main()
 
     // 4️⃣ Test Trajectory Command
     std::vector<Eigen::Vector2f> trajectory = {
-        {0.0f, 0.0f}, {1.0f, 1.0f}, {2.0f, 0.0f}, {3.0f, -1.0f}
+        {0.0f, 0.0f}, {1.0f, 1.0f}, {2.0f, 0.0f}, {3.0f, -1.0f},
+        {0.0f, 0.0f}, {1.0f, 1.0f}, {2.0f, 0.0f}, {3.0f, -1.0f},
+        {0.0f, 0.0f}, {1.0f, 1.0f}, {2.0f, 0.0f}, {3.0f, -1.0f},
+        {0.0f, 0.0f}, {1.0f, 1.0f}, {2.0f, 0.0f}, {3.0f, -1.0f},
     };
     auto reference_time = std::chrono::duration<float>(2.5f); // Execute over 2.5 seconds
 
@@ -77,6 +87,6 @@ int main()
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-    std::cout << "SPI Test Complete!" << std::endl;
+    std::cout << "Comm Test Complete!" << std::endl;
     return 0;
 }

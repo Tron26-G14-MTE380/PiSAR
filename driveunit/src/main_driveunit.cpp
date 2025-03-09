@@ -2,6 +2,7 @@
 #include "pisar/driveunit/operating_mode_manager.h"
 #include "pisar/driveunit/transport_interface.h"
 #include "pisar/driveunit/message_handler.h"
+#include "pisar/driveunit/async_serial_uart.h"
 
 #include <Eigen/Dense>
 
@@ -27,16 +28,14 @@ using OperatingModeManagerT = OperatingModeManager<OperatingModeIdle, OperatingM
 OperatingModeManagerT operating_mode_manager(createDefaultMode);
 
 MessageHandler message_handler(facility, operating_mode_manager);
-TransportInterface<decltype(message_handler)> transport_interface(SPISlave, message_handler);
+TransportInterface<decltype(message_handler)> transport_interface(AsyncSerial2, message_handler);
 
 void setup()
 {
     initLogging(115200, LogLevel::kDebug, true);
 
-    SPISlave.setRX(16);
-    SPISlave.setCS(17);
-    SPISlave.setSCK(18);
-    SPISlave.setTX(19);
+    AsyncSerial2.setTX(4);
+    AsyncSerial2.setRX(5);
 
     // facility.initialize();
     // PISAR_LOG_INFO("Robot facility initialized");
@@ -44,7 +43,7 @@ void setup()
     // operating_mode_manager.initialize(5);
     // PISAR_LOG_INFO("Operating mode manager initialized");
 
-    transport_interface.initialize(6);
+    transport_interface.initialize(configMAX_PRIORITIES-1);
     PISAR_LOG_INFO("Transport interface initialized");
 }
 

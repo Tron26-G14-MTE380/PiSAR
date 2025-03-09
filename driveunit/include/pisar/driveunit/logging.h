@@ -53,12 +53,20 @@ namespace detail {
 
     inline constexpr std::string_view extractFunctionName(std::string_view func_name)
     {
-        // Find first '(' to cut off template parameters and return type
-        size_t pos = func_name.find('(');
-        if (pos != std::string_view::npos)
+        // Find first '(' to remove parameters and return type
+        size_t paren_pos = func_name.find('(');
+        if (paren_pos != std::string_view::npos)
         {
-            return func_name.substr(0, pos); // Keep only function name
+            func_name = func_name.substr(0, paren_pos);
         }
+
+        // Find last "::" to get only the function name
+        size_t last_colon = func_name.rfind("::");
+        if (last_colon != std::string_view::npos)
+        {
+            return func_name.substr(last_colon + 2); // Extract only function name
+        }
+
         return func_name;
     }
 }

@@ -3,6 +3,8 @@
 #include "pisar/driveunit_interface/codec.h"
 #include "pisar/driveunit_interface/interface.h"
 
+#include "pisar/driveunit/async_serial_uart.h"
+
 #include "pisar/driveunit/rtos/stream_buffer.h"
 #include "pisar/driveunit/logging.h"
 
@@ -23,15 +25,13 @@
 namespace pisar::driveunit {
 
 /**
- * @brief SPI Slave communication interface with FreeRTOS task for processing.
- * @tparam tkRecvBufferSize size of the SPI receive buffer.
- * @tparam tkSendBufferSize size of the SPI send buffer.
+ * @brief UART-based communication interface for synchronized request-response handling.
  * @tparam THandler The message handler type.
  */
 template <typename THandler>
 class TransportInterface {
 private:
-    SPISlaveClass& m_spi;                                   ///< SPI slave instance.
+    AsyncSerialUart& m_uart;                                ///< UART instance.
     THandler& m_handler;                                    ///< Message handler.
     TaskHandle_t m_task_handle;                             ///< FreeRTOS task handle for processing.
 
@@ -42,34 +42,24 @@ private:
     StaticStreamBuffer<2 * driveunit_interface::RequestEncoder::kMaxEncodedPacketSize> m_recv_buffer;
 
      /// @brief Buffer for outgoing responses. +1 for size byte
-    FixedVector<std::byte, driveunit_interface::ResponseEncoder::kMaxEncodedPacketSize + 1> m_send_buffer;
-    uint8_t m_default_send_byte;
-
-    size_t m_response_bytes_pending;
-
-    enum class SendState : uint8_t {
-        Initiated = 0,
-        Pending,
-        Completed
-    };
-
-    volatile SendState m_send_state;
+    FixedVector<std::byte, driveunit_interface::ResponseEncoder::kMaxEncodedPacketSize> m_send_buffer;
 
 public:
     /**
-     * @brief Constructs an SPI slave interface.
-     * @param spi Reference to the SPI slave instance.
+     * @brief Constructs a UART-based interface.
+     * @param uart Reference to the AsyncSerialUart instance.
      * @param handler Reference to the message handler.
      */
-    explicit TransportInterface(SPISlaveClass& spi, THandler& handler)
-        : m_spi(spi), m_handler(handler), m_task_handle(nullptr), m_default_send_byte(0), m_response_bytes_pending(0), m_send_state(SendState::Completed)
+    explicit TransportInterface(AsyncSerialUart& uart, THandler& handler)
+        : m_uart(uart), m_handler(handler), m_task_handle(nullptr)
     {
+        // Set up UART callback for incoming data
+        m_uart.setIRQCallback([this](const std::span<const std::byte> buffer) { onDataReceived(buffer); });
     }
 
     /**
-     * @brief Initializes SPI as a slave device.
-     *
-     * @param task_priority Priority of the processing task
+     * @brief Initializes UART and starts the processing task.
+     * @param task_priority Priority of the processing task.
      */
     void initialize(UBaseType_t task_priority)
     {
@@ -80,21 +70,14 @@ public:
         }
 
         // Spawn the processing task
-        if (xTaskCreate(taskEntry, "SPI_Processing", 2048, this, task_priority, &m_task_handle) != pdPASS)
+        if (xTaskCreate(taskEntry, "transport_interface_task", 2048, this, task_priority, &m_task_handle) != pdPASS)
         {
             PISAR_LOG_ERROR("Failed to create SPI processing task");
             return;
         }
 
-        // Set default response.
-        onDataSent();
-
-        // Capture `this` in lambda to avoid needing a singleton
-        m_spi.onDataRecv([this](uint8_t* data, size_t len) { this->onDataReceived(data, len); });
-        m_spi.onDataSent([this]() { this->onDataSent(); });
-
-        // Start SPI slave
-        m_spi.begin(SPISettings(driveunit_interface::kSpiSpeed, MSBFIRST, SPI_MODE1));
+        // Initialize UART
+        m_uart.begin(driveunit_interface::kUartSpeed);
     }
 
 private:
@@ -118,14 +101,12 @@ private:
             {
                 std::array<std::byte, driveunit_interface::RequestEncoder::kMaxEncodedPacketSize> buffer;
 
-                // Wait until SPI ISR signals data reception
+                // Wait until data reception
                 const size_t num_bytes = readData(std::span(buffer));
-
-                for (int i = 0; i < num_bytes; ++i)
+                if (num_bytes == 0)
                 {
-                    Serial.printf("%x ", buffer[i]);
+                    continue;
                 }
-                Serial.println();
 
                 // Decode the received message
                 m_decoder.submit(std::span(buffer.data(), num_bytes));
@@ -170,62 +151,16 @@ private:
         }
 
         PISAR_LOG_DEBUG("Sent %u bytes", bytes_sent.value());
-        m_response_bytes_pending = bytes_sent.value() + 9;
     }
 
     /**
-     * @brief Called when SPI data is received.
-     * @param data Pointer to received data.
-     * @param len Length of received data.
+     * @brief Reads data from the UART buffer.
+     * @param buffer Buffer to store received data.
+     * @return Number of bytes read.
      */
-    void onDataReceived(uint8_t* data, size_t len)
-    {
-        if (m_recv_buffer.spaceAvailable() < len)
-        {
-            // Not enouph space
-            return;
-        }
-
-        BaseType_t higher_priority_task_woken = pdFALSE;
-        m_recv_buffer.sendIsr(std::span(reinterpret_cast<std::byte*>(data), len), &higher_priority_task_woken);
-
-        //portYIELD_FROM_ISR(higher_priority_task_woken);
-    }
-
-    /**
-     * @brief Called when the master has finished reading from SPI.
-     */
-    void onDataSent()
-    {
-        if (m_send_state == SendState::Initiated)
-        {
-            Serial.printf("Initiated data transfer for %u bytes: %u\n", m_send_buffer.size(), m_default_send_byte);
-            m_spi.setData(reinterpret_cast<uint8_t*>(m_send_buffer.data()), m_send_buffer.size());
-            m_send_state = SendState::Pending;
-            return;
-        }
-
-        if (m_send_state == SendState::Pending)
-        {
-            Serial.printf("Completed data transfer\n");
-            m_send_state = SendState::Completed;
-        }
-
-        // Only send default byte if nothing is pending
-        m_default_send_byte++;
-        m_spi.setData(&m_default_send_byte, 1);
-        Serial.printf("Sent %u\n", m_default_send_byte);
-    }
-
     inline size_t readData(const std::span<std::byte> buffer)
     {
-        if (m_response_bytes_pending)
-        {
-            size_t num_bytes = m_recv_buffer.receive(std::span(buffer.data(), m_response_bytes_pending));
-            m_response_bytes_pending = 0;
-        }
-
-        return m_recv_buffer.receive(std::span(buffer));
+        return m_recv_buffer.receive(buffer);
     }
 
     /**
@@ -239,22 +174,27 @@ private:
         m_send_buffer.resize(m_send_buffer.capacity());
 
         driveunit_interface::ResponseEncoder encoder;
-        const auto encoded_buffer = encoder.encode(response_msg, std::span(m_send_buffer.data(), m_send_buffer.size()).subspan(1));
+        const auto encoded_buffer = encoder.encode(response_msg, std::span(m_send_buffer.data(), m_send_buffer.size()));
         if (!encoded_buffer)
         {
             PISAR_LOG_ERROR("Failed to encode response");
             return std::nullopt;
         }
 
-        // First byte will contain the size of the packet
-        m_send_buffer[0] = std::byte(static_cast<uint8_t>(encoded_buffer.value().size()));
-        m_send_buffer.resize(encoded_buffer.value().size() + 1);
+        m_uart.write(reinterpret_cast<const uint8_t*>(encoded_buffer.value().data()), encoded_buffer.value().size());
 
-        portENTER_CRITICAL();
-        m_send_state = SendState::Initiated;
-        portEXIT_CRITICAL();
+        return encoded_buffer.value().size();
+    }
 
-        return m_send_buffer.size();
+    /**
+     * @brief Handles received UART data (called from IRQ).
+     * @param byte The received byte.
+     */
+    void onDataReceived(const std::span<const std::byte> buffer)
+    {
+        BaseType_t higher_priority_task_woken = pdFALSE;
+        m_recv_buffer.sendIsr(buffer, &higher_priority_task_woken);
+        portYIELD_FROM_ISR(higher_priority_task_woken);
     }
 };
 
