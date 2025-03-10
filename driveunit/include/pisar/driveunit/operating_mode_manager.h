@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pisar/driveunit/sync.h"
 #include "pisar/utilities/type_info.h"
 
 #include "Arduino.h"
@@ -22,8 +23,9 @@ private:
     using ModeT = std::variant<TDefaultMode, TOperatingModes...>;
 
     std::function<TDefaultMode()> m_default_mode_factory;               ///< Factory function for default mode
+    std::optional<ModeT> m_next_mode;
+    Mutex m_mode_mutex;
     ModeT m_current_mode;                                               ///< Active mode.
-    QueueHandle_t m_mode_queue;                                         ///< Queue for pending mode changes
     TaskHandle_t m_task_handle;                                         ///< FreeRTOS task handle for mode execution.
 
 public:
@@ -44,10 +46,7 @@ public:
             return; // TODO ERROR CODE
         }
 
-        m_mode_queue = xQueueCreate(1, sizeof(ModeT));
-        configASSERT(m_mode_queue != nullptr);
-
-        if (xTaskCreate(taskEntry, "Mode_Manager", 512, this, task_priority, &m_task_handle) != pdPASS)
+        if (xTaskCreate(taskEntry, "Mode_Manager", 4096, this, task_priority, &m_task_handle) != pdPASS)
         {
             PISAR_LOG_ERROR("Failed to create operating mode manager task!");
             return; // TODO ERROR CODE
@@ -56,16 +55,15 @@ public:
 
     /**
      * @brief Switches to a new operating mode with custom parameters. This is thread-safe.
-     * @tparam TMode The new operating mode type.
-     * @tparam TArgs Types of arguments for mode construction.
-     * @param args Arguments to construct the mode.
+     *
+     * @tparam TMode The new mode type.
+     * @param new_mode The mode to switch to.
      */
-    template<typename TMode, typename... TArgs>
-    void switchMode(TArgs&&... args)
+    template<typename TMode>
+    void switchMode(TMode new_mode)
     {
-        // Store the new mode, to be applied in the next update cycle
-        ModeT new_mode = TMode(std::forward<TArgs>(args)...);
-        xQueueOverwrite(m_mode_queue, &new_mode); // Always overwrite the latest mode
+        Lock<Mutex> lock(m_mode_mutex);
+        m_next_mode = ModeT(std::move(new_mode));
     }
 
     /**
@@ -74,25 +72,20 @@ public:
      * This function is designed to be called within an ISR context. It posts a new mode
      * to the FreeRTOS queue without blocking and wakes the mode manager task if needed.
      *
-     * @tparam TMode The new operating mode type.
-     * @tparam TArgs Types of arguments for mode construction.
-     * @param args Arguments to construct the mode.
+     * @tparam TMode The new mode type.
+     * @param new_mode The mode to switch to.
      */
-    template<typename TMode, typename... TArgs>
-    void switchModeFromISR(TArgs&&... args)
+    template<typename TMode>
+    void switchModeFromISR(TMode new_mode)
     {
-        ModeT new_mode = TMode(std::forward<TArgs>(args)...);
-        BaseType_t taskWoken = pdFALSE;
-        xQueueOverwriteFromISR(m_mode_queue, &new_mode, &taskWoken);
-        portYIELD_FROM_ISR(taskWoken); // Ensure the mode manager task runs immediately if needed
+        LockIsr<Mutex> lock(m_mode_mutex);
+        m_next_mode = ModeT(std::move(new_mode));
     }
 
     /// @brief Switch operating mode to default mode. This is thread-safe.
     void resetToDefaultMode()
     {
-        // Store the new mode, to be applied in the next update cycle
-        ModeT new_mode = m_default_mode_factory();
-        xQueueOverwrite(m_mode_queue, &new_mode); // Always overwrite the latest mode
+        switchMode(m_default_mode_factory());
     }
 
     /**
@@ -103,10 +96,7 @@ public:
      */
     void resetToDefaultModeFromISR()
     {
-        ModeT new_mode = m_default_mode_factory();
-        BaseType_t taskWoken = pdFALSE;
-        xQueueOverwriteFromISR(m_mode_queue, &new_mode, &taskWoken);
-        portYIELD_FROM_ISR(taskWoken); // Ensure the mode manager task runs immediately if needed
+        switchModeFromISR(m_default_mode_factory());
     }
 
 private:
@@ -126,11 +116,13 @@ private:
     {
         while (true)
         {
-            // If new mode is available and pending, switch to it
-            ModeT next_mode = m_default_mode_factory();
-            if (xQueueReceive(m_mode_queue, &next_mode, 0) == pdTRUE) // Non-blocking receive
             {
-                switchModeImpl(std::move(next_mode));
+                Lock<Mutex> lock(m_mode_mutex);
+                if (m_next_mode)
+                {
+                    switchModeImpl(std::move(m_next_mode.value()));
+                    m_next_mode = std::nullopt;
+                }
             }
 
             // Run current mode
@@ -141,7 +133,7 @@ private:
                 switchModeImpl(m_default_mode_factory());
             }
 
-            vTaskDelay(pdMS_TO_TICKS(10)); // Keep updating even if no new mode is received
+            vTaskDelay(pdMS_TO_TICKS(1)); // Keep updating even if no new mode is received
         }
     }
 
@@ -174,7 +166,7 @@ private:
     void switchModeImpl(ModeT&& next_mode)
     {
         exitMode();
-        m_current_mode = std::move(next_mode);
+        m_current_mode = next_mode;
         enterMode();
     }
 

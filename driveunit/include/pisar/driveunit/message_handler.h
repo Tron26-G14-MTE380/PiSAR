@@ -35,23 +35,23 @@ public:
                             [this](const driveunit_interface::CommandIdle& command) -> driveunit_interface::Response
                             {
                                 PISAR_LOG_DEBUG("Got command 'Idle'");
-                                //m_operating_mode_manager.template switchMode<OperatingModeIdle>(m_robot_facility);
+                                m_operating_mode_manager.template switchMode(OperatingModeIdle(m_robot_facility));
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },
 
                             [this](const driveunit_interface::CommandFollowTrajectory& command) -> driveunit_interface::Response
                             {
                                 PISAR_LOG_DEBUG("Got command 'Follow Trajectory'");
-                                //m_operating_mode_manager.template switchMode<OperatingModeFollowTrajectory>(
-                                //    m_robot_facility, std::span(command.trajectory), command.reference_time
-                                //);
+                                m_operating_mode_manager.template switchMode(OperatingModeFollowTrajectory(
+                                   m_robot_facility, std::span(command.trajectory), command.reference_time
+                                ));
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },
 
                             [this](const driveunit_interface::CommandRotate& command) -> driveunit_interface::Response
                             {
                                 PISAR_LOG_DEBUG("Got command 'Rotate'");
-                                //m_operating_mode_manager.template switchMode<OperatingModeRotate>(m_robot_facility, command.rotation_deg);
+                                m_operating_mode_manager.template switchMode(OperatingModeRotate(m_robot_facility, command.rotation_deg));
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },
                         }, command

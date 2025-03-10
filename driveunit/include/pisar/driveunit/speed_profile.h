@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pisar/driveunit/logging.h"
+
 #include <cstdint>
 #include <cmath>
 #include <chrono>
@@ -52,27 +54,38 @@ public:
      */
     inline constexpr float update(std::chrono::microseconds current_time)
     {
-        const std::chrono::duration<float> delta_time = (current_time - m_last_update_time) / 1'000'000.0f;
+        if (m_last_update_time.count() == 0)
+        {
+            m_last_update_time = current_time;
+            return m_current_speed;
+        }
+
+        const float delta_time = std::chrono::duration<float>(current_time - m_last_update_time).count();
+        m_last_update_time = current_time;
 
         const float delta_speed = (m_target_speed - m_current_speed);
-        if (delta_speed == 0)
+        if (fabs(delta_speed) < 1E-3f)
         {
-            return 0;
+            m_current_speed = m_target_speed;
+            return m_current_speed;
         }
 
         const int operating_direction = (m_current_speed > 0.0f) - (m_current_speed < 0.0f);
         const int target_operating_direction = (m_target_speed > 0.0f) - (m_target_speed < 0.0f);
 
-        const float accel_abs = operating_direction > 0 ? m_forward_accel : m_reverse_accel;
-        const float decel_abs = operating_direction > 0 ? m_forward_decel : m_reverse_decel;
+        // If moving forward, the accel/decel values we use are the forward motion ones. If not moving, then take the target speed as reference for forward/backwards
+        const float accel_abs = operating_direction == 0 ? (target_operating_direction > 0 ? m_forward_accel : m_reverse_accel) : (operating_direction > 0 ? m_forward_accel : m_reverse_accel);
+        const float decel_abs = operating_direction == 0 ? (target_operating_direction > 0 ? m_forward_decel : m_reverse_decel) : (operating_direction > 0 ? m_forward_decel : m_reverse_decel);
 
-        const float accel = accel_abs * operating_direction;
-        const float decel = -1 * decel_abs * operating_direction;
+        const float accel = accel_abs * (operating_direction == 0 ? target_operating_direction : operating_direction);
+        const float decel = -1.0f * decel_abs * (operating_direction == 0 ? target_operating_direction : operating_direction);
+
+        // PISAR_LOG_DEBUG("current=%.3f, target=%.3f, accel=%.3f, decel=%.3f", m_current_speed, m_target_speed, accel, decel);
 
         // **Special Case: Switching Directions → Decelerate to 0 First**
         if (operating_direction != target_operating_direction && operating_direction != 0)
         {
-            m_current_speed += decel * delta_time.count();
+            m_current_speed += decel * delta_time;
 
             const int new_operating_direction = (m_current_speed > 0.0f) - (m_current_speed < 0.0f);
 
@@ -88,8 +101,8 @@ public:
             // If going forward and abs(m_target_speed) < abs(m_current_speed), then abs_delta_speed < 0
             // If going backward and abs(m_target_speed) > abs(m_current_speed), then abs_delta_speed > 0
             // If going backward and abs(m_target_speed) < abs(m_current_speed), then abs_delta_speed < 0
-            const float abs_delta_speed = delta_speed * operating_direction;
-            m_current_speed += (abs_delta_speed > 0 ? accel : decel) * delta_time.count();
+            const float abs_delta_speed = delta_speed * target_operating_direction;
+            m_current_speed += (abs_delta_speed > 0 ? accel : decel) * delta_time;
 
             // **Prevent Overshooting**
             if ((delta_speed > 0.0f && m_current_speed > m_target_speed) || (delta_speed < 0.0f && m_current_speed < m_target_speed))
@@ -98,7 +111,6 @@ public:
             }
         }
 
-        m_last_update_time = current_time;
         return m_current_speed;
     }
 

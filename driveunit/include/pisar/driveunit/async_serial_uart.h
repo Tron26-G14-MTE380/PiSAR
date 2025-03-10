@@ -23,8 +23,8 @@ private:
 
     uint8_t m_tx_pin;
     uint8_t m_rx_pin;
-    int8_t m_rts_pin;
-    int8_t m_cts_pin;
+    uint8_t m_rts_pin;
+    uint8_t m_cts_pin;
 
     bool m_running;
     CallbackFunc m_irq_callback;                 ///< Custom IRQ callback function
@@ -36,7 +36,7 @@ private:
     gpio_function_t m_original_cts_fcn;
 
 public:
-    inline AsyncSerialUart(uart_inst_t* p_uart, uint8_t tx_pin, uint8_t rx_pin, int8_t rts_pin = -1, int8_t cts_pin = -1) :
+    inline AsyncSerialUart(uart_inst_t* p_uart, uint8_t tx_pin, uint8_t rx_pin, uint8_t rts_pin = UART_PIN_NOT_DEFINED, uint8_t cts_pin = UART_PIN_NOT_DEFINED) :
         m_p_uart(p_uart), m_tx_pin(tx_pin), m_rx_pin(rx_pin), m_rts_pin(rts_pin), m_cts_pin(cts_pin),
         m_running(false), m_irq_callback(nullptr) {}
 

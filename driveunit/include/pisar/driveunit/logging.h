@@ -280,11 +280,11 @@ inline void initLogging(unsigned int baud, LogLevel level, bool wait_for_connect
 
 #if PISAR_DRIVEUNIT_LOGGING_ENABLED == 1
 
-#define PISAR_LOG(level, msg, ...)      g_uart_logger.log(LogMessageWithLevel(level, msg, ##__VA_ARGS__))
-#define PISAR_LOG_DEBUG(msg, ...)       g_uart_logger.debug(LogMessage(msg, ##__VA_ARGS__))
-#define PISAR_LOG_INFO(msg, ...)        g_uart_logger.info(LogMessage(msg, ##__VA_ARGS__))
-#define PISAR_LOG_WARN(msg, ...)        g_uart_logger.warn(LogMessage(msg, ##__VA_ARGS__))
-#define PISAR_LOG_ERROR(msg, ...)       g_uart_logger.error(LogMessage(msg, ##__VA_ARGS__))
+#define PISAR_LOG(level, msg, ...)      pisar::driveunit::g_uart_logger.log(pisar::driveunit::LogMessageWithLevel(level, msg, ##__VA_ARGS__))
+#define PISAR_LOG_DEBUG(msg, ...)       pisar::driveunit::g_uart_logger.debug(pisar::driveunit::LogMessage(msg, ##__VA_ARGS__))
+#define PISAR_LOG_INFO(msg, ...)        pisar::driveunit::g_uart_logger.info(pisar::driveunit::LogMessage(msg, ##__VA_ARGS__))
+#define PISAR_LOG_WARN(msg, ...)        pisar::driveunit::g_uart_logger.warn(pisar::driveunit::LogMessage(msg, ##__VA_ARGS__))
+#define PISAR_LOG_ERROR(msg, ...)       pisar::driveunit::g_uart_logger.error(pisar::driveunit::LogMessage(msg, ##__VA_ARGS__))
 
 #else
 

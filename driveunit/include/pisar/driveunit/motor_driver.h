@@ -17,23 +17,24 @@ class MotorDriver
 private:
     uint8_t m_pin_a;          ///< GPIO pin A (PWM capable)
     uint8_t m_pin_b;          ///< GPIO pin B (PWM capable)
-    uint8_t m_pwm_slice;      ///< PWM slice controlling both pins
+    uint8_t m_pwm_slice_a;    ///< PWM slice for pin A
+    uint8_t m_pwm_slice_b;    ///< PWM slice for pin B
     uint8_t m_pwm_channel_a;  ///< PWM channel for pin A
     uint8_t m_pwm_channel_b;  ///< PWM channel for pin B
     bool m_enabled = false;
 
-    float m_pwm_freq;         ///< Desired PWM frequency in Hz
-    uint16_t m_pwm_resolution; ///< PWM resolution (max counter value)
+    uint32_t m_pwm_freq;         ///< Desired PWM frequency in Hz
+    uint32_t m_pwm_resolution; ///< PWM resolution (max counter value)
 
 public:
     /**
      * @brief Constructs a MotorDriver object for Cytron MDD3A.
      * @param pin_a GPIO pin A.
      * @param pin_b GPIO pin B.
-     * @param pwm_freq (Optional) PWM frequency in Hz (default: 16 kHz).
+     * @param pwm_freq (Optional) PWM frequency in Hz (default: 20 kHz).
      * @param pwm_resolution (Optional) PWM resolution (default: 65535 for 16-bit).
      */
-    MotorDriver(uint8_t pin_a, uint8_t pin_b, float pwm_freq = 16000.0f, uint16_t pwm_resolution = std::numeric_limits<std::uint16_t>::max());
+    MotorDriver(uint8_t pin_a, uint8_t pin_b, uint32_t pwm_freq = 20000);
 
     /// @brief Initializes the motor driver.
     void initialize();
