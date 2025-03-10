@@ -16,8 +16,8 @@ static uint32_t div_u32u32(uint32_t a, uint32_t b) {
 }
 
 
-MotorDriver::MotorDriver(uint8_t pin_a, uint8_t pin_b, uint32_t pwm_freq)
-    : m_pin_a(pin_a), m_pin_b(pin_b), m_pwm_freq(pwm_freq), m_pwm_resolution(0)
+MotorDriver::MotorDriver(uint8_t pin_a, uint8_t pin_b, float max_speed, uint32_t pwm_freq)
+    : m_pin_a(pin_a), m_pin_b(pin_b), m_pwm_freq(pwm_freq), m_pwm_resolution(0), m_max_speed(std::max(std::min(1.0f, max_speed), 0.0f))
 {
     // Store PWM slice and channel once
     m_pwm_slice_a = pwm_gpio_to_slice_num(pin_a);
@@ -72,7 +72,7 @@ void MotorDriver::setSpeed(float speed)
     }
 
     // Clamp speed to range -1.0 to 1.0
-    speed = std::clamp(speed, -1.0f, 1.0f);
+    speed = std::clamp(speed, -1.0f, 1.0f) * m_max_speed; // Max speed acts as a limiter
 
     // Convert absolute speed to PWM duty cycle (0 to resolution)
     uint16_t duty_cycle = speed == 1.0f ? (m_pwm_resolution + 1) : static_cast<uint16_t>(std::abs(speed) * m_pwm_resolution);

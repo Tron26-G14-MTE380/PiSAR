@@ -96,7 +96,9 @@ void runRobot(std::vector<Eigen::Vector2d> trajectory)
 
 int main()
 {
-    RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
+    //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
+    VideoCameraSource video_source(0);
+
     auto line_tracker = LineTracker<kDebug>(std::span(kTapeHsvThresholds));
     const auto sized_projection = kProjection.for_image({640, 480});
 

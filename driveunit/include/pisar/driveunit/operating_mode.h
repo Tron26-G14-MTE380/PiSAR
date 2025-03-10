@@ -81,6 +81,8 @@ private:
     std::vector<Eigen::Vector2f> m_trajectory;
     std::chrono::duration<float> m_ref_time;
 
+    std::chrono::milliseconds m_start_time;
+
 public:
     OperatingModeFollowTrajectory(
         RobotFacility& facility,

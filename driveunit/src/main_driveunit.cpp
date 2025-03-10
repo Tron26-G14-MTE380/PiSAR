@@ -12,8 +12,8 @@
 
 using namespace pisar::driveunit;
 
-MotorDriver left_motor(7, 6);
-MotorDriver right_motor(8, 9);
+MotorDriver left_motor(7, 6, 0.3f);
+MotorDriver right_motor(8, 9, 0.3f);
 
 DifferentialDriveController drive_controller(left_motor, right_motor, 10);
 Imu imu(SPI1, 3);
@@ -38,9 +38,6 @@ void setup()
 
     AsyncSerial2.setTX(4);
     AsyncSerial2.setRX(5);
-
-    pinMode(25, OUTPUT);
-    digitalWrite(25, LOW);
 
     // initDebugMonitor();
 

@@ -21,10 +21,10 @@ private:
     uint8_t m_pwm_slice_b;    ///< PWM slice for pin B
     uint8_t m_pwm_channel_a;  ///< PWM channel for pin A
     uint8_t m_pwm_channel_b;  ///< PWM channel for pin B
-    bool m_enabled = false;
-
     uint32_t m_pwm_freq;         ///< Desired PWM frequency in Hz
     uint32_t m_pwm_resolution; ///< PWM resolution (max counter value)
+    float m_max_speed = 1.0f;
+    bool m_enabled = false;
 
 public:
     /**
@@ -34,7 +34,7 @@ public:
      * @param pwm_freq (Optional) PWM frequency in Hz (default: 20 kHz).
      * @param pwm_resolution (Optional) PWM resolution (default: 65535 for 16-bit).
      */
-    MotorDriver(uint8_t pin_a, uint8_t pin_b, uint32_t pwm_freq = 20000);
+    MotorDriver(uint8_t pin_a, uint8_t pin_b, float max_speed = 1.0f, uint32_t pwm_freq = 20000);
 
     /// @brief Initializes the motor driver.
     void initialize();

@@ -9,7 +9,7 @@ OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(
     RobotFacility& facility,
     const std::span<const Eigen::Vector2f> trajectory,
     const std::chrono::duration<float> reference_time
-) : m_facility(facility), m_trajectory(trajectory.begin(), trajectory.end()), m_ref_time(reference_time) {}
+) : m_facility(facility), m_trajectory(trajectory.begin(), trajectory.end()), m_ref_time(reference_time), m_start_time(0) {}
 
 void OperatingModeFollowTrajectory::onEnterImpl()
 {
@@ -41,10 +41,17 @@ void OperatingModeFollowTrajectory::onEnterImpl()
 
      // Set speed and move forward (very basic)
      m_facility.get().tankDrive(left_speed, right_speed);
+
+     m_start_time = std::chrono::milliseconds(millis());
 }
 
 [[nodiscard]] bool OperatingModeFollowTrajectory::updateImpl()
 {
+    if (millis() - m_start_time.count() > 500)
+    {
+        return true;
+    }
+
     return false;
 }
 
