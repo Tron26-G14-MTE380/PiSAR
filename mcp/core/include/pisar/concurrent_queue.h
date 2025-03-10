@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pisar/utilities/stdex.h"
+
 #include <queue>
 #include <mutex>
 #include <condition_variable>
@@ -27,8 +29,8 @@ public:
      * @param timeout The maximum time to wait if the queue is full (std::nullopt = infinite wait, 0 = non-blocking).
      * @return True if the item was pushed, false if the timeout was reached.
      */
-    template <typename TRep, typename TPeriod>
-    bool push(T&& item, std::optional<std::chrono::duration<TRep, TPeriod>> timeout = std::nullopt)
+    template <CIsChronoDuration TDuration = std::chrono::milliseconds>
+    bool push(T&& item, std::optional<TDuration> timeout = std::nullopt)
     {
         {
             std::unique_lock lock(m_mutex);
@@ -48,8 +50,8 @@ public:
      * @param timeout The maximum time to wait (std::nullopt = infinite wait, 0 = non-blocking).
      * @return An optional containing the item if available before the timeout, otherwise std::nullopt.
      */
-    template <typename TRep, typename TPeriod>
-    std::optional<T> pop(std::optional<std::chrono::duration<TRep, TPeriod>> timeout = std::nullopt)
+    template <CIsChronoDuration TDuration = std::chrono::milliseconds>
+    std::optional<T> pop(std::optional<TDuration> timeout = std::nullopt)
     {
         std::unique_lock lock(m_mutex);
 

@@ -51,7 +51,7 @@ public:
     } \
     inline const auto& get_##CategoryName() \
     { \
-        static constexpr StaticErrorCategory<EnumType, detail::error_messages_##CategoryName.size()> instance( \
+        static StaticErrorCategory<EnumType, detail::error_messages_##CategoryName.size()> instance( \
             #EnumType, detail::error_messages_##CategoryName); \
         return instance; \
     } \

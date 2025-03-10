@@ -10,4 +10,7 @@ struct Overloaded : Ts...
 template <typename... Ts>
 Overloaded(Ts...) -> Overloaded<Ts...>;
 
+template <typename T>
+concept CIsChronoDuration = std::is_base_of_v<std::chrono::duration<typename T::rep, typename T::period>, T>;
+
 }

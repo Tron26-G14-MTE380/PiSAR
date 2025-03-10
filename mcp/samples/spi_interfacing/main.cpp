@@ -7,15 +7,11 @@
 #include "pisar/driveunit_interface/interface.h"
 #include "pisar/async_driveunit_controller.h"
 
-#include <wiringPi.h>
-
 using namespace pisar::driveunit_interface;
 using namespace pisar::mcp;
 
 int main()
 {
-    wiringPiSetup(); // Initializes wiringPi using wiringPi's simlified number system.
-
     DriveunitTransport transport;
     DriveunitController controller(transport);
 

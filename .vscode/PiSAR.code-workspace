@@ -119,7 +119,8 @@
 			"alignedvector3": "cpp",
 			"barrier": "cpp",
 			"forward_list": "cpp",
-			"ranges": "cpp"
+			"ranges": "cpp",
+			"bvh": "cpp"
 		},
 		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json"
 	},

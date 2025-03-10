@@ -48,7 +48,7 @@ public:
      * @brief Sends a heartbeat request.
      * @return std::optional<HeartbeatResponse> The heartbeat response if successful, otherwise std::nullopt.
      */
-    inline std::optional<driveunit_interface::HeartbeatResponse> sendHeartbeat()
+    inline rd::expected<driveunit_interface::HeartbeatResponse, std::error_code> sendHeartbeat()
     {
         return sendRequest<driveunit_interface::HeartbeatRequest, driveunit_interface::HeartbeatResponse>(driveunit_interface::HeartbeatRequest{});
     }
@@ -57,10 +57,10 @@ public:
      * @brief Sends a command to idle.
      * @return true if the command was acknowledged, false otherwise.
      */
-    inline bool sendIdleCommand()
+    inline rd::expected<bool, std::error_code> sendIdleCommand()
     {
         auto response = sendRequest<driveunit_interface::CommandIdle, driveunit_interface::CommandResponse>(driveunit_interface::CommandIdle{});
-        return response && response->ack;
+        return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 
     /**
@@ -69,11 +69,11 @@ public:
      * @param trajectory The list of waypoints (Eigen::Vector2f).
      * @return true if the command was acknowledged, false otherwise.
      */
-    inline bool sendTrajectoryCommand(std::chrono::duration<float> reference_time, const std::vector<Eigen::Vector2f>& trajectory)
+    inline rd::expected<bool, std::error_code> sendTrajectoryCommand(std::chrono::duration<float> reference_time, const std::vector<Eigen::Vector2f>& trajectory)
     {
         driveunit_interface::CommandFollowTrajectory command{reference_time, trajectory};
         auto response = sendRequest<driveunit_interface::CommandFollowTrajectory, driveunit_interface::CommandResponse>(command);
-        return response && response->ack;
+        return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 
     /**
@@ -81,11 +81,11 @@ public:
      * @param degrees The rotation in degrees (CCW positive).
      * @return true if the command was acknowledged, false otherwise.
      */
-    inline bool sendRotateCommand(float degrees)
+    inline rd::expected<bool, std::error_code> sendRotateCommand(float degrees)
     {
         driveunit_interface::CommandRotate command{degrees};
         auto response = sendRequest<driveunit_interface::CommandRotate, driveunit_interface::CommandResponse>(command);
-        return response && response->ack;
+        return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 };
 

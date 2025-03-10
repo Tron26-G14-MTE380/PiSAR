@@ -906,10 +906,9 @@
      return x.has_value() ? (*x == *y) : (x.error() == y.error());
    }
 
+   // Modified by [Ashkan Ebrahimi] on [March 10, 2025]: Fixed operator== overload resolution issue
    template <class T2>
-   requires(!detail::is_expected<T2>) && requires(T const& x, T2 const& v) {
-     { x == v } -> std::convertible_to<bool>;
-   }
+   requires(!detail::is_expected<T2>) && std::is_same_v<std::remove_cvref_t<T2>, T>
    friend constexpr auto operator==(expected const& x, T2 const& v) -> bool {
      return x.has_value() && static_cast<bool>(*x == v);
    }

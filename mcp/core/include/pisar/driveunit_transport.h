@@ -8,7 +8,6 @@
 #include "pisar/utilities/expected.h"
 #include "pisar/utilities/error.h"
 
-#include <wiringSerial.h>
 #include <Eigen/Dense>
 
 #include <vector>
@@ -18,10 +17,6 @@
 #include <chrono>
 
 namespace pisar::mcp {
-
-class 
-enum class DriveunitTransport::Error;    
-std::error_code make_error_code(DriveunitTransport::Error);
 
 /**
  * @brief Handles UART communication between the Raspberry Pi (master) and driveunit (slave).
@@ -85,21 +80,7 @@ public:
     template<typename TRequest, typename TResponse>
     [[nodiscard]]
     std::enable_if_t<!std::is_same_v<TRequest, driveunit_interface::Request>, rd::expected<TResponse, std::error_code>>
-    sendRequest(const TRequest& request)
-    {
-        const auto result = sendRequestInternal(driveunit_interface::Request(request));
-        if (result.has_value() == false)
-        {
-            return rd::unexpected(result.error());
-        }
-
-        if (auto response = std::get_if<TResponse>(&result.value()))
-        {
-            return rd::expected<TResponse, std::error_code>(*response);
-        }
-
-        return rd::unexpected(make_error_code(Error::kInvalidResponse));
-    }
+    sendRequest(const TRequest& request);
 
     /**
      * @brief Overload for sending a raw `driveunit_interface::Request` directly.
@@ -107,7 +88,7 @@ public:
      * @return `rd::expected<driveunit_interface::Response, std::error_code>` Response or error.
      */
     [[nodiscard]]
-    rd::expected<driveunit_interface::Response, std::error_code>
+    inline rd::expected<driveunit_interface::Response, std::error_code>
     sendRequest(const driveunit_interface::Request& request)
     {
         return sendRequestInternal(request);
@@ -137,15 +118,35 @@ private:
 };
 
 PISAR_DEFINE_ERROR_CATEGORY(DriveunitTransport::Error, TransportErrorCategory,
-    std::make_pair(DriveunitTransport::Error::kNone, "No error"),
-    std::make_pair(DriveunitTransport::Error::kUartNotOpen, "UART is not open"),
-    std::make_pair(DriveunitTransport::Error::kEncodingError, "Encoding failed"),
-    std::make_pair(DriveunitTransport::Error::kWriteError, "UART write failed"),
-    std::make_pair(DriveunitTransport::Error::kReadTimeout, "Read timeout"),
-    std::make_pair(DriveunitTransport::Error::kDecodingError, "Decoding failed"),
-    std::make_pair(DriveunitTransport::Error::kInvalidResponse, "Invalid Response")
+    std::make_pair(DriveunitTransport::Error::kNone, std::string_view("No error")),
+    std::make_pair(DriveunitTransport::Error::kUartNotOpen, std::string_view("UART is not open")),
+    std::make_pair(DriveunitTransport::Error::kEncodingError, std::string_view("Encoding failed")),
+    std::make_pair(DriveunitTransport::Error::kWriteError, std::string_view("UART write failed")),
+    std::make_pair(DriveunitTransport::Error::kReadTimeout, std::string_view("Read timeout")),
+    std::make_pair(DriveunitTransport::Error::kDecodingError, std::string_view("Decoding failed")),
+    std::make_pair(DriveunitTransport::Error::kInvalidResponse, std::string_view("Invalid Response"))
 );
+
+template<typename TRequest, typename TResponse>
+[[nodiscard]]
+std::enable_if_t<!std::is_same_v<TRequest, driveunit_interface::Request>, rd::expected<TResponse, std::error_code>>
+DriveunitTransport::sendRequest(const TRequest& request)
+{
+    const auto result = sendRequestInternal(driveunit_interface::Request(request));
+    if (result.has_value() == false)
+    {
+        return rd::unexpected(result.error());
+    }
+
+    if (auto response = std::get_if<TResponse>(&result.value()))
+    {
+        return rd::expected<TResponse, std::error_code>(*response);
+    }
+
+    return rd::unexpected(make_error_code(Error::kInvalidResponse));
+}
+
 
 } // namespace pisar::mcp
 
-PISAR_REGISTER_ERROR(DriveunitTransport::Error);
+PISAR_REGISTER_ERROR(pisar::mcp::DriveunitTransport::Error);

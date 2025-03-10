@@ -1,7 +1,9 @@
 #pragma once
 
+#ifdef __linux__
 #include <wiringPi.h>
 #include <wiringSerial.h>
+#endif
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -11,6 +13,8 @@
 #include <iostream>
 
 namespace pisar::mcp {
+
+#ifdef __linux__
 
 /**
  * @brief UART serial communication wrapper for Raspberry Pi using WiringPi.
@@ -49,6 +53,7 @@ public:
      */
     [[nodiscard]] inline bool open(int baud_rate)
     {
+        wiringPiSetup(); // Initializes wiringPi using wiringPi's simlified number system.
         m_fd = serialOpen(m_port.c_str(), baud_rate);
         if (m_fd < 0)
         {
@@ -189,5 +194,98 @@ public:
         }
     }
 };
+
+#else
+
+/**
+ * @brief UART serial communication wrapper for Raspberry Pi using WiringPi.
+ *
+ * Provides buffered reading with optional timeouts, non-blocking writes, and
+ * efficient handling of UART data via file descriptors.
+ */
+class SerialUart
+{
+private:
+    int m_fd;                     ///< File descriptor for the serial port.
+    std::string m_port;           ///< Path to the serial device (e.g., "/dev/serial0").
+
+public:
+    /**
+     * @brief Constructs the SerialUart object.
+     * @param port The device file (e.g., "/dev/serial0").
+     */
+    explicit SerialUart(const std::string_view port) : m_fd(-1), m_port(port) {}
+
+    /// @brief Returns the uart device name.
+    [[nodiscard]] inline std::string_view device() { return m_port; }
+
+    /**
+     * @brief Opens the serial port using WiringPi.
+     * @param baud_rate Baud rate (e.g., 115200).
+     * @return True if successful, false otherwise.
+     */
+    [[nodiscard]] inline bool open(int baud_rate) { return false; }
+
+    /**
+     * @brief Closes the serial port.
+     */
+    inline void close() {}
+
+    /**
+     * @brief Checks if the serial port is open.
+     * @return True if open, false otherwise.
+     */
+    [[nodiscard]] inline bool isOpen() const { return false; }
+
+    /**
+     * @brief Writes data to the serial port.
+     * @param buffer The byte buffer to send.
+     * @return The number of bytes successfully written.
+     */
+    [[nodiscard]] inline size_t write(const std::span<const std::byte>& buffer) const { return 0; }
+
+    /**
+     * @brief Writes data to the serial port.
+     * @param data The byte to send.
+     * @return True if successful otherwise false.
+     */
+    [[nodiscard]] inline bool write(const std::byte data) const { return false; }
+
+    /**
+     * @brief Return the number of bytes of data avalable to be read in the serial port
+     *
+     * @return The number of bytes available for reading or std::nullopt on failure.
+     */
+    [[nodiscard]] inline std::optional<size_t> available() const { return 0; }
+
+    /**
+     * @brief Reads data from the serial port (blocking or non-blocking).
+     * @param buffer The buffer to read into..
+     * @param timeout Optional timeout (0 = non-blocking).
+     * @return The number of
+     */
+    inline std::optional<size_t> read(
+        const std::span<std::byte> buffer, const std::chrono::milliseconds timeout = std::chrono::milliseconds(0)) const
+    {
+        return std::nullopt;
+    }
+
+    /**
+     * @brief Reads a single byte from the serial port.
+     * @param timeout Timeout duration (0 for non-blocking).
+     * @return std::optional<uint8_t> The received byte, or std::nullopt if nothing received.
+     */
+    inline std::optional<std::byte> readByte(const std::chrono::milliseconds timeout = std::chrono::milliseconds(0)) const
+    {
+        return std::nullopt;
+    }
+
+    /**
+     * @brief Flushes input and output buffers.
+     */
+    inline void flush() const {}
+};
+
+#endif
 
 }

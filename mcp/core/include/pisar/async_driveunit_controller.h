@@ -132,9 +132,9 @@ public:
             return rd::unexpected(response.error());
         }
 
-        if (auto valid_response = std::get_if<TResponse>(&response.value()))
+        if (!std::holds_alternative<TResponse>(response.value()))
         {
-            return rd::expected(*valid_response);
+            return rd::expected<TResponse, std::error_code>(std::get<TResponse>(result.value()));
         }
 
         return rd::unexpected(make_error_code(DriveunitTransport::Error::kInvalidResponse));
@@ -174,14 +174,14 @@ private:
         while (m_running.load(std::memory_order_acquire))
         {
             // Timeout so we can check the running flag periodically
-            auto request_entry = m_request_queue.pop(std::chrono::milliseconds(10));
+            auto request_entry = m_request_queue.pop(std::optional(std::chrono::milliseconds(10)));
             if (!request_entry.has_value())
             {
                 continue;
             }
 
             const uint32_t request_id = request_entry->request_id;
-            const driveunit_interface::Request& request_data = request_entry->request;
+            const driveunit_interface::Request& request_data = request_entry->data;
 
             // Send request and wait for response
             const auto response = m_transport.get().sendRequest(request_data);
