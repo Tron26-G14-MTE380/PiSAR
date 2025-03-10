@@ -104,80 +104,93 @@ cv::Mat createHomographyProjectionVisualization(
 
 cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& debug_images, int max_size, int grid_padding)
 {
-    if (debug_images.empty()) {
+    if (debug_images.empty()) 
+    {
         return cv::Mat::ones(100, 100, CV_8UC3) * 255; // Return a blank white canvas if empty
     }
-
-    // Determine minimum width and height
-    int min_width = std::numeric_limits<int>::max();
-    int min_height = std::numeric_limits<int>::max();
-
-    for (const auto& [key, img] : debug_images)
+    
+    std::vector<std::pair<std::string, cv::Mat>> processed_images;
+    for (const auto& [name, img] : debug_images)
     {
-        min_width = std::min(min_width, img.size().width);
-        min_height = std::min(min_height, img.size().height);
+        processed_images.emplace_back(name, img.empty() ? cv::Mat::zeros(max_size, max_size, CV_8UC3) : img);
     }
 
-    // Ensures no image exceeds 320px in width/height
-    double scale_factor = (std::max(min_width, min_height) > max_size) ?
-                          static_cast<double>(max_size) / static_cast<double>(std::max(min_width, min_height)) : 1.0;
+    // Determine maximum width and height
+    int max_width = 0, max_height = 0;
+    for (const auto& [_, img] : processed_images)
+    {
+        max_width = std::max(max_width, img.cols);
+        max_height = std::max(max_height, img.rows);
+    }
+
+    double scale_factor = (std::max(max_width, max_height) > max_size) ?
+                          static_cast<double>(max_size) / std::max(max_width, max_height) : 1.0;
 
     // Resize images while maintaining aspect ratio
-    std::vector<cv::Mat> resized_images(debug_images.size());
-    std::transform(debug_images.begin(), debug_images.end(), resized_images.begin(),
-                   [scale_factor](const auto& pair) {
-                       cv::Mat resized;
-                       cv::resize(pair.second, resized, cv::Size(), scale_factor, scale_factor, cv::INTER_LINEAR);
-                       return resized;
-                   });
+    std::vector<cv::Mat> resized_images;
+    for (const auto& [_, img] : processed_images)
+    {
+        cv::Mat resized;
+        cv::resize(img, resized, cv::Size(), scale_factor, scale_factor, cv::INTER_LINEAR);
+        resized_images.push_back(resized);
+    }
 
     // Convert grayscale to BGR for consistency
     for (auto& img : resized_images)
     {
-        if (img.channels() == 1) {
+        if (img.channels() == 1)
+        {
             cv::cvtColor(img, img, cv::COLOR_GRAY2BGR);
         }
     }
 
-    // Determine grid layout
-    const int num_images = resized_images.size();
-    const int grid_cols = 4;  // Number of columns in the grid
-    const int grid_rows = std::ceil(static_cast<double>(num_images) / grid_cols); // Correct floating-point division
+    const int grid_cols = 4;
+    const int grid_rows = std::ceil(static_cast<double>(resized_images.size()) / grid_cols);
 
-    const cv::Size img_size = resized_images[0].size();
+    // Determine max resized width/height
+    int img_width = 0, img_height = 0;
+    for (const auto& img : resized_images)
+    {
+        img_width = std::max(img_width, img.cols);
+        img_height = std::max(img_height, img.rows);
+    }
 
-    // Create an empty canvas for the grid with padding
-    const cv::Size grid_size = {
-        (img_size.width + grid_padding) * grid_cols - grid_padding,
-        (img_size.height + grid_padding) * grid_rows - grid_padding
-    };
+    // Compute final canvas size
+    cv::Size grid_size(
+        (img_width + grid_padding) * grid_cols - grid_padding,
+        (img_height + grid_padding) * grid_rows - grid_padding
+    );
 
     cv::Mat grid_canvas = cv::Mat::ones(grid_size, CV_8UC3) * 255;
 
-    // Place images in the grid with padding
+    // Place images
     for (int i = 0; i < resized_images.size(); ++i)
     {
-        const int row = i / grid_cols;
-        const int col = i % grid_cols;
+        int row = i / grid_cols;
+        int col = i % grid_cols;
 
-        cv::Point start_point = {
-            col * (img_size.width + grid_padding),
-            row * (img_size.height + grid_padding),
-        };
+        cv::Point start_point(col * (img_width + grid_padding), row * (img_height + grid_padding));
 
-        resized_images[i].copyTo(
-            grid_canvas(cv::Rect(start_point.x, start_point.y, resized_images[i].cols, resized_images[i].rows))
+        cv::Rect roi(
+            start_point.x, start_point.y,
+            std::min(resized_images[i].cols, grid_canvas.cols - start_point.x),
+            std::min(resized_images[i].rows, grid_canvas.rows - start_point.y)
         );
+
+        if (roi.width > 0 && roi.height > 0)
+        {
+            resized_images[i].copyTo(grid_canvas(roi));
+        }
 
         // Add text labels
-        cv::putText(
-            grid_canvas, debug_images[i].first, {start_point.x + 10, start_point.y + 20},
-            cv::FONT_HERSHEY_SIMPLEX, 0.5, {0, 255, 0}, 1, cv::LINE_AA
-        );
+        cv::putText(grid_canvas, processed_images[i].first, 
+                    {start_point.x + 10, start_point.y + 20},
+                    cv::FONT_HERSHEY_SIMPLEX, 0.5, {0, 255, 0}, 1, cv::LINE_AA);
     }
 
     return grid_canvas;
 }
+
 
 void displayDebug(const cv::Mat debug_canvas)
 {

@@ -8,6 +8,10 @@
 
 #include <opencv2/opencv.hpp>
 
+#ifdef __linux__
+
+#endif
+
 namespace pisar::mcp {
 
 /**
@@ -67,15 +71,15 @@ public:
      * @brief Starts the image source by loading the file.
      * @throws std::runtime_error if the image fails to load.
      */
-    inline void startImpl(const cv::Size frame_size) 
+    inline void startImpl(const cv::Size frame_size)
     {
-        if (!m_img.empty()) 
+        if (!m_img.empty())
         {
             throw std::runtime_error("Already started");
         }
 
         m_img = cv::imread(m_filePath);
-        if (m_img.empty()) 
+        if (m_img.empty())
         {
             throw std::runtime_error("Failed to load image: " + m_filePath);
         }
@@ -89,7 +93,7 @@ public:
      * @retval cv::Mat The captured frame is successful.
      * @retval std::nullopt if no frame captured.
      */
-    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl() 
+    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
     {
         if (m_img.empty()) {
             throw std::runtime_error("Image not loaded. Call start() first.");
@@ -103,8 +107,96 @@ public:
     inline void stopImpl() { m_img.release(); }
 };
 
+#ifdef __linux__
+
+
+
 /**
- * @brief Video source from a camera feed. 
+ * @brief Video source using a camera feed (via GStreamer).
+ */
+class VideoCameraSource : public VideoSource<VideoCameraSource> {
+private:
+    int m_camera_id;        ///< Camera ID (ignored for libcamera, but kept for compatibility).
+    cv::VideoCapture m_cap; ///< OpenCV VideoCapture object using GStreamer.
+
+public:
+    /**
+     * @brief Constructs a VideoCameraSource.
+     * @param camera_id Camera index.
+     */
+    inline explicit VideoCameraSource(int camera_id)
+        : VideoSource(), m_camera_id(camera_id), m_cap() {}
+
+    /**
+     * @brief Starts the video capture.
+     * @param frame_size Image frame size.
+     * @throws std::runtime_error if the camera fails to open.
+     */
+    inline void startImpl(const cv::Size frame_size)
+    {
+        if (m_cap.isOpened()) {
+            throw std::runtime_error("Camera already started.");
+        }
+
+        // GStreamer pipeline for libcamera
+        std::string p_line1 = "libcamerasrc camera-name=/base/axi/pcie@120000/rp1/i2c@88000/imx219@10 ";  // for PiCam V2
+        std::string p_line2 = "! video/x-raw, format=RGBx, width=640, height=480, framerate=200/1 ";  // for PiCam V2
+        std::string p_line3 = "! videoconvert ! video/x-raw, format=BGR ";
+        std::string p_line4 = "! appsink";
+        std::string pipeline = p_line1 + p_line2 + p_line3 + p_line4;
+        std::cout << "Pipeline: " << pipeline << std::endl;
+        std::cout << "OpenCV build info: " << cv::getBuildInformation() << std::endl;
+
+        m_cap.open(pipeline, cv::CAP_GSTREAMER);
+        if (!m_cap.isOpened()) {
+            throw std::runtime_error("Failed to open camera via GStreamer.");
+        }
+    }
+    
+    bool isBlackImage(const cv::Mat& img)
+    {
+        cv::Mat gray;
+        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY); // Convert to grayscale
+        return cv::countNonZero(gray) == 0;
+    }
+
+    /**
+     * @brief Captures a frame from the video source.
+     * @return std::optional<cv::Mat> containing the frame if successful, otherwise std::nullopt.
+     */
+    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
+    {
+        if (!m_cap.isOpened()) {
+            throw std::runtime_error("Camera is not started.");
+        }
+
+        cv::Mat frame;
+        while (frame.empty() || isBlackImage(frame))
+        {
+            if (!m_cap.read(frame)) 
+            {
+                return std::nullopt;
+            }
+        }
+
+        return frame;
+    }
+
+    /**
+     * @brief Stops the video capture and releases the camera.
+     */
+    inline void stopImpl()
+    {
+        if (m_cap.isOpened()) {
+            m_cap.release();
+        }
+    }
+};
+
+#else
+
+/**
+ * @brief Video source from a camera feed.
  */
 class VideoCameraSource : public VideoSource<VideoCameraSource> {
 private:
@@ -123,14 +215,14 @@ public:
      * @brief Starts the video capture.
      * @throws std::runtime_error if the camera fails to open.
      */
-    inline void startImpl(const cv::Size frame_size) 
+    inline void startImpl(const cv::Size frame_size)
     {
-        if (m_cap.isOpened()) 
+        if (m_cap.isOpened())
         {
             throw std::runtime_error("Camera already opened");
         }
 
-        if (!m_cap.open(m_camera_id)) 
+        if (!m_cap.open(m_camera_id))
         {
             throw std::runtime_error("Failed to open camera");
         }
@@ -145,15 +237,15 @@ public:
      * @retval std::nullopt if no frame captured.
      * @throws std::runtime_error on error.
      */
-    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl() 
+    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
     {
-        if (!m_cap.isOpened()) 
+        if (!m_cap.isOpened())
         {
             throw std::runtime_error("Camera is not started");
         }
 
         cv::Mat frame;
-        while (!m_cap.read(frame)) 
+        while (!m_cap.read(frame))
         {
             return std::nullopt;
         }
@@ -164,13 +256,15 @@ public:
     /**
      * @brief Stops the video capture and releases the camera.
      */
-    inline void stopImpl() 
+    inline void stopImpl()
     {
-        if (m_cap.isOpened()) 
+        if (m_cap.isOpened())
         {
             m_cap.release();
         }
     }
 };
+
+#endif
 
 }

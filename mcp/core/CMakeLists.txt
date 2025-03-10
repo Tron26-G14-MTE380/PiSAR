@@ -15,7 +15,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_NAME MATCHES "Linux")
     find_library(WIRINGPI_LIB wiringPi)
     set(PISAR_CORE_BUILD_RASPBERRY_PI TRUE)
 else()
-    message(STATUS "Not on Raspberry Pi: Skipping wiringPi")
+    message(STATUS "Not on Raspberry Pi: Skipping wiringPi and libcamera")
     set(PISAR_CORE_BUILD_RASPBERRY_PI FALSE)
 endif()
 

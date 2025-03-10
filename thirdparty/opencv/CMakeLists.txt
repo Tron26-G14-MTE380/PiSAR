@@ -30,5 +30,11 @@ ExternalProject_Add(
         -DBUILD_JAVA=OFF
         -DBUILD_opencv_python2=OFF
         -DBUILD_opencv_python3=OFF
+        -DWITH_GSTREAMER=ON
+        -DWITH_V4L=ON
+        -DWITH_LIBV4L=ON
+        -DWITH_OPENGL=ON
+        -DBUILD_opencv_videoio=ON
+        -DWITH_OPENEXR=OFF
     INSTALL_COMMAND cmake --install .
 )

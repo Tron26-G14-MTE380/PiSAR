@@ -665,7 +665,7 @@ public:
     {}
 
     /// @brief Runs the thinning algorithm
-    void run(const cv::Mat& img, cv::Mat& output) 
+    cv::Mat run(const cv::Mat& img) 
     {
         m_image = img.clone();
         m_new_image = img.clone();
@@ -693,8 +693,9 @@ public:
             t.join();
         }
 
-        output = m_new_image;
-        postProcessing(output);
+        postProcessing(m_new_image);
+        
+        return m_new_image.clone();
     }
 
 private:
@@ -744,8 +745,7 @@ private:
     /// @brief Assembles the new image for the next iteration
     void assembleImage() 
     {
-        std::swap(m_image, m_new_image);
-        m_new_image = m_image.clone();
+        m_image = m_new_image.clone();
 
         m_stop.store(!m_deleted.load(std::memory_order_relaxed), std::memory_order_relaxed);
         m_deleted.store(false, std::memory_order_relaxed);
@@ -771,18 +771,22 @@ void thinningMaRenParallel(cv::InputArray img, cv::OutputArray output)
 {
     EASY_FUNCTION();
 
-    cv::Mat processed = img.getMat().clone();
+    cv::Mat processed = img.getMat();
     CV_CheckTypeEQ(processed.type(), CV_8UC1, "");
-    // Enforce the range of the input image to be in between 0 - 255
-    processed /= 255;
 
-    // TODO: Find a better way to set threads based on host processors but lets hardcode 4 for now (rpi5 has 4 cores)
+    if (processed.empty()) 
+    {
+        throw std::runtime_error("thinningMaRenParallel: Input image is empty");
+    }
 
-    cv::Mat output_img;
+    cv::Mat processed_clone = processed.clone();
+    processed_clone /= 255;  // Normalize to 0-1
+
+    cv::Mat output_img = processed_clone.clone(); // Ensure output matrix is allocated
     auto thinning = MaRenParallelThinning(4);
-    thinning.run(processed, output_img);
+    output_img = thinning.run(processed_clone);
 
-    output_img *= 255;
+    output_img *= 255;  // Restore range
     output.assign(output_img);
 }
 

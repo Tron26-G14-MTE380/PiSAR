@@ -3,6 +3,7 @@
 #include "pisar/vision/line_tracker.h"
 #include "pisar/vision/homography.h"
 #include "pisar/vision/debug_visualization.h"
+#include "pisar/driveunit_controller.h"
 
 #include <easy/profiler.h>
 
@@ -19,10 +20,6 @@
 using namespace pisar::mcp;
 
 constexpr bool kDebug = false;
-constexpr uint64_t kProfileTimeMs = 10000;
-
-constexpr int kLeftMotorControlPin = 10;
-constexpr int kRightMotorControlPin = 9;
 
 const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> kTapeHsvThresholds = {
     std::make_pair(cv::Scalar(0, 120, 70), cv::Scalar(10, 255, 255)),
@@ -49,7 +46,18 @@ const CameraCalibrationData kCameraCalibration {
 
 const HomographyProjection kProjection = HomographyProjection(kCameraTransform, kAxisMapping, kCameraCalibration);
 
-void runRobot(std::vector<Eigen::Vector2d> trajectory)
+std::vector<Eigen::Vector2f> convertVector(const std::vector<Eigen::Vector2d>& input)
+{
+    std::vector<Eigen::Vector2f> output;
+    output.reserve(input.size()); // Reserve memory to avoid reallocation
+
+    std::transform(input.begin(), input.end(), std::back_inserter(output),
+                   [](const Eigen::Vector2d& v) { return v.cast<float>(); });
+
+    return output;
+}
+
+void runRobot(DriveunitController& driveunit_controller, std::vector<Eigen::Vector2d> trajectory)
 {
     const float firstPointLength = trajectory[0].norm();
     const float lastPointLength = trajectory[1].norm();
@@ -60,52 +68,25 @@ void runRobot(std::vector<Eigen::Vector2d> trajectory)
         std::reverse(trajectory.begin(), trajectory.end()); // Reverses the vector in place
     }
 
-    double x = trajectory[0].x();
-    double y = trajectory[0].y();
-
-    // Threshold to ignore tiny x deviations
-    constexpr double kThreshold = 0.1;
-
-    // Determine motor control
-    bool left_motor_on = false;
-    bool right_motor_on = false;
-
-    if (x > kThreshold) {
-        // Turn right: Stop left motor, Run right motor
-        left_motor_on = false;
-        right_motor_on = true;
-    } else if (x < -kThreshold) {
-        // Turn left: Run left motor, Stop right motor
-        left_motor_on = true;
-        right_motor_on = false;
-    } else {
-        // Move forward: Run both motors
-        left_motor_on = true;
-        right_motor_on = true;
+    const auto du_response = driveunit_controller.sendTrajectoryCommand(std::chrono::duration<float>(0), convertVector(trajectory));
+    if (!du_response.has_value())
+    {
+        std::cerr << "Error sending trajectory: " << du_response.error().message() << std::endl;
     }
-
-    const char* left_status = (left_motor_on ? "on" : "off");
-    const char* right_status = (right_motor_on ? "on" : "off");
-    std::cout << "Left: " << left_status << ", Right: " << right_status << std::endl;
-
-    // Apply to GPIO
-    digitalWrite(kLeftMotorControlPin, left_motor_on ? HIGH : LOW);
-    digitalWrite(kRightMotorControlPin, right_motor_on ? HIGH : LOW);
 }
-
 
 int main()
 {
     //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
-    VideoCameraSource video_source(0);
+    VideoCameraSource video_source(1);
+    
+    DriveunitTransport driveunit_transport;
+    DriveunitController driveunit_controller(driveunit_transport);
 
     auto line_tracker = LineTracker<kDebug>(std::span(kTapeHsvThresholds));
     const auto sized_projection = kProjection.for_image({640, 480});
 
-    wiringPiSetup();  // Initialize WiringPi
-    wiringPiSetupGpio();
-    pinMode(kLeftMotorControlPin, OUTPUT);
-    pinMode(kRightMotorControlPin, OUTPUT);
+    driveunit_transport.open();
 
     video_source.start({640, 480});
 
@@ -136,15 +117,15 @@ int main()
                 std::make_pair("Filtered Skeleton", debug_data.filtered_skeleton),
                 std::make_pair("Trajectory", debug_data.trajectory),
                 std::make_pair("Simplified Trajectory", debug_data.simplified_trajectory),
-                std::make_pair("Trajectory Homography Projection", createHomographyProjectionVisualization(640, 480, sized_projection, world_trajectory))
+                std::make_pair("Homography Projection", createHomographyProjectionVisualization({640, 480}, sized_projection, world_trajectory))
             };
 
             displayDebug(createDebugCanvas(debug_image_map));
         }
 
-        runRobot(world_trajectory);
+        //runRobot(driveunit_controller, world_trajectory);
     }
 
-    video_source.stop();
+    //video_source.stop();
 
 }
