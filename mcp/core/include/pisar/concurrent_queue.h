@@ -94,7 +94,7 @@ public:
      * @brief Clears the queue.
      *
      */
-    [[nodiscard]] inline void clear() const
+    [[nodiscard]] inline void clear()
     {
         std::scoped_lock lock(m_mutex);
         while (!m_queue.empty())

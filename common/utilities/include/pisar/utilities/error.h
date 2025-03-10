@@ -4,7 +4,7 @@
 #include <array>
 #include <string_view>
 
-namespace pisar::mcp {
+namespace pisar {
 
 /**
  * @brief Compile-time lookup for error messages using a linear search.
@@ -58,7 +58,11 @@ public:
     inline std::error_code make_error_code(EnumType e) \
     { \
         return {static_cast<int>(e), get_##CategoryName()}; \
-    } \
-    namespace std { \
-        template <> struct is_error_code_enum<::EnumType> : true_type {}; \
     }
+
+
+#define PISAR_REGISTER_ERROR(EnumType) \
+namespace std { \
+    template <> struct is_error_code_enum<::EnumType> : true_type {}; \
+}
+

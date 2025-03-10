@@ -39,7 +39,7 @@ rd::expected<driveunit_interface::Response, std::error_code>
 DriveunitTransport::receiveResponse(std::chrono::milliseconds timeout)
 {
     driveunit_interface::ResponseDecoder<1> decoder;
-    std::array<std::byte, ResponseEncoder::kMaxEncodedPacketSize> read_buffer;
+    std::array<std::byte, driveunit_interface::ResponseEncoder::kMaxEncodedPacketSize> read_buffer;
 
     const auto start_time = std::chrono::steady_clock::now();
 

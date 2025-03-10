@@ -9,6 +9,7 @@
 #include <atomic>
 #include <future>
 #include <chrono>
+#include <optional>
 
 namespace pisar::mcp {
 
@@ -57,7 +58,7 @@ public:
      */
     inline bool start()
     {
-        close();
+        stop();
         m_running.store(true, std::memory_order_release);
         m_worker_thread = std::thread(&AsyncDriveunitController::processRequests, this);
         return true;
@@ -136,7 +137,7 @@ public:
             return rd::expected(*valid_response);
         }
 
-        return rd::unexpected(make_error_code(DriveunitTransport::TransportError::kInvalidResponse));
+        return rd::unexpected(make_error_code(DriveunitTransport::Error::kInvalidResponse));
     }
 
     /**
@@ -145,7 +146,7 @@ public:
      * @return The request response or error.
      */
     [[nodiscard]] inline rd::expected<driveunit_interface::Response, std::error_code>
-    sendRequest(const driveunit_interface::Request& request)
+    sendRequestSync(const driveunit_interface::Request& request)
     {
         return m_transport.get().sendRequest(request);
     }

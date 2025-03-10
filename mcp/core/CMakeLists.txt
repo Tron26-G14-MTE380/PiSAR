@@ -29,6 +29,9 @@ target_include_directories(pisar_core
 
 target_sources(pisar_core
     PUBLIC
+    src/driveunit/async_driveunit_controller.cpp
+    src/driveunit/driveunit_transport.cpp
+
     src/vision/thinning/thinning_classical.cpp
     src/vision/thinning/thinning_ma_ren.cpp
     src/vision/debug_visualization.cpp

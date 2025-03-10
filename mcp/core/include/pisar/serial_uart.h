@@ -89,7 +89,7 @@ public:
             return 0;
         }
 
-        return ::write(m_fd, reinterpret_cast<uint8_t*>(buffer.data()), buffer.size());
+        return ::write(m_fd, reinterpret_cast<const uint8_t*>(buffer.data()), buffer.size());
     }
 
     /**
@@ -154,7 +154,12 @@ public:
         }
 
         const size_t bytes_read = ::read(m_fd, buffer.data(), buffer.size());
-        return bytes_read > 0 ? static_cast<size_t>(bytes_read) : std::nullopt;
+        if (bytes_read == 0)
+        {
+            return std::nullopt;
+        }
+
+        return bytes_read;
     }
 
     /**

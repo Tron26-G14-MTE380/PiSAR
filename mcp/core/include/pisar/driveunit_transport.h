@@ -6,6 +6,7 @@
 #include "pisar/serial_uart.h"
 
 #include "pisar/utilities/expected.h"
+#include "pisar/utilities/error.h"
 
 #include <wiringSerial.h>
 #include <Eigen/Dense>
@@ -18,6 +19,10 @@
 
 namespace pisar::mcp {
 
+class 
+enum class DriveunitTransport::Error;    
+std::error_code make_error_code(DriveunitTransport::Error);
+
 /**
  * @brief Handles UART communication between the Raspberry Pi (master) and driveunit (slave).
  */
@@ -28,12 +33,13 @@ private:
 
 public:
     enum class Error : uint8_t {
-        kNone,          ///< No error, operation successful.
-        kUartNotOpen,   ///< UART connection is closed.
-        kEncodingError, ///< Failed to encode the request.
-        kWriteError,    ///< UART write operation failed.
-        kReadTimeout,   ///< No response received within the timeout.
-        kDecodingError  ///< Response was received but failed decoding.
+        kNone,              ///< No error, operation successful.
+        kUartNotOpen,       ///< UART connection is closed.
+        kEncodingError,     ///< Failed to encode the request.
+        kWriteError,        ///< UART write operation failed.
+        kReadTimeout,       ///< No response received within the timeout.
+        kDecodingError,     ///< Response was received but failed decoding.
+        kInvalidResponse    ///< Response type not expected.
     };
 
     /**
@@ -84,15 +90,15 @@ public:
         const auto result = sendRequestInternal(driveunit_interface::Request(request));
         if (result.has_value() == false)
         {
-            return result.error();
+            return rd::unexpected(result.error());
         }
 
         if (auto response = std::get_if<TResponse>(&result.value()))
         {
-            return rd::expected(*response);
+            return rd::expected<TResponse, std::error_code>(*response);
         }
 
-        return rd::unexpected(make_error_code(DriveunitTransport::TransportError::kInvalidResponse));
+        return rd::unexpected(make_error_code(Error::kInvalidResponse));
     }
 
     /**
@@ -130,13 +136,16 @@ private:
     receiveResponse(std::chrono::milliseconds timeout = std::chrono::milliseconds(5));
 };
 
-PISAR_DEFINE_ERROR_CATEGORY(DriveunitTransport::Error, TransportErrorCategory, {
+PISAR_DEFINE_ERROR_CATEGORY(DriveunitTransport::Error, TransportErrorCategory,
     std::make_pair(DriveunitTransport::Error::kNone, "No error"),
     std::make_pair(DriveunitTransport::Error::kUartNotOpen, "UART is not open"),
     std::make_pair(DriveunitTransport::Error::kEncodingError, "Encoding failed"),
     std::make_pair(DriveunitTransport::Error::kWriteError, "UART write failed"),
     std::make_pair(DriveunitTransport::Error::kReadTimeout, "Read timeout"),
-    std::make_pair(DriveunitTransport::Error::kDecodingError, "Decoding failed")
-});
+    std::make_pair(DriveunitTransport::Error::kDecodingError, "Decoding failed"),
+    std::make_pair(DriveunitTransport::Error::kInvalidResponse, "Invalid Response")
+);
 
 } // namespace pisar::mcp
+
+PISAR_REGISTER_ERROR(DriveunitTransport::Error);

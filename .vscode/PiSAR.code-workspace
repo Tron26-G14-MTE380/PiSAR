@@ -116,7 +116,10 @@
 			"codecvt": "cpp",
 			"typeindex": "cpp",
 			"source_location": "cpp",
-			"alignedvector3": "cpp"
+			"alignedvector3": "cpp",
+			"barrier": "cpp",
+			"forward_list": "cpp",
+			"ranges": "cpp"
 		},
 		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json"
 	},
