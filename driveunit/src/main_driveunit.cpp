@@ -4,13 +4,15 @@
 #include "pisar/driveunit/message_handler.h"
 #include "pisar/driveunit/async_serial_uart.h"
 
+#include "pisar/driveunit/rtos/debug.h"
+
 #include <Eigen/Dense>
 
 #include "Arduino.h"
 
 using namespace pisar::driveunit;
 
-MotorDriver left_motor(6, 7);
+MotorDriver left_motor(7, 6);
 MotorDriver right_motor(8, 9);
 
 DifferentialDriveController drive_controller(left_motor, right_motor, 10);
@@ -19,7 +21,7 @@ RobotFacility facility(drive_controller, imu);
 
 
 /// @brief Factory function for creating the default mode
-OperatingModeIdle createDefaultMode()
+inline OperatingModeIdle createDefaultMode()
 {
     return OperatingModeIdle(facility);
 }
@@ -37,11 +39,16 @@ void setup()
     AsyncSerial2.setTX(4);
     AsyncSerial2.setRX(5);
 
-    // facility.initialize();
-    // PISAR_LOG_INFO("Robot facility initialized");
+    pinMode(25, OUTPUT);
+    digitalWrite(25, LOW);
 
-    // operating_mode_manager.initialize(5);
-    // PISAR_LOG_INFO("Operating mode manager initialized");
+    // initDebugMonitor();
+
+    facility.initialize(configMAX_PRIORITIES-3);
+    PISAR_LOG_INFO("Robot facility initialized");
+
+    operating_mode_manager.initialize(configMAX_PRIORITIES-2);
+    PISAR_LOG_INFO("Operating mode manager initialized");
 
     transport_interface.initialize(configMAX_PRIORITIES-1);
     PISAR_LOG_INFO("Transport interface initialized");
@@ -49,7 +56,7 @@ void setup()
 
 void loop()
 {
-    //PISAR_LOG_INFO("Hello World!");
+    PISAR_LOG_INFO("Hello World!");
     delay(2000);
 }
 

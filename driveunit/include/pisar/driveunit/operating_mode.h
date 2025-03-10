@@ -66,9 +66,9 @@ private:
 
 public:
     OperatingModeIdle(RobotFacility& facility) : m_facility(facility) {}
-    inline void onEnterImpl() {}
+    inline void onEnterImpl() { m_facility.get().driveStop(); }
     [[nodiscard]] inline bool updateImpl() { return false; }
-    inline void onExitImpl() {}
+    inline void onExitImpl() { m_facility.get().driveStop(); }
 };
 
 
@@ -86,10 +86,10 @@ public:
         RobotFacility& facility,
         const std::span<const Eigen::Vector2f> trajectory,
         const std::chrono::duration<float> reference_time
-    ) : m_facility(facility), m_trajectory(trajectory.begin(), trajectory.end()), m_ref_time(reference_time) {}
-    void onEnterImpl() {}
-    [[nodiscard]] bool updateImpl() { return true; }
-    void onExitImpl() {}
+    );
+    void onEnterImpl();
+    [[nodiscard]] bool updateImpl();
+    void onExitImpl();
 };
 
 class OperatingModeRotate: public OperatingMode<OperatingModeRotate>
@@ -99,11 +99,10 @@ private:
     float m_rotation_deg;
 
 public:
-    OperatingModeRotate(RobotFacility& facility, float rotation_deg) :
-        m_facility(facility), m_rotation_deg(rotation_deg) {}
-    void onEnterImpl() {}
-    [[nodiscard]] bool updateImpl() { return true; }
-    void onExitImpl() {}
+    OperatingModeRotate(RobotFacility& facility, float rotation_deg);
+    void onEnterImpl();
+    [[nodiscard]] bool updateImpl();
+    void onExitImpl();
 };
 
 }
