@@ -6,7 +6,8 @@
                 "${workspaceFolder}/core/include",
                 "${workspaceFolder:thirdparty}/install/Release/include",
                 "${workspaceFolder:thirdparty}/install/Release/include/eigen3",
-                "${workspaceFolder:driveunit_interface}/include"
+                "${workspaceFolder:driveunit_interface}/include",
+                "${workspaceFolder:common}/utilities/include"
             ],
             "cppStandard": "c++20"
         }

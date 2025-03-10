@@ -5,24 +5,23 @@
 #include <Eigen/Dense>
 
 #include "pisar/driveunit_interface/interface.h"
-#include "pisar/driveunit_controller.h"
+#include "pisar/async_driveunit_controller.h"
 
 #include <wiringPi.h>
 
 using namespace pisar::driveunit_interface;
 using namespace pisar::mcp;
 
-std::string_view kUartDevice = "/dev/ttyAMA0";
-
 int main()
 {
     wiringPiSetup(); // Initializes wiringPi using wiringPi's simlified number system.
 
-    DriveunitController controller;
+    DriveunitTransport transport;
+    DriveunitController controller(transport);
 
-    if (controller.open(kUartDevice) == false)
+    if (transport.open() == false)
     {
-        std::cerr << "Error opening UART device: " << kUartDevice << std::endl;
+        std::cerr << "Error opening UART device: " << transport.device() << std::endl;
         return 0;
     }
 
