@@ -19,7 +19,7 @@
 
 using namespace pisar::mcp;
 
-constexpr bool kDebug = false;
+constexpr bool kDebug = true;
 
 const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> kTapeHsvThresholds = {
     std::make_pair(cv::Scalar(0, 120, 70), cv::Scalar(10, 255, 255)),
@@ -59,13 +59,26 @@ std::vector<Eigen::Vector2f> convertVector(const std::vector<Eigen::Vector2d>& i
 
 void runRobot(DriveunitController& driveunit_controller, std::vector<Eigen::Vector2d> trajectory)
 {
-    const float firstPointLength = trajectory[0].norm();
-    const float lastPointLength = trajectory[1].norm();
-
-    // Take closest end of the trajectory as start
-    if (lastPointLength < firstPointLength)
+    if (trajectory.empty())
     {
-        std::reverse(trajectory.begin(), trajectory.end()); // Reverses the vector in place
+        return;
+    }
+    
+    if (trajectory.size() > 1)
+    {
+        const float firstPointLength = trajectory[0].norm();
+        const float lastPointLength = trajectory[1].norm();
+
+        // Take closest end of the trajectory as start
+        if (lastPointLength < firstPointLength)
+        {
+            std::reverse(trajectory.begin(), trajectory.end()); // Reverses the vector in place
+        }
+    }
+    
+    if (trajectory.size() > 5)
+    {
+        trajectory.resize(5);
     }
 
     const auto du_response = driveunit_controller.sendTrajectoryCommand(std::chrono::duration<float>(0), convertVector(trajectory));
@@ -110,22 +123,15 @@ int main()
         {
             auto debug_data = line_tracker.debugData();
             std::vector<std::pair<std::string, cv::Mat>> debug_image_map = {
-                std::make_pair("Original", captured_frame.value_or(cv::Mat())),
-                std::make_pair("Preprocessed", debug_data.preprocessed),
-                std::make_pair("HSV Filtered", debug_data.hsvFiltered),
-                std::make_pair("Skeleton", debug_data.skeleton),
-                std::make_pair("Filtered Skeleton", debug_data.filtered_skeleton),
-                std::make_pair("Trajectory", debug_data.trajectory),
-                std::make_pair("Simplified Trajectory", debug_data.simplified_trajectory),
-                std::make_pair("Homography Projection", createHomographyProjectionVisualization({640, 480}, sized_projection, world_trajectory))
+                std::make_pair("Original", captured_frame.value_or(cv::Mat()))
             };
 
             displayDebug(createDebugCanvas(debug_image_map));
         }
 
-        //runRobot(driveunit_controller, world_trajectory);
+        runRobot(driveunit_controller, world_trajectory);
     }
 
-    //video_source.stop();
+    video_source.stop();
 
 }

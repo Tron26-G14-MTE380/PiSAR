@@ -139,13 +139,16 @@ public:
         }
 
         // GStreamer pipeline for libcamera
-        std::string p_line1 = "libcamerasrc camera-name=/base/axi/pcie@120000/rp1/i2c@88000/imx219@10 ";  // for PiCam V2
-        std::string p_line2 = "! video/x-raw, format=RGBx, width=640, height=480, framerate=200/1 ";  // for PiCam V2
-        std::string p_line3 = "! videoconvert ! video/x-raw, format=BGR ";
+        std::string p_line1 = "libcamerasrc camera-name=/base/axi/pcie@120000/rp1/i2c@88000/imx219@10 "
+                      "exposure-mode=normal gain=1 denoise=auto ";  // Enable auto-exposure, gain, and denoising
+
+        std::string p_line2 = "! video/x-raw, format=NV12, width=640, height=480, framerate=60/1 ";  // Use NV12 for better quality
+
+        std::string p_line3 = "! videoconvert ! video/x-raw, format=BGR ";  // Convert to standard format
         std::string p_line4 = "! appsink";
+        
         std::string pipeline = p_line1 + p_line2 + p_line3 + p_line4;
         std::cout << "Pipeline: " << pipeline << std::endl;
-        std::cout << "OpenCV build info: " << cv::getBuildInformation() << std::endl;
 
         m_cap.open(pipeline, cv::CAP_GSTREAMER);
         if (!m_cap.isOpened()) {
