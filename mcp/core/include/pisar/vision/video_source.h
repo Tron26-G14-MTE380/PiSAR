@@ -139,10 +139,9 @@ public:
         }
 
         // GStreamer pipeline for libcamera
-        std::string p_line1 = "libcamerasrc camera-name=/base/axi/pcie@120000/rp1/i2c@88000/imx219@10 "
-                      "exposure-mode=normal gain=1 denoise=auto ";  // Enable auto-exposure, gain, and denoising
+        std::string p_line1 = "libcamerasrc camera-name=/base/axi/pcie@120000/rp1/i2c@88000/imx219@10 contrast=1.2 ";  // Enable auto-exposure, gain, and denoising
 
-        std::string p_line2 = "! video/x-raw, format=NV12, width=640, height=480, framerate=60/1 ";  // Use NV12 for better quality
+        std::string p_line2 = "! video/x-raw, width=640, height=480, framerate=60/1, format=NV12 ";  // Use NV12 for better quality
 
         std::string p_line3 = "! videoconvert ! video/x-raw, format=BGR ";  // Convert to standard format
         std::string p_line4 = "! appsink";
