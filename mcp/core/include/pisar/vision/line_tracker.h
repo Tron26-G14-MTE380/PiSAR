@@ -141,7 +141,7 @@ private:
         if constexpr (tkDebug)
         {
             m_debug.skeleton = skeleton;
-            m_debug.filtered_skeleton = skeleton;
+            m_debug.filtered_skeleton = filtered_skeleton;
         }
 
         return filtered_skeleton;
@@ -171,14 +171,17 @@ private:
     {
         EASY_FUNCTION();
 
+        cv::Mat closed_skeleton;
+        cv::morphologyEx(skeleton, closed_skeleton, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+
         cv::Mat labels, stats, centroids;
-        int num_labels = cv::connectedComponentsWithStats(skeleton, labels, stats, centroids, 8);
+        int num_labels = cv::connectedComponentsWithStats(closed_skeleton, labels, stats, centroids, 8);
 
         if (num_labels <= 1) {
-            return skeleton.clone();
+            return closed_skeleton.clone();
         }
 
-        // Find the largest component (ignoring the background at index 0)
+        // Find the largest connected component (excluding background)
         int largest_idx = 1;
         int max_area = stats.at<int>(1, cv::CC_STAT_AREA);
         for (int i = 2; i < num_labels; ++i) {
@@ -189,8 +192,16 @@ private:
             }
         }
 
-        cv::Mat largest_skeleton = cv::Mat::zeros(skeleton.size(), CV_8U);
-        largest_skeleton.setTo(255, labels == largest_idx);
+        // Create a blank mask and explicitly extract the largest component
+        cv::Mat largest_skeleton = cv::Mat::zeros(closed_skeleton.size(), CV_8U);
+
+        for (int r = 0; r < labels.rows; ++r) {
+            for (int c = 0; c < labels.cols; ++c) {
+                if (labels.at<int>(r, c) == largest_idx) {
+                    largest_skeleton.at<uint8_t>(r, c) = 255;  // Set pixel to white
+                }
+            }
+        }
 
         return largest_skeleton;
     }

@@ -1,8 +1,8 @@
 /**
  * @file thinning_ma_ren.cpp
  * @author Ashkan Ebrahimi (a28ebrah@uwaterloo.ca)
- * @brief An implementation of a skeletonization/thinning algorithm proposed in the paper 
- * "A novel fully parallel skeletonization algorithm". Full credits to Jun Ma, Xunhuan Ren, Viktar Yurevich Tsviatkou 
+ * @brief An implementation of a skeletonization/thinning algorithm proposed in the paper
+ * "A novel fully parallel skeletonization algorithm". Full credits to Jun Ma, Xunhuan Ren, Viktar Yurevich Tsviatkou
  * and Valery Kanstantinavich Kanapelka for the theory behind the algorithm.
  */
 
@@ -44,7 +44,7 @@ static constexpr inline auto toBitset(TBools&&...bools)
 
 
 /**
- * @brief 
+ * @brief
  * @param img The binary image (CV_8UC1, values should be 0 or 1).
  * @param p The pixel coordinate (x, y).
  * @return A bitset representing the neighborhood.
@@ -532,7 +532,7 @@ static inline bool checkTemplateM(const std::bitset<20> neighbors)
 }
 
 constexpr std::array<bool (*)(const std::bitset<20>), 10> kpExtraDeletionTemplateCheckers = {
-    checkTemplateD, checkTemplateE, checkTemplateF, checkTemplateG, checkTemplateH, 
+    checkTemplateD, checkTemplateE, checkTemplateF, checkTemplateG, checkTemplateH,
     checkTemplateI, checkTemplateJ, checkTemplateK, checkTemplateL, checkTemplateM
 };
 
@@ -544,7 +544,7 @@ static bool shouldDeletePixel(const cv::Mat& img, int r, int c)
     {
         return false;
     }
-    
+
     const std::bitset<8> immediate_neighbors = getPackedImmediateNeighbors(img, cv::Point{c, r});
     const uint8_t A = num_ordered_pairs(immediate_neighbors);
     const uint8_t B = num_neighbours_set(immediate_neighbors);
@@ -573,24 +573,24 @@ static bool shouldDeletePixel(const cv::Mat& img, int r, int c)
     return false;
 }
 
-static inline bool shouldDeletePixelPostProcessing(const cv::Mat& img, int r, int c) 
+static inline bool shouldDeletePixelPostProcessing(const cv::Mat& img, int r, int c)
 {
     const std::bitset<8> neighbors = getPackedImmediateNeighbors(img, cv::Point{c, r});
 
-    constexpr std::bitset<8> mask1 = (1 << 5) | (1 << 2) | (1 << 0); 
-    constexpr std::bitset<8> mask2 = (1 << 7) | (1 << 4) | (1 << 2); 
-    constexpr std::bitset<8> mask3 = (1 << 1) | (1 << 6) | (1 << 4); 
+    constexpr std::bitset<8> mask1 = (1 << 5) | (1 << 2) | (1 << 0);
+    constexpr std::bitset<8> mask2 = (1 << 7) | (1 << 4) | (1 << 2);
+    constexpr std::bitset<8> mask3 = (1 << 1) | (1 << 6) | (1 << 4);
     constexpr std::bitset<8> mask4 = (1 << 3) | (1 << 0) | (1 << 6);
 
-    constexpr std::bitset<8> pattern1 = (1 << 2) | (1 << 0); 
-    constexpr std::bitset<8> pattern2 = (1 << 4) | (1 << 2); 
-    constexpr std::bitset<8> pattern3 = (1 << 6) | (1 << 4); 
+    constexpr std::bitset<8> pattern1 = (1 << 2) | (1 << 0);
+    constexpr std::bitset<8> pattern2 = (1 << 4) | (1 << 2);
+    constexpr std::bitset<8> pattern3 = (1 << 6) | (1 << 4);
     constexpr std::bitset<8> pattern4 = (1 << 0) | (1 << 6);
 
     return (
-        ((neighbors & mask1) == pattern1) || 
-        ((neighbors & mask2) == pattern2) || 
-        ((neighbors & mask3) == pattern3) ||  
+        ((neighbors & mask1) == pattern1) ||
+        ((neighbors & mask2) == pattern2) ||
+        ((neighbors & mask3) == pattern3) ||
         ((neighbors & mask4) == pattern4)
     );
 }
@@ -627,7 +627,7 @@ static void thinningMaRenIterativeImpl(cv::Mat& img)
                 }
             }
         }
-        
+
         if (flag == false)
         {
             break;
@@ -636,7 +636,7 @@ static void thinningMaRenIterativeImpl(cv::Mat& img)
         img -= delete_matrix;
         delete_matrix.setTo(0);
     }
-    
+
     postProcessing(img);
 }
 
@@ -656,7 +656,7 @@ private:
 public:
     /**
      * @brief Constructs the thinning processor
-     * 
+     *
      * @param num_threads Number of worker threads
      */
     MaRenParallelThinning(int num_threads)
@@ -665,7 +665,7 @@ public:
     {}
 
     /// @brief Runs the thinning algorithm
-    cv::Mat run(const cv::Mat& img) 
+    cv::Mat run(const cv::Mat& img)
     {
         m_image = img.clone();
         m_new_image = img.clone();
@@ -681,41 +681,41 @@ public:
         const int remainder = totalRows % m_num_threads;
 
         int start_row = 2; // Begin at row index 2
-        for (int i = 0; i < m_num_threads; ++i) 
+        for (int i = 0; i < m_num_threads; ++i)
         {
             int end_row = start_row + rowsPerThread + (i < remainder ? 1 : 0); // Distribute remainder
             workers.emplace_back(&MaRenParallelThinning::workerThread, this, start_row, end_row);
             start_row = end_row; // Move to next chunk
         }
 
-        for (auto& t : workers) 
+        for (auto& t : workers)
         {
             t.join();
         }
 
         postProcessing(m_new_image);
-        
+
         return m_new_image.clone();
     }
 
 private:
     /**
      * @brief Worker thread function
-     * 
+     *
      * @param start_row Start row of the assigned segment
      * @param end_row End row of the assigned segment
      */
     void workerThread(int start_row, int end_row) {
         cv::Mat local_delete_matrix = cv::Mat::zeros(cv::Size(m_image.cols, end_row - start_row), CV_8UC1);
         while (true) {
-            
+
             bool local_deleted = false;
 
-            for (int r = start_row; r < end_row; ++r) 
+            for (int r = start_row; r < end_row; ++r)
             {
-                for (int c = 2; c < m_image.cols - 2; ++c) 
+                for (int c = 2; c < m_image.cols - 2; ++c)
                 {
-                    if (shouldDeletePixel(m_image, r, c)) 
+                    if (shouldDeletePixel(m_image, r, c))
                     {
                         local_delete_matrix.at<uint8_t>(r - start_row, c) = 1;
                         local_deleted = true;
@@ -723,19 +723,19 @@ private:
                 }
             }
 
-            if (local_deleted) 
+            if (local_deleted)
             {
                 m_deleted.store(true, std::memory_order_relaxed);
             }
-            
+
             // Extract the region from m_new_image that corresponds to this thread's work area
             cv::Mat image_region = m_new_image.rowRange(start_row, end_row);
-            image_region -= local_delete_matrix; // Apply deletions in one step
+            cv::subtract(image_region, local_delete_matrix, image_region);
             local_delete_matrix.setTo(0);
 
             m_barrier.arrive_and_wait();
 
-            if (m_stop.load(std::memory_order_relaxed)) 
+            if (m_stop.load(std::memory_order_relaxed))
             {
                 break;  // Stop when no pixels are deleted
             }
@@ -743,7 +743,7 @@ private:
     }
 
     /// @brief Assembles the new image for the next iteration
-    void assembleImage() 
+    void assembleImage()
     {
         m_image = m_new_image.clone();
 
@@ -774,7 +774,7 @@ void thinningMaRenParallel(cv::InputArray img, cv::OutputArray output)
     cv::Mat processed = img.getMat();
     CV_CheckTypeEQ(processed.type(), CV_8UC1, "");
 
-    if (processed.empty()) 
+    if (processed.empty())
     {
         throw std::runtime_error("thinningMaRenParallel: Input image is empty");
     }
