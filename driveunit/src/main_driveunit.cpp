@@ -12,8 +12,8 @@
 
 using namespace pisar::driveunit;
 
-MotorDriver left_motor(7, 6, 0.3f);
-MotorDriver right_motor(8, 9, 0.3f);
+MotorDriver left_motor(7, 6, 0.2f);
+MotorDriver right_motor(8, 9, 0.2f);
 
 DifferentialDriveController drive_controller(left_motor, right_motor, 10);
 Imu imu(SPI1, 3);
@@ -34,10 +34,13 @@ TransportInterface<decltype(message_handler)> transport_interface(AsyncSerial2, 
 
 void setup()
 {
-    initLogging(115200, LogLevel::kDebug, true);
+    initLogging(115200, LogLevel::kDebug, false);
 
     AsyncSerial2.setTX(4);
     AsyncSerial2.setRX(5);
+
+    pinMode(25, OUTPUT);
+    digitalWrite(25, LOW);
 
     // initDebugMonitor();
 
@@ -54,6 +57,9 @@ void setup()
 void loop()
 {
     PISAR_LOG_INFO("Hello World!");
-    delay(2000);
+    digitalWrite(25, LOW);
+    delay(1000);
+    digitalWrite(25, HIGH);
+    delay(1000);
 }
 
