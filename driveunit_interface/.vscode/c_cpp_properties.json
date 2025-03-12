@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "name": "pisar_driveunit_interface",
+            "includePath": [
+                "${workspaceFolder}/include/**",
+                "${workspaceFolder:common}/utilities/include/**",
+                "${workspaceFolder:thirdparty}/zpp_bits/zpp_bits/**"
+            ],
+            "cppStandard": "c++20",
+        }
+    ],
+    "version": 4
+}

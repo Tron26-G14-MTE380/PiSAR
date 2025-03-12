@@ -1,0 +1,4 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/zpp_bitsTargets.cmake")
+check_required_components(zpp_bits)

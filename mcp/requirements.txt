@@ -1,0 +1,5 @@
+numpy<3.0                       # Regular Numpy
+opencv-python<5.0               # Regular OpenCv
+opencv-contrib-python<5.0       # Extended Image Processing (ximgproc)
+scipy<2.0                       # Required for KDTree
+scikit-image<1.0                # Required for RDP

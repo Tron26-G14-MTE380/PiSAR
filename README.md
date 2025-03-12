@@ -5,9 +5,9 @@
 
 The system consists of two main components:
 
-- **Brain (Raspberry Pi)**: Handles vision processing, state management, and high-level decision-making.
-- **Firmware (Microcontroller)**: Controls motor actions and responds to commands sent by the Raspberry Pi.
+- **MCP (Master Control Program, Raspberry Pi)**: Handles vision processing, state management, and high-level decision-making.
+- **driveunit (Microcontroller)**: Controls motor actions and responds to commands sent by the Raspberry Pi.
 
 This repository contains all the software for controlling the robot, divided into two primary folders:
-- **`firmware/`**: Microcontroller firmware for motor control.
-- **`brain/`**: Raspberry Pi code for vision processing and state machine.
+- **`driveunit`**: Microcontroller firmware for motor control.
+- **`mcp`**: Raspberry Pi code for vision processing and state machine.

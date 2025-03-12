@@ -1,0 +1,12 @@
+{
+    "configurations": [
+        {
+            "name": "thirdparty",
+            "includePath": [
+                "${workspaceFolder}/zpp_bits/zpp_bits"
+            ],
+            "cppStandard": "c++20"
+        }
+    ],
+    "version": 4
+}

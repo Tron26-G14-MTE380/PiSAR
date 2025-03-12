@@ -31,11 +31,16 @@
 *.out
 *.app
 
-# Ignore the .vscode folder
-.vscode/
-
-# Do not ignore workspace files (e.g., my_project.code-workspace)
-!*.code-workspace
-
 # PIO
 .pio
+
+# python
+.venv/
+__pycache__/
+
+# cmake
+build/
+install/
+
+# easy_profiler
+*.prof

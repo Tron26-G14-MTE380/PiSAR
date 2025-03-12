@@ -1,0 +1,41 @@
+{
+    "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
+    "name": "PiSAR-driveunit-interface",
+    "version": "1.0.0",
+    "description": "Implementation of interface between the PiSAR raspberry pi brain and drive unit",
+    "authors": [
+      {
+        "name": "Ashkan Ebrahimi"
+      },
+      {
+        "name": "Gabe Vaughan"
+      },
+      {
+        "name": "Eric Bettinson"
+      },
+      {
+        "name": "Erik Smith"
+      },
+      {
+        "name": "Ryan Beauregard"
+      }
+    ],
+    "license": "Mozilla Public License Version 2.0",
+    "dependencies": [
+      {
+        "name": "zpp_bits"
+      },
+      {
+        "name": "pisar_utilities"
+      }
+    ],
+    "build": {
+        "includeDir": "include",
+        "srcFilter": [
+          "+<src/*.cpp>",   
+          "+<include/*.h>",
+          "+<include/*.hpp>"
+        ],
+        "srcDir": "include"
+    }
+}
