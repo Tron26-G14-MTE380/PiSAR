@@ -23,13 +23,13 @@ void OperatingModeFollowTrajectory::onEnterImpl()
     }
 
      // Move towards the first waypoint
-     Eigen::Vector2f target = m_trajectory.front();
+     Eigen::Vector2f target = m_trajectory.front().normalized();
 
-     float forward_movement = target.x();  // Forward distance
-     float sideways_movement = target.y(); // Sideways movement
+     float forward_movement = std::clamp(target.y(), 0.0f, 1.0f);  // Forward distance
+     float sideways_movement = std::clamp(-target.x(), -1.0f, 1.0f); // Sideways movement
 
      // Convert sideways movement into turning (assumption: positive = right, negative = left)
-     float base_speed = 0.3f;
+     const float base_speed = 1.0f;
      float turn_speed = std::clamp(sideways_movement * 0.5f, -1.0f, 1.0f);
 
      float left_speed = base_speed - turn_speed;
