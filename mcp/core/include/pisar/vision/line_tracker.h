@@ -104,6 +104,11 @@ private:
             cv::inRange(hsv, lower, upper, temp_mask);
             cv::bitwise_or(mask, temp_mask, mask);
         }
+        
+        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11)));
+        
+        // Apply Erosion to remove small artifacts
+        cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11)));
 
         if constexpr (tkDebug)
         {

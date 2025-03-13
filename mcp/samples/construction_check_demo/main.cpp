@@ -22,8 +22,8 @@ using namespace pisar::mcp;
 constexpr bool kDebug = false;
 
 const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> kTapeHsvThresholds = {
-    std::make_pair(cv::Scalar(0, 120, 70), cv::Scalar(10, 255, 255)),
-    std::make_pair(cv::Scalar(170, 120, 70), cv::Scalar(180, 255, 255))
+    std::make_pair(cv::Scalar(0, 100, 50), cv::Scalar(10, 255, 255)),
+    std::make_pair(cv::Scalar(170, 100, 50), cv::Scalar(180, 255, 255))
 };
 
 const CameraTransform kCameraTransform {
