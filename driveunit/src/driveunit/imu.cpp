@@ -9,64 +9,104 @@ using namespace std::chrono_literals;
 namespace pisar::driveunit
 {
 
-Imu::Imu(SPIClass &spi, uint8_t cs_pin, uint16_t sample_rate) :
+Imu::Imu(SPIClassRP2040 &spi, uint8_t cs_pin, uint8_t rx_pin, uint8_t tx_pin, uint8_t sck_pin, uint16_t sample_rate, uint32_t spi_speed) :
     m_sample_rate(sample_rate),
     m_sample_time(static_cast<std::chrono::microseconds::rep>(1E6f / sample_rate)),
-    m_imu(&spi, cs_pin)
-{
-}
+    m_imu(&spi, cs_pin, spi_speed),
+    m_spi(spi),
+    m_cs_pin(cs_pin),
+    m_rx_pin(rx_pin),
+    m_tx_pin(tx_pin),
+    m_sck_pin(sck_pin)
+{}
 
 
-void Imu::initialize()
+bool Imu::initialize()
 {
+
+    if (m_spi.setRX(m_rx_pin) == false)
+    {
+        PISAR_LOG_ERROR("Failed to setup RX pin!");
+        return false;
+    }
+
+    if (m_spi.setTX(m_tx_pin) == false)
+    {
+        PISAR_LOG_ERROR("Failed to setup TX pin!");
+        return false;
+    }
+
+    if (m_spi.setSCK(m_sck_pin) == false)
+    {
+        PISAR_LOG_ERROR("Failed to setup SCK pin!");
+        return false;
+    }
+
+    if (m_spi.setCS(m_cs_pin) == false)
+    {
+        PISAR_LOG_ERROR("Failed to setup CS pin!");
+        return false;
+    }
+
+    // no return for this guy :p
+    m_spi.begin();
+
     if (m_imu.begin() != LSM6DSO_OK)
     {
         PISAR_LOG_ERROR("Failed to initialize LSM6DSO via SPI!");
-        return;
+        return false;
+    }
+    
+    if (connectionCheck() == false)
+    {
+        PISAR_LOG_ERROR("Failed to connect! Try connecting again!");
+        return false;
     }
 
     if (m_imu.Set_X_FS(2) != LSM6DSO_OK)
     {
         PISAR_LOG_ERROR("Failed to set accelerometer range!");
-        return;
+        return false;
     }
 
     if (m_imu.Set_X_ODR(m_sample_rate) != LSM6DSO_OK) // Maps to 833 Hz
     {
         PISAR_LOG_ERROR("Failed to set accelerometer data rate!");
-        return;
+        return false;
     }
 
     if (m_imu.Set_G_FS(125) != LSM6DSO_OK)
     {
         PISAR_LOG_ERROR("Failed to set gyroscope range!");
-        return;
+        return false;
     }
 
     if (m_imu.Set_G_ODR(m_sample_rate) != LSM6DSO_OK) // Maps to 833 Hz
     {
         PISAR_LOG_ERROR("Failed to set gyroscope data rate!");
-        return;
+        return false;
     }
 
-    // Setup onboard fifo
-    if (m_imu.Set_FIFO_Mode(LSM6DSO_STREAM_MODE) != LSM6DSO_OK)
-    {
-        PISAR_LOG_ERROR("Failed to set IMU fifo mode!");
-        return;
-    }
+    // // Setup onboard fifo
+    // if (m_imu.Set_FIFO_Mode(LSM6DSO_STREAM_MODE) != LSM6DSO_OK)
+    // {
+    //     PISAR_LOG_ERROR("Failed to set IMU fifo mode!");
+    //     return false;
+    // }
 
-    if (m_imu.Set_FIFO_X_BDR(m_sample_rate) != LSM6DSO_OK)
-    {
-        PISAR_LOG_ERROR("Failed to set accelerometer FIFO batch rate!");
-        return;
-    }
+    // if (m_imu.Set_FIFO_X_BDR(m_sample_rate) != LSM6DSO_OK)
+    // {
+    //     PISAR_LOG_ERROR("Failed to set accelerometer FIFO batch rate!");
+    //     return false;
+    // }
 
-    if (m_imu.Set_FIFO_G_BDR(m_sample_rate) != LSM6DSO_OK)
-    {
-        PISAR_LOG_ERROR("Failed to set gryoscope FIFO batch rate!");
-        return;
-    }
+    // if (m_imu.Set_FIFO_G_BDR(m_sample_rate) != LSM6DSO_OK)
+    // {
+    //     PISAR_LOG_ERROR("Failed to set gryoscope FIFO batch rate!");
+    //     return false;
+    // }
+
+    return true;
 }
 
 

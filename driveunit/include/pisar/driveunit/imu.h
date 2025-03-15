@@ -45,19 +45,29 @@ public:
     };
 
 private:
+    SPIClassRP2040 &m_spi;  ///< SPI bus reference
+    uint8_t m_cs_pin; ///< Chip Select (CS) pin
+    uint8_t m_rx_pin; ///< Chip Select (CS) pin
+    uint8_t m_tx_pin; ///< Chip Select (CS) pin
+    uint8_t m_sck_pin; ///< Chip Select (CS) pin
     uint16_t m_sample_rate;                     ///< Sample rate.
     std::chrono::microseconds m_sample_time;    ///< Sample time.
     LSM6DSOSensor m_imu;                        ///< Underlying imu sensor driver.
+
 
 public:
 
     /**
      * @brief Constructs an Imu object.
-     * @param spi Reference to the SPI bus.
+     * @param spi Reference to the SPI bus (RP2040).
      * @param cs_pin Chip select (CS) pin for SPI communication.
-     * @param sample_rate The accelerometer and gyroscope sample rate.
+     * @param rx_pin The SPI RX pin.
+     * @param tx_pin The SPI TX pin.
+     * @param sck_pin The SPI SCK pin.
+     * @param sample_rate The accelerometer and gyroscope sample rate (default: 800).
+     * @param spi_speed The SPI communication speed in Hz (default: 1000000).
      */
-    Imu(SPIClass &spi, uint8_t cs_pin, uint16_t sample_rate = 800);
+    Imu(SPIClassRP2040 &spi, uint8_t cs_pin, uint8_t rx_pin, uint8_t tx_pin, uint8_t sck_pin, uint16_t sample_rate = 800, uint32_t spi_speed = 1'000'000);
 
     /// @brief Destructor
     ~Imu();
@@ -65,8 +75,10 @@ public:
     [[nodiscard]] inline uint16_t getSampleRate() { return m_sample_rate; }
     [[nodiscard]] inline std::chrono::microseconds getSampleTime() { return m_sample_time; }
 
-    /// @brief Initializes the Imu sensor.
-    void initialize();
+    /**
+     * @brief Initializes the IMU, setting up SPI and sensor configurations.
+     */
+    [[nodiscard]] bool initialize();
 
     /// @brief Returns whether data is ready.
     [[nodiscard]] inline bool accelDataReady()
@@ -183,6 +195,32 @@ public:
     }
 
     /**
+     * @brief Reads the WHO_AM_I register to verify IMU communication.
+     * @return The expected ID (0x6A) if successful, otherwise 0x00 or 0xFF if communication fails.
+     */
+    [[nodiscard]] inline std::optional<uint8_t> readWhoAmI()
+    {
+        uint8_t who_am_i = 0;
+        if (m_imu.ReadID(&who_am_i) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to read WHO_AM_I register");
+            return std::nullopt;
+        }
+        return who_am_i;
+    }
+
+    [[nodiscard]] inline bool connectionCheck()
+    {
+        const auto whoami = readWhoAmI();
+        if (!whoami)
+        {
+            return false;        
+        }
+
+        return whoami.value() == 0x6C;
+    }
+
+    /**
      * @brief Reads the stream of raw accelerometer and gyroscope samples from the fifo.
      * @param output Output buffer to store the samples.
      */
@@ -206,6 +244,7 @@ public:
      * @return List of accelerometer and gyroscope data pairs.
      */
     [[nodiscard]] std::vector<Data> readFifo();
+
 };
 
 }
