@@ -151,7 +151,9 @@
 			"splines": "cpp",
 			"*.ipp": "cpp",
 			"csignal": "cpp",
-			"strstream": "cpp"
+			"strstream": "cpp",
+			"matrixfunctions": "cpp",
+			"polynomials": "cpp"
 		},
 		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
 		"editor.tabSize": 4,

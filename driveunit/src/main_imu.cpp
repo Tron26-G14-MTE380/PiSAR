@@ -11,15 +11,17 @@ void setup()
 
     initLogging(115200, LogLevel::kInfo, true);
 
-    if (!imu.initialize())
+    if (imu.initialize())
     {
-        PISAR_LOG_ERROR("IMU initialization FAILED!");
+        PISAR_LOG_INFO("IMU initialization SUCCESS!");
         return;
     }
-    PISAR_LOG_INFO("IMU initialization SUCCESS!");
+
 }
 
 void loop()
 {
-    // skibidi pa pa
+    auto accelData = imu.readAccel();
+    PISAR_LOG_INFO("Accel Data: x = %i, y = %i, z = %i",
+                   accelData.values.x(), accelData.values.y(), accelData.values.z());   
 }
