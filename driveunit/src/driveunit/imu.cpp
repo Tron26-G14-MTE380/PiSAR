@@ -59,7 +59,7 @@ bool Imu::initialize()
     
     if (connectionCheck() == false)
     {
-        PISAR_LOG_ERROR("Failed to connect! Try connecting again!");
+        PISAR_LOG_ERROR("Failed to connect to the IMU! Try connecting again!");
         return false;
     }
 
@@ -87,24 +87,24 @@ bool Imu::initialize()
         return false;
     }
 
-    // // Setup onboard fifo
-    // if (m_imu.Set_FIFO_Mode(LSM6DSO_STREAM_MODE) != LSM6DSO_OK)
-    // {
-    //     PISAR_LOG_ERROR("Failed to set IMU fifo mode!");
-    //     return false;
-    // }
+    // Setup onboard fifo
+    if (m_imu.Set_FIFO_Mode(LSM6DSO_STREAM_MODE) != LSM6DSO_OK)
+    {
+        PISAR_LOG_ERROR("Failed to set IMU fifo mode!");
+        return false;
+    }
 
-    // if (m_imu.Set_FIFO_X_BDR(m_sample_rate) != LSM6DSO_OK)
-    // {
-    //     PISAR_LOG_ERROR("Failed to set accelerometer FIFO batch rate!");
-    //     return false;
-    // }
+    if (m_imu.Set_FIFO_X_BDR(m_sample_rate) != LSM6DSO_OK)
+    {
+        PISAR_LOG_ERROR("Failed to set accelerometer FIFO batch rate!");
+        return false;
+    }
 
-    // if (m_imu.Set_FIFO_G_BDR(m_sample_rate) != LSM6DSO_OK)
-    // {
-    //     PISAR_LOG_ERROR("Failed to set gryoscope FIFO batch rate!");
-    //     return false;
-    // }
+    if (m_imu.Set_FIFO_G_BDR(m_sample_rate) != LSM6DSO_OK)
+    {
+        PISAR_LOG_ERROR("Failed to set gryoscope FIFO batch rate!");
+        return false;
+    }
 
     return true;
 }
