@@ -211,6 +211,11 @@ public:
         return who_am_i;
     }
 
+
+    /**
+     * @brief Checks the connection to the IMU by reading the WHO_AM_I register.
+     * @return True if the WHO_AM_I register value matches the expected ID (0x6C), false otherwise.
+     */
     [[nodiscard]] inline bool connectionCheck()
     {
         const auto whoami = readWhoAmI();
@@ -220,6 +225,38 @@ public:
         }
 
         return whoami.value() == 0x6C;
+    }
+
+    /**
+     * @brief Gets the accelerometer sensitivity.
+     * @return The accelerometer sensitivity if successful, otherwise -1.0f to indicate failure.
+     */
+    [[nodiscard]] inline float getXSensitivity()
+    {
+        float sensitivity = 0;
+        if (m_imu.Get_X_Sensitivity(&sensitivity) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to get accelerometer sensitivity.");
+            return -1.0f;;
+        }
+
+        return sensitivity;
+    }
+
+    /**
+     * @brief Gets the gyroscope sensitivity.
+     * @return The gyroscope sensitivity if successful, otherwise -1.0f to indicate failure.
+     */
+    [[nodiscard]] inline float getGSensitivity()
+    {
+        float sensitivity = 0;
+        if (m_imu.Get_G_Sensitivity(&sensitivity) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to get gyro sensitivity.");
+            return -1.0f;;
+        }
+
+        return sensitivity;
     }
 
     /**
