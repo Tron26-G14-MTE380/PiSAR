@@ -62,10 +62,10 @@ bool Imu::initialize()
         PISAR_LOG_ERROR("Failed to connect to the IMU! Try connecting again!");
         return false;
     }
-
-    if (m_imu.Set_X_FS(2) != LSM6DSO_OK)
+    
+    if (m_imu.Enable_X() != LSM6DSO_OK)
     {
-        PISAR_LOG_ERROR("Failed to set accelerometer range!");
+        PISAR_LOG_ERROR("Failed to enable the IMU's accelerometer!");
         return false;
     }
 
@@ -75,15 +75,27 @@ bool Imu::initialize()
         return false;
     }
 
-    if (m_imu.Set_G_FS(125) != LSM6DSO_OK)
+    if (m_imu.Set_X_FS(2) != LSM6DSO_OK)
     {
-        PISAR_LOG_ERROR("Failed to set gyroscope range!");
+        PISAR_LOG_ERROR("Failed to set accelerometer range!");
+        return false;
+    }
+
+    if (m_imu.Enable_G() != LSM6DSO_OK)
+    {
+        PISAR_LOG_ERROR("Failed to enable the IMU's gyro!");
         return false;
     }
 
     if (m_imu.Set_G_ODR(m_sample_rate) != LSM6DSO_OK) // Maps to 833 Hz
     {
         PISAR_LOG_ERROR("Failed to set gyroscope data rate!");
+        return false;
+    }
+
+    if (m_imu.Set_G_FS(125) != LSM6DSO_OK)
+    {
+        PISAR_LOG_ERROR("Failed to set gyroscope range!");
         return false;
     }
 

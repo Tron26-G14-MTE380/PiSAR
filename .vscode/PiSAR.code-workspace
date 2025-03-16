@@ -120,7 +120,10 @@
 			"barrier": "cpp",
 			"forward_list": "cpp",
 			"ranges": "cpp",
-			"bvh": "cpp"
+			"bvh": "cpp",
+			"dense": "cpp",
+			"matrixfunctions": "cpp",
+			"polynomials": "cpp"
 		},
 		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json"
 	},

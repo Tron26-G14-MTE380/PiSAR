@@ -90,6 +90,8 @@ public:
             return false;
         }
 
+        PISAR_LOG_ERROR("ready value: %d", ready);
+
         return ready;
     }
 
