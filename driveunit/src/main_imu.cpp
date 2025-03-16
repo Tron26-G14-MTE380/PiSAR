@@ -21,7 +21,4 @@ void setup()
 
 void loop()
 {
-    auto accelData = imu.readAccel();
-    PISAR_LOG_INFO("Accel Data: x = %i, y = %i, z = %i",
-                   accelData.values.x(), accelData.values.y(), accelData.values.z());   
 }
