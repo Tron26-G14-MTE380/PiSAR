@@ -48,3 +48,11 @@ class SafeZoneDetector:
         cv2.drawContours(debug_image, [hull], -1, (255, 255, 255), 2)
         cv2.imshow("Convex Hull Shape", debug_image)
         cv2.waitKey(1)
+
+        # Compute bounding box (for precise center)
+        x, y, w, h = cv2.boundingRect(hull)
+        cx, cy = x + w // 2, y + h // 2
+
+        print(f"Safe Zone Center (Corrected): ({cx}, {cy})")
+
+        return (cx, cy)
