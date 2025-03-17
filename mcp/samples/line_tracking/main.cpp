@@ -53,11 +53,11 @@ int main()
         EASY_PROFILER_ENABLE;
     }
 
-    RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
+    //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
+    VideoFileSource video_source("../../sample_images/track_video.mp4");
 
     auto line_tracker = LineTracker<kDebug>(std::span(kTapeHsvThresholds));
     const auto sized_projection = kProjection.for_image({640, 480});
-
     video_source.start({640, 480});
 
     const auto start = std::chrono::high_resolution_clock::now(); // Start time

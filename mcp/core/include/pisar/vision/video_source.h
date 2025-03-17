@@ -1,10 +1,14 @@
 #pragma once
 
+#include "pisar/vision/utils.h"
+
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <span>
 #include <optional>
+#include <filesystem>
+#include <iostream>
 
 #include <opencv2/opencv.hpp>
 
@@ -145,7 +149,7 @@ public:
 
         std::string p_line3 = "! videoconvert ! video/x-raw, format=BGR ";  // Convert to standard format
         std::string p_line4 = "! appsink";
-        
+
         std::string pipeline = p_line1 + p_line2 + p_line3 + p_line4;
         std::cout << "Pipeline: " << pipeline << std::endl;
 
@@ -154,7 +158,7 @@ public:
             throw std::runtime_error("Failed to open camera via GStreamer.");
         }
     }
-    
+
     bool isBlackImage(const cv::Mat& img)
     {
         cv::Mat gray;
@@ -175,7 +179,7 @@ public:
         cv::Mat frame;
         while (frame.empty() || isBlackImage(frame))
         {
-            if (!m_cap.read(frame)) 
+            if (!m_cap.read(frame))
             {
                 return std::nullopt;
             }
@@ -268,5 +272,92 @@ public:
 };
 
 #endif
+
+/**
+ * @brief Video source from a video file.
+ */
+class VideoFileSource : public VideoSource<VideoFileSource> {
+private:
+    std::filesystem::path m_file_path;
+    cv::VideoCapture m_cap;
+    bool m_repeat;
+    cv::Size m_size;
+
+public:
+    /**
+     * @brief Constructs a VideoFileSource.
+     * @param file_path Path to the video file.
+     * @param repeat Whether to loop the video after reaching the end.
+     */
+    inline VideoFileSource(const std::filesystem::path& file_path, bool repeat = false)
+        : VideoSource(), m_file_path(std::filesystem::absolute(file_path)), m_cap(), m_repeat(repeat), m_size(0, 0) {}
+
+    /**
+     * @brief Starts the video capture.
+     * @throws std::runtime_error if the video file fails to open.
+     */
+    inline void startImpl(const cv::Size frame_size)
+    {
+        if (m_cap.isOpened())
+        {
+            throw std::runtime_error("Video file already opened");
+        }
+
+        m_cap.open(m_file_path.string(), cv::CAP_FFMPEG);
+        if (!m_cap.isOpened())
+        {
+            std::cout << cv::getBuildInformation() << std::endl;
+            throw std::runtime_error("Failed to open video file: " + m_file_path.string());
+        }
+
+        m_size = frame_size;
+    }
+
+    /**
+     * @brief Captures a frame from the video source.
+     * @retval cv::Mat The captured frame if successful.
+     * @retval std::nullopt if no frame captured.
+     * @throws std::runtime_error on error.
+     */
+    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
+    {
+        if (!m_cap.isOpened())
+        {
+            throw std::runtime_error("Video file is not started");
+        }
+
+        cv::Mat frame;
+        if (!m_cap.read(frame))
+        {
+            if (m_repeat)
+            {
+                m_cap.set(cv::CAP_PROP_POS_FRAMES, 0); // Restart video
+                if (!m_cap.read(frame))
+                {
+                    return std::nullopt; // Return empty if still failing
+                }
+            }
+            else
+            {
+                return std::nullopt; // No frame available (end of video)
+            }
+        }
+
+        frame = resizeWithPadding(frame, m_size);
+
+        return frame;
+    }
+
+    /**
+     * @brief Stops the video capture and releases the file.
+     */
+    inline void stopImpl()
+    {
+        if (m_cap.isOpened())
+        {
+            m_cap.release();
+        }
+    }
+};
 
 }

@@ -23,4 +23,50 @@ cv::Rect computeBoundingBox(const cv::Mat& img) {
     return cv::Rect(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1);
 }
 
+cv::Mat resizeWithPadding(const cv::Mat& input, const cv::Size& target_size)
+{
+    if (input.empty())
+    {
+        std::cerr << "Error: Input image is empty!" << std::endl;
+        return cv::Mat();
+    }
+
+    const int original_width = input.cols;
+    const int original_height = input.rows;
+    const double aspect_ratio = static_cast<double>(original_width) / original_height;
+
+    const int target_width = target_size.width;
+    const int target_height = target_size.height;
+    const double target_aspect_ratio = static_cast<double>(target_width) / target_height;
+
+    int new_width, new_height;
+
+    // Resize while keeping aspect ratio
+    if (aspect_ratio > target_aspect_ratio)
+    {
+        new_width = target_width;
+        new_height = static_cast<int>(target_width / aspect_ratio);
+    }
+    else
+    {
+        new_height = target_height;
+        new_width = static_cast<int>(target_height * aspect_ratio);
+    }
+
+    cv::Mat resized;
+    cv::resize(input, resized, cv::Size(new_width, new_height), 0, 0, cv::INTER_LINEAR);
+
+    // Compute padding
+    int top = (target_height - new_height) / 2;
+    int bottom = target_height - new_height - top;
+    int left = (target_width - new_width) / 2;
+    int right = target_width - new_width - left;
+
+    // Create output image with padding
+    cv::Mat output;
+    cv::copyMakeBorder(resized, output, top, bottom, left, right, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0)); // Black padding
+
+    return output;
+}
+
 }
