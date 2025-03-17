@@ -118,7 +118,48 @@ bool Imu::initialize()
         return false;
     }
 
+    // if (m_imu.Set_FIFO_Watermark_Level(32) != LSM6DSO_OK)  // Set FIFO threshold to 32 samples
+    // {
+    //     PISAR_LOG_ERROR("Failed to set FIFO watermark level!");
+    //     return false;
+    // }
+
     return true;
+}
+
+void Imu::calibrate(size_t num_samples)
+{
+    PISAR_LOG_INFO("Starting IMU calibration... Keep the IMU **completely still**!");
+
+    Eigen::Vector3<int32_t> accel_sum(0, 0, 0);
+    Eigen::Vector3<int32_t> gyro_sum(0, 0, 0);
+
+    for (size_t i = 0; i < num_samples; i++)
+    {
+        auto accel = readAccelRaw();
+        auto gyro = readGyroRaw();
+
+        if (accel.values.allFinite() && gyro.values.allFinite()) // Prevent accumulating bad data
+        {
+            accel_sum += accel.values.cast<int32_t>();
+            gyro_sum += gyro.values.cast<int32_t>();
+        }
+        else
+        {
+            PISAR_LOG_ERROR("Invalid IMU data detected during calibration! Try again and ensure good connections!");
+            return;
+        }
+
+        delay(m_sample_time.count() / 1000); // Convert microseconds to milliseconds
+    }
+
+    // Compute average offsets
+    m_accel_offset = (accel_sum / static_cast<int32_t>(num_samples)).cast<int16_t>();
+    m_gyro_offset = (gyro_sum / static_cast<int32_t>(num_samples)).cast<int16_t>();
+
+    PISAR_LOG_INFO("IMU Calibration complete.");
+    PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", m_accel_offset.x(), m_accel_offset.y(), m_accel_offset.z());
+    PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", m_gyro_offset.x(), m_gyro_offset.y(), m_gyro_offset.z());
 }
 
 

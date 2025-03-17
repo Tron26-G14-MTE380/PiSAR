@@ -14,9 +14,9 @@ void setup()
     if (imu.initialize())
     {
         PISAR_LOG_INFO("IMU initialization SUCCESS!");
-        return;
     }
 
+    imu.calibrate(10000);
 }
 
 void loop()

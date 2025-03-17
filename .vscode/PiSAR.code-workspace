@@ -123,7 +123,21 @@
 			"bvh": "cpp",
 			"dense": "cpp",
 			"matrixfunctions": "cpp",
-			"polynomials": "cpp"
+			"polynomials": "cpp",
+			"core": "cpp",
+			"superlusupport": "cpp",
+			"*.evaluator": "cpp",
+			"*.traits": "cpp",
+			"adolcforward": "cpp",
+			"autodiff": "cpp",
+			"eulerangles": "cpp",
+			"fft": "cpp",
+			"kroneckerproduct": "cpp",
+			"mprealsupport": "cpp",
+			"numericaldiff": "cpp",
+			"openglsupport": "cpp",
+			"specialfunctions": "cpp",
+			"splines": "cpp"
 		},
 		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json"
 	},

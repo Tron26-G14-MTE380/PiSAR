@@ -45,14 +45,16 @@ public:
     };
 
 private:
-    SPIClassRP2040 &m_spi;  ///< SPI bus reference
-    uint8_t m_cs_pin; ///< Chip Select (CS) pin
-    uint8_t m_rx_pin; ///< Chip Select (CS) pin
-    uint8_t m_tx_pin; ///< Chip Select (CS) pin
-    uint8_t m_sck_pin; ///< Chip Select (CS) pin
+    SPIClassRP2040 &m_spi;  ///< SPI bus reference.
+    uint8_t m_cs_pin; ///< Chip Select (CS) pin.
+    uint8_t m_rx_pin; ///< Chip Select (CS) pin.
+    uint8_t m_tx_pin; ///< Chip Select (CS) pin.
+    uint8_t m_sck_pin; ///< Chip Select (CS) pin.
     uint16_t m_sample_rate;                     ///< Sample rate.
     std::chrono::microseconds m_sample_time;    ///< Sample time.
     LSM6DSOSensor m_imu;                        ///< Underlying imu sensor driver.
+    Eigen::Vector3<int16_t> m_accel_offset{0, 0, 0}; ///< Offset for accelerometer.
+    Eigen::Vector3<int16_t> m_gyro_offset{0, 0, 0};  ///< Offset for gyroscope.
 
 
 public:
@@ -119,6 +121,9 @@ public:
             PISAR_LOG_ERROR("Failed to read raw accelerometer data");
             return {};
         }
+
+        data.values -= m_accel_offset;
+
         return data;
     }
 
@@ -134,6 +139,11 @@ public:
             PISAR_LOG_ERROR("Failed to read accelerometer data");
             return {};
         }
+
+        float sensitivity = getXSensitivity();
+
+        data.values = (data.values).cast<int32_t>() - (m_accel_offset.cast<float>() * sensitivity).cast<int32_t>();
+
         return data;
     }
 
@@ -149,6 +159,9 @@ public:
             PISAR_LOG_ERROR("Failed to read raw gyroscope data");
             return {};
         }
+
+        data.values -= m_gyro_offset;
+
         return data;
     }
 
@@ -164,6 +177,11 @@ public:
             PISAR_LOG_ERROR("Failed to read gyroscope data");
             return {};
         }
+
+        float sensitivity = getGSensitivity();
+
+        data.values = (data.values).cast<int32_t>() - (m_gyro_offset.cast<float>() * sensitivity).cast<int32_t>();
+
         return data;
     }
 
@@ -249,7 +267,7 @@ public:
      */
     [[nodiscard]] inline float getGSensitivity()
     {
-        float sensitivity = 0;
+        float sensitivity = 0.0;
         if (m_imu.Get_G_Sensitivity(&sensitivity) != LSM6DSO_OK)
         {
             PISAR_LOG_ERROR("Failed to get gyro sensitivity.");
@@ -258,6 +276,17 @@ public:
 
         return sensitivity;
     }
+
+    /**
+     * @brief Calibrates the IMU by computing offsets for the accelerometer and gyroscope.
+     *
+     * @param num_samples The number of samples to collect for calibration.
+     *
+     * @note Ensure the IMU is motionless during calibration to get accurate offsets.
+     * @note Offsets are stored as integer values to match the IMU's processed data format.
+     * @note Max number of samples is 65'535.
+     */
+    void calibrate(size_t num_samples);
 
     /**
      * @brief Reads the stream of raw accelerometer and gyroscope samples from the fifo.
