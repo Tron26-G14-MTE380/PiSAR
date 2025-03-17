@@ -104,11 +104,11 @@ cv::Mat createHomographyProjectionVisualization(
 
 cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& debug_images, int max_size, int grid_padding)
 {
-    if (debug_images.empty()) 
+    if (debug_images.empty())
     {
         return cv::Mat::ones(100, 100, CV_8UC3) * 255; // Return a blank white canvas if empty
     }
-    
+
     std::vector<std::pair<std::string, cv::Mat>> processed_images;
     for (const auto& [name, img] : debug_images)
     {
@@ -183,7 +183,7 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& de
         }
 
         // Add text labels
-        cv::putText(grid_canvas, processed_images[i].first, 
+        cv::putText(grid_canvas, processed_images[i].first,
                     {start_point.x + 10, start_point.y + 20},
                     cv::FONT_HERSHEY_SIMPLEX, 0.5, {0, 255, 0}, 1, cv::LINE_AA);
     }
@@ -191,6 +191,38 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& de
     return grid_canvas;
 }
 
+#include <iostream>
+
+cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, RoiMat>>& debug_images, int max_size, int grid_padding)
+{
+    if (debug_images.empty())
+    {
+        return cv::Mat::ones(100, 100, CV_8UC3) * 255; // Return a blank white canvas if empty
+    }
+
+    std::vector<std::pair<std::string, cv::Mat>> processed_images;
+    for (const auto& [name, roi_mat] : debug_images)
+    {
+        std::cout << "Name: " << name  << ", Offset: " << roi_mat.getOffset() << ", size: " << roi_mat.getMat().size() << ", original size: " << roi_mat.getOriginalSize() << std::endl;
+        cv::Mat restored = roi_mat.restoreToOriginalSize();
+
+        // Convert grayscale to BGR to allow color overlays
+        if (restored.channels() == 1)
+        {
+            cv::cvtColor(restored, restored, cv::COLOR_GRAY2BGR);
+        }
+
+        if (roi_mat.getOffset() != cv::Point(0, 0) || roi_mat.getOriginalSize() != roi_mat.getMat().size())
+        {
+            // Draw a red border around the cropped area
+            cv::rectangle(restored, cv::Rect(roi_mat.getOffset(), roi_mat.getMat().size()), {0, 0, 255}, 5);
+        }
+
+        processed_images.emplace_back(name, restored);
+    }
+
+    return createDebugCanvas(processed_images, max_size, grid_padding);
+}
 
 void displayDebug(const cv::Mat debug_canvas)
 {

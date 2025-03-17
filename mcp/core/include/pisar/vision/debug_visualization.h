@@ -21,6 +21,11 @@ cv::Mat createDebugCanvas(
     int max_size = 640, int grid_padding = 10
 );
 
+cv::Mat createDebugCanvas(
+    const std::vector<std::pair<std::string, RoiMat>>& debug_images,
+    int max_size = 640, int grid_padding = 10
+);
+
 void displayDebug(const cv::Mat debug_canvas);
 
 }

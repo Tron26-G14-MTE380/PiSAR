@@ -63,7 +63,7 @@ void runRobot(DriveunitController& driveunit_controller, std::vector<Eigen::Vect
     {
         return;
     }
-    
+
     if (trajectory.size() > 1)
     {
         const float firstPointLength = trajectory[0].norm();
@@ -75,7 +75,7 @@ void runRobot(DriveunitController& driveunit_controller, std::vector<Eigen::Vect
             std::reverse(trajectory.begin(), trajectory.end()); // Reverses the vector in place
         }
     }
-    
+
     if (trajectory.size() > 5)
     {
         trajectory.resize(5);
@@ -92,15 +92,14 @@ int main()
 {
     //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
     VideoCameraSource video_source(1);
-    
+
     DriveunitTransport driveunit_transport;
     DriveunitController driveunit_controller(driveunit_transport);
 
     auto line_tracker = LineTracker<kDebug>(std::span(kTapeHsvThresholds));
-    const auto sized_projection = kProjection.for_image({640, 480});
-
     driveunit_transport.open();
 
+    const auto sized_projection = kProjection.for_image({640, 480});
     video_source.start({640, 480});
 
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
@@ -111,8 +110,8 @@ int main()
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
 
         const auto image_trajectory = line_tracker.extractTrajectory(captured_frame.value());
-        std::vector<Eigen::Vector2d> world_trajectory(image_trajectory.size());
-        sized_projection.project(std::span(image_trajectory), std::span(world_trajectory));
+
+        std::vector<Eigen::Vector2d> world_trajectory = sized_projection.project(std::span(image_trajectory));
 
         const auto loop_end = std::chrono::high_resolution_clock::now(); // end time
         const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(loop_end - loop_start).count(); // Convert to milliseconds
@@ -122,15 +121,15 @@ int main()
         if constexpr (kDebug)
         {
             auto debug_data = line_tracker.debugData();
-            std::vector<std::pair<std::string, cv::Mat>> debug_image_map = {
-                std::make_pair("Original", captured_frame.value_or(cv::Mat())),
+            std::vector<std::pair<std::string, RoiMat>> debug_image_map = {
+                std::make_pair("Original", RoiMat(captured_frame.value_or(cv::Mat()))),
                 std::make_pair("Preprocessed", debug_data.preprocessed),
                 std::make_pair("HSV Filtered", debug_data.hsvFiltered),
                 std::make_pair("Skeleton", debug_data.skeleton),
                 std::make_pair("Filtered Skeleton", debug_data.filtered_skeleton),
                 std::make_pair("Trajectory", debug_data.trajectory),
                 std::make_pair("Simplified Trajectory", debug_data.simplified_trajectory),
-                std::make_pair("Homography Projection", createHomographyProjectionVisualization({640, 480}, sized_projection, world_trajectory))
+                std::make_pair("Homography Projection", RoiMat(createHomographyProjectionVisualization(captured_frame.value().size(), sized_projection, world_trajectory)))
             };
 
             displayDebug(createDebugCanvas(debug_image_map));

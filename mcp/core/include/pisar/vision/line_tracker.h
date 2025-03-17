@@ -3,6 +3,7 @@
 #include "pisar/vision/thinning.h"
 #include "pisar/vision/path_extraction.h"
 #include "pisar/vision/path_simplification.h"
+#include "pisar/vision/roi_mat.h"
 #include "pisar/vision/utils.h"
 
 #include <opencv2/opencv.hpp>
@@ -26,12 +27,12 @@ template<bool tkDebug>
 class LineTracker {
 public:
     struct DebugData {
-        cv::Mat preprocessed;
-        cv::Mat hsvFiltered;
-        cv::Mat skeleton;
-        cv::Mat filtered_skeleton;
-        cv::Mat trajectory;
-        cv::Mat simplified_trajectory;
+        RoiMat preprocessed;
+        RoiMat hsvFiltered;
+        RoiMat skeleton;
+        RoiMat filtered_skeleton;
+        RoiMat trajectory;
+        RoiMat simplified_trajectory;
     };
 
 private:
@@ -58,10 +59,15 @@ public:
     {
         EASY_FUNCTION();
 
-        cv::Mat preprocessed = preprocess(frame);
-        cv::Mat binary_mask = applyHSVThreshold(preprocessed);
-        cv::Mat skeleton = skeletonizeCropped(binary_mask);
-        return fitSkeleton(skeleton);
+        auto preprocessed = preprocess(RoiMat(frame));
+        auto binary_mask = applyHSVThreshold(preprocessed);
+        const auto skeleton = skeletonizeCropped(binary_mask);
+        if (!skeleton)
+        {
+            return {};
+        }
+
+        return fitSkeleton(skeleton.value());
     }
 
     [[nodiscard]] inline const DebugData& debugData() const { return m_debug; }
@@ -73,17 +79,21 @@ private:
      * @param input Input image.
      * @return Blurred image.
      */
-    [[nodiscard]] cv::Mat preprocess(const cv::Mat& input)
+    [[nodiscard]] RoiMat preprocess(const RoiMat& input)
     {
         EASY_FUNCTION();
 
         cv::Mat blurred;
-        cv::GaussianBlur(input, blurred, cv::Size(5, 5), 0);
+        cv::GaussianBlur(input.getMat(), blurred, cv::Size(5, 5), 0);
+
+        RoiMat output(blurred, input);
+
         if constexpr (tkDebug)
         {
-            m_debug.preprocessed = blurred;
+            m_debug.preprocessed = output;
         }
-        return blurred;
+
+        return output;
     }
 
     /**
@@ -91,31 +101,33 @@ private:
      * @param input Input image (BGR format).
      * @return Binary mask combining all detected ranges.
      */
-    [[nodiscard]] cv::Mat applyHSVThreshold(const cv::Mat& input)
+    [[nodiscard]] RoiMat applyHSVThreshold(const RoiMat& input)
     {
         EASY_FUNCTION();
 
         cv::Mat hsv, mask;
-        cv::cvtColor(input, hsv, cv::COLOR_BGR2HSV);
-        mask = cv::Mat::zeros(input.size(), CV_8U);
+        cv::cvtColor(input.getMat(), hsv, cv::COLOR_BGR2HSV);
+        mask = cv::Mat::zeros(input.getMat().size(), CV_8U);
 
         for (const auto& [lower, upper] : m_hsvMasks) {
             cv::Mat temp_mask;
             cv::inRange(hsv, lower, upper, temp_mask);
             cv::bitwise_or(mask, temp_mask, mask);
         }
-        
+
         cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11)));
-        
+
         // Apply Erosion to remove small artifacts
         cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11)));
 
+        RoiMat output(mask, input);
+
         if constexpr (tkDebug)
         {
-            m_debug.hsvFiltered = mask;
+            m_debug.hsvFiltered = output;
         }
 
-        return mask;
+        return output;
     }
 
     /**
@@ -123,7 +135,7 @@ private:
      * @param binary_input Binary image.
      * @return Skeletonized image with noise removed.
      */
-    [[nodiscard]] cv::Mat skeletonize(const cv::Mat& binary_input)
+    [[nodiscard]] RoiMat skeletonize(const RoiMat& binary_input)
     {
         EASY_FUNCTION();
 
@@ -131,7 +143,7 @@ private:
 
         // Pad to simulate an "extended line" --> thinning doesn't truncate or flatten tips
         cv::Mat padded_binary;
-        cv::copyMakeBorder(binary_input, padded_binary, padding, padding, padding, padding, cv::BORDER_REPLICATE, cv::Scalar(0));
+        cv::copyMakeBorder(binary_input.getMat(), padded_binary, padding, padding, padding, padding, cv::BORDER_REPLICATE, cv::Scalar(0));
 
         // Apply Zhang-Suen thinning
         cv::Mat skeleton;
@@ -143,26 +155,27 @@ private:
         // Remove small connected components
         cv::Mat filtered_skeleton = filterComponents(skeleton);
 
+        RoiMat output(filtered_skeleton, binary_input);
+
         if constexpr (tkDebug)
         {
-            m_debug.skeleton = skeleton;
-            m_debug.filtered_skeleton = filtered_skeleton;
+            m_debug.skeleton = RoiMat(skeleton, binary_input);
+            m_debug.filtered_skeleton = output;
         }
 
-        return filtered_skeleton;
+        return output;
     }
 
-    [[nodiscard]] cv::Mat skeletonizeCropped(const cv::Mat& binary_mask)
+    [[nodiscard]] std::optional<RoiMat> skeletonizeCropped(const RoiMat& binary_mask)
     {
         EASY_FUNCTION();
 
-        const cv::Rect bbox = computeBoundingBox(binary_mask);
-        if (bbox.width == 0 || bbox.height == 0) return {};
+        const cv::Rect bbox = computeBoundingBox(binary_mask.getMat());
+        if (bbox.width == 0 || bbox.height == 0) return std::nullopt;
 
         // Crop the region of interest (ROI)
-        cv::Mat cropped_binary_mask = binary_mask(bbox).clone(); // Clone ensures we work on a separate copy
-
-        cv::Mat cropped_skeleton = skeletonize(cropped_binary_mask);
+        RoiMat cropped_binary_mask = binary_mask.crop(bbox);
+        RoiMat cropped_skeleton = skeletonize(cropped_binary_mask);
 
         return cropped_skeleton;
     }
@@ -216,15 +229,16 @@ private:
      * @param skeleton Skeletonized image.
      * @return Ordered list of key points representing the fitted trajectory.
      */
-    [[nodiscard]] std::vector<Eigen::Vector2i> fitSkeleton(const cv::Mat& skeleton)
+    [[nodiscard]] std::vector<Eigen::Vector2i> fitSkeleton(const RoiMat& skeleton)
     {
         EASY_FUNCTION();
 
         std::vector<Eigen::Vector2i> points;
-        for (int y = 0; y < skeleton.rows; ++y) {
-            for (int x = 0; x < skeleton.cols; ++x) {
-                if (skeleton.at<uchar>(y, x) > 0) {
-                    points.emplace_back(x, y);
+        for (int y = 0; y < skeleton.getMat().rows; ++y) {
+            for (int x = 0; x < skeleton.getMat().cols; ++x) {
+                if (skeleton.getMat().at<uchar>(y, x) > 0) {
+                    const cv::Point coord = skeleton.toOriginalCoords({x, y});
+                    points.emplace_back(coord.x, coord.y);
                 }
             }
         }
@@ -235,12 +249,12 @@ private:
         if constexpr (tkDebug)
         {
             // Create an empty image (same size as input_img, single-channel black)
-            m_debug.trajectory = cv::Mat::zeros(skeleton.size(), skeleton.type());
+            m_debug.trajectory = RoiMat(cv::Mat::zeros(skeleton.getOriginalSize(), skeleton.getMat().type()));
 
             // Draw points
             for (const auto& pt : ordered_points)
             {
-                cv::circle(m_debug.trajectory, cv::Point(pt.x(), pt.y()), 1, 255, cv::FILLED);
+                cv::circle(m_debug.trajectory.getMat(), cv::Point(pt.x(), pt.y()), 1, 255, cv::FILLED);
             }
 
             // Connect points with lines
@@ -248,7 +262,7 @@ private:
             {
                 const auto prev_pt = cv::Point(ordered_points[i - 1].x(), ordered_points[i - 1].y());
                 const auto current_pt = cv::Point(ordered_points[i].x(), ordered_points[i].y());
-                cv::line(m_debug.trajectory, prev_pt, current_pt, 255, 1);
+                cv::line(m_debug.trajectory.getMat(), prev_pt, current_pt, 255, 1);
             }
         }
 
@@ -257,12 +271,12 @@ private:
         if constexpr (tkDebug)
         {
             // Create an empty image (same size as input_img, single-channel black)
-            m_debug.simplified_trajectory = cv::Mat::zeros(skeleton.size(), skeleton.type());
+            m_debug.simplified_trajectory = RoiMat(cv::Mat::zeros(skeleton.getOriginalSize(), skeleton.getMat().type()));
 
             // Draw points
             for (const auto& pt : simplified_trajectory)
             {
-                cv::circle(m_debug.simplified_trajectory, cv::Point(pt.x(), pt.y()), 3, 255, cv::FILLED);
+                cv::circle(m_debug.simplified_trajectory.getMat(), cv::Point(pt.x(), pt.y()), 3, 255, cv::FILLED);
             }
 
             // Connect points with lines
@@ -270,7 +284,7 @@ private:
             {
                 const auto prev_pt = cv::Point(simplified_trajectory[i - 1].x(), simplified_trajectory[i - 1].y());
                 const auto current_pt = cv::Point(simplified_trajectory[i].x(), simplified_trajectory[i].y());
-                cv::line(m_debug.simplified_trajectory, prev_pt, current_pt, 255, 1);
+                cv::line(m_debug.simplified_trajectory.getMat(), prev_pt, current_pt, 255, 1);
             }
         }
 

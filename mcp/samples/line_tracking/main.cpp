@@ -2,6 +2,7 @@
 #include "pisar/vision/video_source.h"
 #include "pisar/vision/line_tracker.h"
 #include "pisar/vision/homography.h"
+#include "pisar/vision/roi_mat.h"
 #include "pisar/vision/debug_visualization.h"
 
 #include <easy/profiler.h>
@@ -77,15 +78,15 @@ int main()
         if constexpr (kDebug)
         {
             auto debug_data = line_tracker.debugData();
-            std::vector<std::pair<std::string, cv::Mat>> debug_image_map = {
-                std::make_pair("Original", captured_frame.value_or(cv::Mat())),
+            std::vector<std::pair<std::string, RoiMat>> debug_image_map = {
+                std::make_pair("Original", RoiMat(captured_frame.value_or(cv::Mat()))),
                 std::make_pair("Preprocessed", debug_data.preprocessed),
                 std::make_pair("HSV Filtered", debug_data.hsvFiltered),
                 std::make_pair("Skeleton", debug_data.skeleton),
                 std::make_pair("Filtered Skeleton", debug_data.filtered_skeleton),
                 std::make_pair("Trajectory", debug_data.trajectory),
                 std::make_pair("Simplified Trajectory", debug_data.simplified_trajectory),
-                std::make_pair("Homography Projection", createHomographyProjectionVisualization({640, 480}, sized_projection, world_trajectory))
+                std::make_pair("Homography Projection", RoiMat(createHomographyProjectionVisualization(captured_frame.value().size(), sized_projection, world_trajectory)))
             };
 
             displayDebug(createDebugCanvas(debug_image_map));
