@@ -167,7 +167,8 @@
 			"numericaldiff": "cpp",
 			"openglsupport": "cpp",
 			"specialfunctions": "cpp",
-			"splines": "cpp"
+			"splines": "cpp",
+			"*.impl": "cpp"
 		},
 		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
 		"editor.tabSize": 4,

@@ -6,22 +6,93 @@
 #include <vector>
 #include <FS.h>
 #include <LittleFS.h>
-#include <zpp_bits.h>
 
 using namespace std::chrono_literals;
 
 namespace pisar::driveunit
 {
+bool Imu::CalibrationData::save(const std::string_view file_path) const
+{
+    // Serialize the calibration data
+    auto [data_buffer, encoder] = zpp::bits::data_out();
 
-Imu::Imu(SPIClassRP2040 &spi, uint8_t cs_pin, uint8_t rx_pin, uint8_t tx_pin, uint8_t sck_pin, uint16_t sample_rate, uint32_t spi_speed) :
-    m_sample_rate(sample_rate),
-    m_sample_time(static_cast<std::chrono::microseconds::rep>(1E6f / sample_rate)),
-    m_imu(&spi, cs_pin, spi_speed),
+    if (zpp::bits::failure(encoder(*this)))
+    {
+        PISAR_LOG_ERROR("Failed to encode calibration data!");
+        return false;
+    }
+
+    // Write to LittleFS
+    File file = LittleFS.open(file_path.data(), "w");
+    if (!file)
+    {
+        PISAR_LOG_ERROR("Failed to open file for writing!");
+        return false;
+    }
+
+    auto serialized_data = encoder.processed_data();
+    const size_t bytes_written = file.write(reinterpret_cast<const uint8_t*>(serialized_data.data()), serialized_data.size());
+    file.close();
+
+    if (bytes_written != serialized_data.size())
+    {
+        PISAR_LOG_ERROR("Failed to write calibration data to file! Only %u bytes written.", bytes_written);
+        return false;
+    }
+
+    return true;
+}
+
+
+bool Imu::CalibrationData::load(const std::string_view file_path)
+{
+    // Open file
+    File file = LittleFS.open(file_path.data(), "r");
+    if (!file)
+    {
+        PISAR_LOG_ERROR("Calibration data file not found. Calibration loading failed!");
+        return false;
+    }
+
+    // Read data into buffer
+    std::vector<std::byte> data_buffer(file.size());
+    const int bytes_read = file.read(reinterpret_cast<uint8_t*>(data_buffer.data()), data_buffer.size());
+    file.close();
+
+    if (bytes_read == 0)
+    {
+        PISAR_LOG_ERROR("Failed to read calibration data from file!");
+        return false;
+    }
+
+    // Deserialize calibration data
+    auto decoder = zpp::bits::in(std::span(data_buffer.data(), bytes_read));
+
+    if (zpp::bits::failure(decoder(*this)))
+    {
+        PISAR_LOG_ERROR("Failed to decode calibration data from file!");
+        return false;
+    }
+
+    return true;
+}
+    
+
+Imu::Imu(
+    SPIClassRP2040 &spi, 
+    uint8_t cs_pin, uint8_t rx_pin, uint8_t tx_pin, uint8_t sck_pin, 
+    std::string_view calibration_data_file_path, 
+    uint16_t sample_rate, uint32_t spi_speed
+) :
     m_spi(spi),
     m_cs_pin(cs_pin),
     m_rx_pin(rx_pin),
     m_tx_pin(tx_pin),
-    m_sck_pin(sck_pin)
+    m_sck_pin(sck_pin),
+    m_calibration_data_file_path(calibration_data_file_path),
+    m_sample_rate(sample_rate),
+    m_sample_time(static_cast<std::chrono::microseconds::rep>(1E6f / sample_rate)),
+    m_imu(&spi, cs_pin, spi_speed)
 {}
 
 
@@ -65,6 +136,22 @@ bool Imu::initialize()
     {
         PISAR_LOG_ERROR("Failed to connect to the IMU! Try connecting again!");
         return false;
+    }
+
+    // Load calibration data
+    if (calibrationDataSaved())
+    {
+        PISAR_LOG_INFO("Calibration data saved to %s, loading...", m_calibration_data_file_path.data());
+        loadCalibrationData();
+    }
+    else
+    {
+        PISAR_LOG_WARN("No calibration data found at %s, call calibrate to calibrate IMU", m_calibration_data_file_path.data());
+        // Fresh calibration
+        m_calibration_data = {
+            .accel_offset = {0, 0, 0},
+            .gyro_offset = {0, 0, 0}
+        };
     }
     
     if (m_imu.Enable_X() != LSM6DSO_OK)
@@ -131,9 +218,12 @@ bool Imu::initialize()
     return true;
 }
 
-void Imu::calibrate(size_t num_samples)
+bool Imu::calibrate(size_t num_samples, bool save)
 {
-    PISAR_LOG_INFO("Starting IMU calibration... Keep the IMU **completely still**!");
+    constexpr int kDelaySeconds = 3;
+    PISAR_LOG_INFO("Starting IMU calibration in %d seconds... Keep the IMU **completely still**!", kDelaySeconds);
+    delay(kDelaySeconds * 1000);
+    PISAR_LOG_INFO("Starting Calibration...");
 
     Eigen::Vector3<int32_t> accel_sum(0, 0, 0);
     Eigen::Vector3<int32_t> gyro_sum(0, 0, 0);
@@ -151,101 +241,31 @@ void Imu::calibrate(size_t num_samples)
         else
         {
             PISAR_LOG_ERROR("Invalid IMU data detected during calibration! Try again and ensure good connections!");
-            return;
+            return false;
         }
 
         delay(m_sample_time.count() / 1000); // Convert microseconds to milliseconds
     }
 
     // Compute average offsets
-    m_accel_offset = (accel_sum / static_cast<int32_t>(num_samples)).cast<int16_t>();
-    m_gyro_offset = (gyro_sum / static_cast<int32_t>(num_samples)).cast<int16_t>();
+    m_calibration_data.accel_offset = (accel_sum / static_cast<int32_t>(num_samples)).cast<int16_t>();
+    m_calibration_data.gyro_offset = (gyro_sum / static_cast<int32_t>(num_samples)).cast<int16_t>();
 
     PISAR_LOG_INFO("IMU Calibration complete.");
-    PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", m_accel_offset.x(), m_accel_offset.y(), m_accel_offset.z());
-    PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", m_gyro_offset.x(), m_gyro_offset.y(), m_gyro_offset.z());
+    // PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", m_calibration_data.accel_offset.x(), m_calibration_data.accel_offset.y(), m_calibration_data.accel_offset.z());
+    // PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", m_calibration_data.gyro_offset.x(), m_calibration_data.gyro_offset.y(), m_calibration_data.gyro_offset.z());
 
-}
-
-/**
- * @brief Saves IMU calibration data to LittleFS.
- * @param calib_data The calibration data to save.
- * @return True if the data was successfully saved, false otherwise.
- */
-bool Imu::saveCalibrationData() const
-{
-    // Serialize the calibration data
-    auto [data, out] = zpp::bits::data_out();
-    auto result = out(m_accel_offset, m_gyro_offset); 
-    if(failure(result))
+    if (save)
     {
-        PISAR_LOG_ERROR("Failed to serialize calibration data!");
-        return false;
+        if (!saveCalibrationData())
+        {
+            PISAR_LOG_ERROR("Failed to save calibration data.");
+            return false;
+        }
+
+        PISAR_LOG_INFO("Calibration data saved successfully!");
     }
 
-    // Write to LittleFS
-    File file = LittleFS.open("/calibration_data.bin", "w");
-    if (!file)
-    {
-        PISAR_LOG_ERROR("Failed to open file for writing!");
-        return false;
-    }
-
-    file.write(reinterpret_cast<const uint8_t*>(data.data()), data.size());
-    file.close();
-
-    PISAR_LOG_INFO("Calibration data saved successfully.");
-    // ✅ **Read Back and Print File Contents**
-    file = LittleFS.open("/calibration_data.bin", "r");
-    if (!file)
-    {
-        PISAR_LOG_ERROR("Failed to open file for verification!");
-        return false;
-    }
-
-    std::vector<uint8_t> buffer(file.size());
-    file.read(buffer.data(), buffer.size());
-    file.close();
-
-    PISAR_LOG_INFO("Calibration data file contents (%u bytes):", buffer.size());
-
-    for (size_t i = 0; i < buffer.size(); i++)
-    {
-        PISAR_LOG_INFO("Byte[%u]: 0x%02X", i, buffer[i]);
-    }
-
-    return true;
-}
-
-/**
- * @brief Loads IMU calibration data from LittleFS.
- * @return True if the data was successfully loaded, false otherwise.
- */
-bool Imu::loadCalibrationData()
-{
-    auto [data, in] = zpp::bits::data_in();
-
-    // Open file
-    File file = LittleFS.open("/calibration_data.bin", "r");
-    if (!file)
-    {
-        PISAR_LOG_ERROR("Calibration data file not found. Calibration loading failed!");
-        return false;
-    }
-
-    // Read data into buffer
-    file.read(reinterpret_cast<uint8_t*>(data.data()), data.size());
-    file.close();
-
-    // Deserialize calibration data
-    auto result = in(data);
-    if (failure(result))
-    {
-        PISAR_LOG_ERROR("Failed to deserialize calibration data!");
-        return false;
-    }
-
-    PISAR_LOG_INFO("Calibration data loaded successfully.");
     return true;
 }
 
