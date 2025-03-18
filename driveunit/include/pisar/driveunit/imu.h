@@ -16,6 +16,19 @@
 namespace pisar::driveunit
 {
 
+/**
+ * @brief Stores calibration offsets for accelerometer and gyroscope.
+ */
+struct ImuCalibrationData
+{
+    Eigen::Vector3<int16_t> accel_offset; ///< Accelerometer offset values
+    Eigen::Vector3<int16_t> gyro_offset;  ///< Gyroscope offset values
+
+    // constexpr static auto serialize(auto& archive, auto& self)
+    // {
+    //     return archive(self.accel_offset, self.gyro_offset);
+    // }
+};
 
 /**
  * @brief Provides an interface for a 6-axis Imu sensor using SPI.
@@ -287,6 +300,12 @@ public:
      * @note Max number of samples is 65'535.
      */
     void calibrate(size_t num_samples);
+
+    void setCalibration(const ImuCalibrationData& calib_data);
+    void getCalibration(ImuCalibrationData& calib_data) const;
+
+    [[nodiscard]] bool loadCalibrationData();
+    [[nodiscard]] bool saveCalibrationData() const;
 
     /**
      * @brief Reads the stream of raw accelerometer and gyroscope samples from the fifo.
