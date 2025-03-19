@@ -70,19 +70,24 @@ public:
         [[nodiscard]] bool load(std::string_view file_path);
     };
 
+    using InterruptCallback = std::function<void()>;
+
 private:
 
-    SPIClassRP2040 &m_spi;  ///< SPI bus reference.
-    uint8_t m_cs_pin;                               ///< Chip Select (CS) pin.
-    uint8_t m_rx_pin;                               ///< RX (MISO) pin.
-    uint8_t m_tx_pin;                               ///< TX (MOSI) pin.
-    uint8_t m_sck_pin;                              ///< Clock (SCK) pin.
-    std::string_view m_calibration_data_file_path;  ///< Calibration data file path.
-    uint16_t m_sample_rate;                         ///< Sample rate.
-    std::chrono::microseconds m_sample_time;        ///< Sample time.
-    LSM6DSOSensor m_imu;                            ///< Underlying imu sensor driver.
+    SPIClassRP2040 &m_spi;                                  ///< SPI bus reference.
+    uint8_t m_cs_pin;                                       ///< Chip Select (CS) pin.
+    uint8_t m_rx_pin;                                       ///< RX (MISO) pin.
+    uint8_t m_tx_pin;                                       ///< TX (MOSI) pin.
+    uint8_t m_sck_pin;                                      ///< Clock (SCK) pin.
+    std::optional<uint8_t> m_int1_pin;                      ///< INT1 pin.
+    std::string_view m_calibration_data_file_path;          ///< Calibration data file path.
+    uint16_t m_sample_rate;                                 ///< Sample rate.
+    std::chrono::microseconds m_sample_time;                ///< Sample time.
+    LSM6DSOSensor m_imu;                                    ///< Underlying imu sensor driver.
 
-    CalibrationData m_calibration_data; ///< Calibration data.
+    CalibrationData m_calibration_data;                     ///< Calibration data.
+
+    std::optional<InterruptCallback> m_interrupt_callback;  ///< Interrupt callback.
 
 public:
 
@@ -93,13 +98,14 @@ public:
      * @param rx_pin The SPI RX pin.
      * @param tx_pin The SPI TX pin.
      * @param sck_pin The SPI SCK pin.
+     * @param int1_pin The interrupt pin for the IMU.
      * @param calibration_data_file_path The path to the calibration data file.
      * @param sample_rate The accelerometer and gyroscope sample rate (default: 800).
      * @param spi_speed The SPI communication speed in Hz (default: 1000000).
      */
     Imu(
         SPIClassRP2040 &spi, 
-        uint8_t cs_pin, uint8_t rx_pin, uint8_t tx_pin, uint8_t sck_pin, 
+        uint8_t cs_pin, uint8_t rx_pin, uint8_t tx_pin, uint8_t sck_pin, std::optional<uint8_t> int1_pin,
         std::string_view calibration_data_file_path, 
         uint16_t sample_rate = 800, uint32_t spi_speed = 1'000'000
     );
@@ -114,6 +120,13 @@ public:
      * @brief Initializes the IMU, setting up SPI and sensor configurations.
      */
     [[nodiscard]] bool initialize();
+
+    /**
+     * @brief Set an interrupt on reaching FIFO watermark threshold.
+     * @param num_samples Number of data samples to generate on (number of accel + gyro data pairs).
+     * @param callback The interrupt callback function.
+     */
+    [[nodiscard]] bool setFifoWatermarkInterrupt(const uint8_t num_samples, const InterruptCallback callback);
 
     /// @brief Returns whether data is ready.
     [[nodiscard]] inline bool accelDataReady()
@@ -387,6 +400,15 @@ public:
      */
     [[nodiscard]] std::vector<Data> readFifo();
 
+private:
+
+    static inline void interruptHandler1(Imu* p_context)
+    {
+        if (p_context->m_interrupt_callback)
+        {
+            p_context->m_interrupt_callback.value()();
+        }
+    }
 };
 
 }

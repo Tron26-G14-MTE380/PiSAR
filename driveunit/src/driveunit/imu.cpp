@@ -80,7 +80,7 @@ bool Imu::CalibrationData::load(const std::string_view file_path)
 
 Imu::Imu(
     SPIClassRP2040 &spi, 
-    uint8_t cs_pin, uint8_t rx_pin, uint8_t tx_pin, uint8_t sck_pin, 
+    uint8_t cs_pin, uint8_t rx_pin, uint8_t tx_pin, uint8_t sck_pin, std::optional<uint8_t> int1_pin,
     std::string_view calibration_data_file_path, 
     uint16_t sample_rate, uint32_t spi_speed
 ) :
@@ -89,12 +89,13 @@ Imu::Imu(
     m_rx_pin(rx_pin),
     m_tx_pin(tx_pin),
     m_sck_pin(sck_pin),
+    m_int1_pin(int1_pin),
     m_calibration_data_file_path(calibration_data_file_path),
     m_sample_rate(sample_rate),
     m_sample_time(static_cast<std::chrono::microseconds::rep>(1E6f / sample_rate)),
-    m_imu(&spi, cs_pin, spi_speed)
+    m_imu(&spi, cs_pin, spi_speed),
+    m_interrupt_callback(std::nullopt)
 {}
-
 
 bool Imu::initialize()
 {
@@ -142,7 +143,11 @@ bool Imu::initialize()
     if (calibrationDataSaved())
     {
         PISAR_LOG_INFO("Calibration data saved to %s, loading...", m_calibration_data_file_path.data());
-        loadCalibrationData();
+        if (!loadCalibrationData())
+        {
+            PISAR_LOG_ERROR("Failed to load calibration data!");
+            return false;
+        }
     }
     else
     {
@@ -209,11 +214,44 @@ bool Imu::initialize()
         return false;
     }
 
-    // if (m_imu.Set_FIFO_Watermark_Level(32) != LSM6DSO_OK)  // Set FIFO threshold to 32 samples
-    // {
-    //     PISAR_LOG_ERROR("Failed to set FIFO watermark level!");
-    //     return false;
-    // }
+    return true;
+}
+
+[[nodiscard]] bool Imu::setFifoWatermarkInterrupt(const uint8_t num_samples, const InterruptCallback callback)
+{
+    if (!m_int1_pin.has_value())
+    {
+        PISAR_LOG_ERROR("IMU interrupt pin not set!");
+        return false;
+    }
+
+    if (!callback)
+    {
+        PISAR_LOG_ERROR("Interrupt callback is null!");
+        return false;
+    }
+
+    // Need to double since watermark level is for gyro and accel samples combined.
+    if (m_imu.Set_FIFO_Watermark_Level(num_samples * 2) != LSM6DSO_OK)
+    {
+        PISAR_LOG_ERROR("Failed to set FIFO watermark level!");
+        return false;
+    }
+
+    lsm6dso_reg_t reg = { .byte = 0 };
+    reg.int1_ctrl.int1_fifo_th = 1;
+
+    if (m_imu.Write_Reg(LSM6DSO_INT1_CTRL, reg.byte) != LSM6DSO_OK)
+    {
+        PISAR_LOG_ERROR("Failed to set FIFO watermark interrupt!");
+        return false;
+    }
+
+    m_interrupt_callback = callback;
+
+    // Setup interrupt
+    pinMode(m_int1_pin.value(), INPUT);
+    attachInterrupt(digitalPinToInterrupt(m_int1_pin.value()), interruptHandler1, RISING, this);
 
     return true;
 }
@@ -454,12 +492,22 @@ bool Imu::calibrate(size_t num_samples, bool save)
     // Handle remaining unmatched samples (use last known values)
     while (!accel_buffer.empty() && data_samples < output.size())
     {
+        if (gyro_buffer.empty())
+        {
+            PISAR_LOG_WARN("No gyro data available to pair with remaining accel data!");
+        }
+
         output[data_samples++] = Data{accel_buffer.front().first, gyro_buffer.empty() ? GyroData{} : gyro_buffer.back().first};
         accel_buffer.pop();
     }
 
     while (!gyro_buffer.empty() && data_samples < output.size())
     {
+        if (accel_buffer.empty())
+        {
+            PISAR_LOG_WARN("No accel data available to pair with remaining gyro data!");
+        }
+
         output[data_samples++] = Data{accel_buffer.empty() ? AccelData{} : accel_buffer.back().first, gyro_buffer.front().first};
         gyro_buffer.pop();
     }
