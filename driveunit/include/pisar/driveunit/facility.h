@@ -155,7 +155,7 @@ public:
         m_drive_controller.stop();
     }
 
-    /// @brief Stops robot smoothly.
+    /// @brief Stops robot abruptly.
     inline void driveHardStop()
     {
         Lock<Mutex> lock(m_drive_mutex);

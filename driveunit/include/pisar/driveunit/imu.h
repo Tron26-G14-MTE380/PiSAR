@@ -26,7 +26,7 @@ class Imu
 public:
 
     using DataRawValueT = int16_t;
-    using DataValueT = int32_t;
+    using DataValueT = float;
 
     struct AccelDataRaw { Eigen::Vector3<DataRawValueT> values; };
     struct AccelData { Eigen::Vector3<DataValueT> values; };
@@ -176,21 +176,20 @@ public:
     /**
      * @brief Reads the latest accelerometer data.
      * @return The accelerometer x, y, z readings.
+     * @note [m/s^2]
      */
     [[nodiscard]] inline AccelData readAccel()
     {
-        AccelData data;
-        if (m_imu.Get_X_Axes(data.values.data()) != LSM6DSO_OK)
+        AccelDataRaw rawData;
+        if (m_imu.Get_X_AxesRaw(rawData.values.data()) != LSM6DSO_OK)
         {
-            PISAR_LOG_ERROR("Failed to read accelerometer data");
+            PISAR_LOG_ERROR("Failed to read raw accelerometer data");
             return {};
         }
 
         float sensitivity = getXSensitivity();
 
-        data.values = (data.values).cast<int32_t>() - (m_calibration_data.accel_offset.cast<float>() * sensitivity).cast<int32_t>();
-
-        return data;
+        return AccelData{((rawData.values.cast<float>() - m_calibration_data.accel_offset.cast<float>()) * sensitivity)/100.0f};
     }
 
     /**
@@ -214,11 +213,12 @@ public:
     /**
      * @brief Reads the latest gryoscope data.
      * @return The gyroscope x, y, z readings.
+     * @note [deg/s]
      */
     [[nodiscard]] inline GyroData readGyro()
     {
-        GyroData data;
-        if (m_imu.Get_G_Axes(data.values.data()) != LSM6DSO_OK)
+        GyroDataRaw rawData;
+        if (m_imu.Get_G_AxesRaw(rawData.values.data()) != LSM6DSO_OK)
         {
             PISAR_LOG_ERROR("Failed to read gyroscope data");
             return {};
@@ -226,9 +226,7 @@ public:
 
         float sensitivity = getGSensitivity();
 
-        data.values = (data.values).cast<int32_t>() - (m_calibration_data.gyro_offset.cast<float>() * sensitivity).cast<int32_t>();
-
-        return data;
+        return GyroData{((rawData.values.cast<float>() - m_calibration_data.gyro_offset.cast<float>()) * sensitivity)/1000.0f};
     }
 
     /**
@@ -376,29 +374,31 @@ public:
     }
 
     /**
-     * @brief Reads the stream of raw accelerometer and gyroscope samples from the fifo.
-     * @param output Output buffer to store the samples.
+     * @brief Reads raw accelerometer and gyroscope samples from the IMU FIFO buffer. 
+     * @param output Output buffer to store the raw samples.
+     * @return The number of samples successfully read from the FIFO.
      */
     [[nodiscard]] size_t readFifoRaw(const std::span<std::variant<AccelDataRaw, GyroDataRaw>>& output);
 
     /**
-     * @brief Reads the stream of accelerometer and gyroscope samples from the fifo.
-     * @param output Output buffer to store the samples.
+     * @brief Reads raw accelerometer and gyroscope samples from the FIFO and applies scaling.
+     * @param output Output buffer to store the scaled IMU samples.
+     * @return The number of samples successfully read from the FIFO.
      */
     [[nodiscard]] size_t readFifo(const std::span<std::variant<AccelData, GyroData>>& output);
 
     /**
-     * @brief Reads the stream of accelerometer and gyroscope samples from the fifo.
-     * @param output Output buffer to store the imu data samples.
+     * @brief Reads raw FIFO samples, pairs accelerometer and gyroscope readings, applies scaling, and stores them in order. 
+     * @param output Output buffer to store paired IMU samples as `Data` structures.
+     * @return The number of valid accelerometer-gyroscope sample pairs stored in the output.
      */
-    [[nodiscard]] size_t readFifo(const std::span<Data>& output);
+    [[nodiscard]] size_t readFifoPaired(const std::span<Data>& output);
 
     /**
-     * @brief Reads the stream of accelerometer and gyroscope samples from the fifo.
-     *
-     * @return List of accelerometer and gyroscope data pairs.
+     * @brief Reads and buffers FIFO samples into a dynamically sized vector.
+     * @return A `std::vector<Data>` containing synchronized accelerometer-gyroscope pairs.
      */
-    [[nodiscard]] std::vector<Data> readFifo();
+    [[nodiscard]] std::vector<Data> readFifoBuffered();
 
 private:
 

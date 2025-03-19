@@ -7,7 +7,7 @@
 using namespace pisar::driveunit;
 
 // IMU instance
-Imu imu(SPI1, 13, 12, 11, 10, "/calibration_data.bin", 14);
+Imu imu(SPI1, 13, 12, 11, 10, "/calibration_data.bin");
 
 void setup()
 {
@@ -27,7 +27,7 @@ void setup()
     }
 
     // First, calibrate and save data
-    if (!imu.calibrate(1000, true)) // Simulate calibration
+    if (!imu.calibrate(10000, true)) // Simulate calibration
     {
         PISAR_LOG_ERROR("Calibration failed!");
         return;

@@ -148,6 +148,7 @@ bool Imu::initialize()
             PISAR_LOG_ERROR("Failed to load calibration data!");
             return false;
         }
+        PISAR_LOG_INFO("Calibration data successfully loaded!");
     }
     else
     {
@@ -376,7 +377,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
     for (int i = 0; i < total_samples_to_read; ++i)
     {
         uint8_t tag = 0;
-        Eigen::Vector3<DataValueT> data;
+        Eigen::Vector3<int32_t> data;
 
         if(m_imu.Get_FIFO_Tag(&tag) != LSM6DSO_OK)
         {
@@ -392,7 +393,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
                     PISAR_LOG_ERROR("Failed to get FIFO accelerometer data");
                     return 0;
                 }
-                output[samples_read++].emplace<AccelData>(data);
+                output[samples_read++].emplace<AccelData>((data.cast<float>() * getXSensitivity())/100.0f);
                 break;
             case LSM6DSO_GYRO_NC_TAG:
                 if (m_imu.Get_FIFO_G_Axes(data.data()) != LSM6DSO_OK)
@@ -400,7 +401,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
                     PISAR_LOG_ERROR("Failed to get FIFO gyro data");
                     return 0;
                 }
-                output[samples_read++].emplace<GyroData>(data);
+                output[samples_read++].emplace<GyroData>((data.cast<float>() * getGSensitivity())/1000.0f);
                 break;
             default:
                 PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);
@@ -411,7 +412,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
     return samples_read;
 }
 
-[[nodiscard]] size_t Imu::readFifo(const std::span<Data>& output)
+[[nodiscard]] size_t Imu::readFifoPaired(const std::span<Data>& output)
 {
     size_t samples_available = fifoSamplesAvailable();
     if (samples_available == 0)
@@ -430,7 +431,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
     while((data_samples + accel_buffer.size() + gyro_buffer.size()) < output.size() && samples_available)
     {
         uint8_t tag = 0;
-        Eigen::Vector3<DataValueT> data;
+        Eigen::Vector3<int32_t> data;
 
         if(m_imu.Get_FIFO_Tag(&tag) != LSM6DSO_OK)
         {
@@ -446,7 +447,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
                     PISAR_LOG_ERROR("Failed to get FIFO accelerometer data");
                     return 0;
                 }
-                accel_buffer.push({AccelData{data}, timestamp});
+                accel_buffer.push({AccelData{(data.cast<float>() * getXSensitivity())/100.0f}, timestamp});
                 break;
             case LSM6DSO_GYRO_NC_TAG:
                 if (m_imu.Get_FIFO_G_Axes(data.data()) != LSM6DSO_OK)
@@ -454,7 +455,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
                     PISAR_LOG_ERROR("Failed to get FIFO gyro data");
                     return 0;
                 }
-                gyro_buffer.push({GyroData{data}, timestamp});
+                gyro_buffer.push({GyroData{(data.cast<float>() * getGSensitivity())/1000.0f}, timestamp});
                 break;
             default:
                 PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);
@@ -514,7 +515,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
     return data_samples;
 }
 
-[[nodiscard]] std::vector<Imu::Data> Imu::readFifo()
+[[nodiscard]] std::vector<Imu::Data> Imu::readFifoBuffered()
 {
     const size_t samples_available = fifoSamplesAvailable();
     if (samples_available == 0)
@@ -525,7 +526,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
     std::vector<Data> fifo_data(samples_available);
 
     // Call the fixed-size version to fill the vector
-    size_t samples_read = readFifo(std::span(fifo_data));
+    size_t samples_read = readFifoPaired(std::span(fifo_data));
 
     // Resize vector to match actual samples read
     fifo_data.resize(samples_read);
