@@ -4,6 +4,7 @@
 #include "pisar/vision/homography.h"
 #include "pisar/vision/roi_mat.h"
 #include "pisar/vision/debug_visualization.h"
+#include "pisar/vision/trajectory_filter.h"
 
 #include <easy/profiler.h>
 
@@ -43,7 +44,6 @@ const CameraCalibrationData kCameraCalibration {
     .skew = 0
 };
 
-const HomographyProjection kProjection = HomographyProjection(kCameraTransform, kAxisMapping, kCameraCalibration);
 
 
 int main()
@@ -53,11 +53,13 @@ int main()
         EASY_PROFILER_ENABLE;
     }
 
+    HomographyProjection projection = HomographyProjection(kCameraTransform, kAxisMapping, kCameraCalibration);
+    TrajectoryFilter<double> filter;
+
+    auto line_tracker = LineTracker<kDebug>({640, 480}, std::span(kTapeHsvThresholds), projection, filter);
+
     //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
     VideoFileSource video_source("../../sample_images/track_video.mp4");
-
-    auto line_tracker = LineTracker<kDebug>(std::span(kTapeHsvThresholds));
-    const auto sized_projection = kProjection.for_image({640, 480});
     video_source.start({640, 480});
 
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
@@ -66,9 +68,9 @@ int main()
     while ((captured_frame = video_source.getFrame()).has_value())
     {
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
+        const std::chrono::duration<float> frame_capture_time = loop_start.time_since_epoch();
 
-        const auto image_trajectory = line_tracker.extractTrajectory(captured_frame.value());
-        const std::vector<Eigen::Vector2d> world_trajectory = sized_projection.project(std::span(image_trajectory));
+        const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(captured_frame.value(), frame_capture_time);
 
         const auto loop_end = std::chrono::high_resolution_clock::now(); // end time
         const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(loop_end - loop_start).count(); // Convert to milliseconds
@@ -79,17 +81,20 @@ int main()
         {
             auto debug_data = line_tracker.debugData();
             std::vector<std::pair<std::string, RoiMat>> debug_image_map = {
-                std::make_pair("Original", RoiMat(captured_frame.value_or(cv::Mat()))),
-                std::make_pair("Preprocessed", debug_data.preprocessed),
-                std::make_pair("HSV Filtered", debug_data.hsvFiltered),
-                std::make_pair("Skeleton", debug_data.skeleton),
-                std::make_pair("Filtered Skeleton", debug_data.filtered_skeleton),
-                std::make_pair("Trajectory", debug_data.trajectory),
-                std::make_pair("Simplified Trajectory", debug_data.simplified_trajectory),
-                std::make_pair("Homography Projection", RoiMat(createHomographyProjectionVisualization(captured_frame.value().size(), sized_projection, world_trajectory)))
+                std::make_pair("1. Original", RoiMat(captured_frame.value_or(cv::Mat()))),
+                std::make_pair("2. Preprocessed", debug_data.preprocessed),
+                std::make_pair("3. HSV Filtered", debug_data.hsvFiltered),
+                std::make_pair("4. Skeleton", debug_data.skeleton),
+                std::make_pair("5. Filtered Skeleton", debug_data.filtered_skeleton),
+                std::make_pair("6. Trajectory", debug_data.trajectory),
+                std::make_pair("7. Simplified Trajectory", debug_data.simplified_trajectory),
+                std::make_pair("8. Projected Trajectory", debug_data.projected_trajectory),
+                std::make_pair("9. Filtered Trajectory", debug_data.filtered_trajectory),
+                std::make_pair("10. Simplified Trajectory", debug_data.simplified_filtered_trajectory)
             };
 
-            displayDebug(createDebugCanvas(debug_image_map));
+
+            displayDebug(createDebugCanvas(debug_image_map, 480));
         }
 
         if constexpr (kProfile)

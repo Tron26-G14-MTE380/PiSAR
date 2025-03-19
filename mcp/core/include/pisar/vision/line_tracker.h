@@ -5,6 +5,9 @@
 #include "pisar/vision/path_simplification.h"
 #include "pisar/vision/roi_mat.h"
 #include "pisar/vision/utils.h"
+#include "pisar/vision/debug_visualization.h"
+#include "pisar/vision/trajectory_filter.h"
+#include "pisar/vision/homography.h"
 
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>
@@ -16,6 +19,9 @@
 #include <optional>
 #include <type_traits>
 #include <variant>
+#include <ranges>
+#include <iostream>
+#include <chrono>
 
 namespace pisar::mcp {
 
@@ -33,41 +39,74 @@ public:
         RoiMat filtered_skeleton;
         RoiMat trajectory;
         RoiMat simplified_trajectory;
+        RoiMat projected_trajectory;
+        RoiMat filtered_trajectory;
+        RoiMat simplified_filtered_trajectory;
     };
 
 private:
     using DebugDataT = typename std::conditional_t<tkDebug, DebugData, std::monostate>;
 
-    std::vector<std::pair<cv::Scalar, cv::Scalar>> m_hsvMasks;
+    cv::Size m_frame_size;
+    std::vector<std::pair<cv::Scalar, cv::Scalar>> m_hsv_masks;
+
+    std::reference_wrapper<HomographyProjection> m_homography_projection;
+    HomographySizedProjection m_homography_sized_projection;
+    std::reference_wrapper<TrajectoryFilter<double>> m_trajectory_filter;
+
     DebugDataT m_debug;
 
 public:
 
     /**
-     * @brief Constructs a LineTracker with multiple HSV masks.
+     * @brief Constructs a LineTracker with multiple HSV masks and validation parameters.
      * @param hsv_masks List of HSV threshold pairs (lower and upper bounds).
+     * @param homography_projection Reference to homography projection to use.
+     * @param trajectory_filter Reference to trajectory filter.
      */
-    explicit LineTracker(const std::span<const std::pair<cv::Scalar, cv::Scalar>>& hsv_masks)
-        : m_hsvMasks(hsv_masks.begin(), hsv_masks.end()) {}
+    explicit LineTracker(
+        const cv::Size& frame_size,
+        const std::span<const std::pair<cv::Scalar, cv::Scalar>>& hsv_masks,
+        HomographyProjection& homography_projection,
+        TrajectoryFilter<double>& trajectory_filter
+    )
+        : m_frame_size(frame_size),
+          m_hsv_masks(hsv_masks.begin(), hsv_masks.end()),
+          m_homography_projection(homography_projection),
+          m_homography_sized_projection(homography_projection.for_image({frame_size.width, frame_size.height})),
+          m_trajectory_filter(trajectory_filter) {}
 
     /**
      * @brief Processes the input frame to extract a fitted trajectory.
      * @param frame The input frame (BGR format).
      * @return Ordered list of key points representing the fitted trajectory.
      */
-    [[nodiscard]] std::vector<Eigen::Vector2i> extractTrajectory(const cv::Mat& frame)
+    [[nodiscard]] std::vector<Eigen::Vector2d> extractTrajectory(const cv::Mat& frame, std::chrono::duration<float> timestamp)
     {
         EASY_FUNCTION();
 
-        auto preprocessed = preprocess(RoiMat(frame));
-        auto binary_mask = applyHSVThreshold(preprocessed);
-        const auto skeleton = skeletonizeCropped(binary_mask);
-        if (!skeleton)
+        if (frame.size() != m_frame_size)
         {
-            return {};
+            std::cerr << "Input frame size (" << frame.size() << ") doesn't match expected frame size (" << m_frame_size << ")" << std::endl;
         }
 
-        return fitSkeleton(skeleton.value());
+        // Smooth out the frame with some preprocessing
+        auto preprocessed = preprocess(RoiMat(frame));
+
+        // Apply hsv filtering to detect colors
+        auto binary_mask = applyHSVThreshold(preprocessed);
+
+        // Skeletonize the line
+        auto skeleton = skeletonizeCropped(binary_mask);
+
+        // Get trajectory from skeleton
+        auto trajectory = skeleton.has_value() ? fitSkeleton(skeleton.value()) : std::vector<Eigen::Vector2i>();
+
+        // Project trajectory to real-world coordinates
+        auto projected_trajectory = projectTrajectory(std::span(trajectory));
+
+        // Filter the trajectory.
+        return filterTrajectory(std::span(projected_trajectory), timestamp);
     }
 
     [[nodiscard]] inline const DebugData& debugData() const { return m_debug; }
@@ -109,7 +148,7 @@ private:
         cv::cvtColor(input.getMat(), hsv, cv::COLOR_BGR2HSV);
         mask = cv::Mat::zeros(input.getMat().size(), CV_8U);
 
-        for (const auto& [lower, upper] : m_hsvMasks) {
+        for (const auto& [lower, upper] : m_hsv_masks) {
             cv::Mat temp_mask;
             cv::inRange(hsv, lower, upper, temp_mask);
             cv::bitwise_or(mask, temp_mask, mask);
@@ -243,52 +282,52 @@ private:
             }
         }
 
-        // const std::vector<Eigen::Vector2i> ordered_points = orderPoints(points);
+        // Order the points in trajectory
         const std::vector<Eigen::Vector2i> ordered_points = extractLongestPath(points);
 
-        if constexpr (tkDebug)
-        {
-            // Create an empty image (same size as input_img, single-channel black)
-            m_debug.trajectory = RoiMat(cv::Mat::zeros(skeleton.getOriginalSize(), skeleton.getMat().type()));
 
-            // Draw points
-            for (const auto& pt : ordered_points)
-            {
-                cv::circle(m_debug.trajectory.getMat(), cv::Point(pt.x(), pt.y()), 1, 255, cv::FILLED);
-            }
-
-            // Connect points with lines
-            for (size_t i = 1; i < ordered_points.size(); ++i)
-            {
-                const auto prev_pt = cv::Point(ordered_points[i - 1].x(), ordered_points[i - 1].y());
-                const auto current_pt = cv::Point(ordered_points[i].x(), ordered_points[i].y());
-                cv::line(m_debug.trajectory.getMat(), prev_pt, current_pt, 255, 1);
-            }
-        }
-
+        // Simplify the trajectory
         const std::vector<Eigen::Vector2i> simplified_trajectory = simplifyPath(std::span(ordered_points), 3);
 
+        // Orient the trajectory
+        // TODO
+
         if constexpr (tkDebug)
         {
-            // Create an empty image (same size as input_img, single-channel black)
-            m_debug.simplified_trajectory = RoiMat(cv::Mat::zeros(skeleton.getOriginalSize(), skeleton.getMat().type()));
+            m_debug.trajectory = RoiMat(cv::Mat::zeros(skeleton.getOriginalSize(), CV_8UC1));
+            createTrajectoryVisualization(m_debug.trajectory.getMat(), ordered_points, 255);
 
-            // Draw points
-            for (const auto& pt : simplified_trajectory)
-            {
-                cv::circle(m_debug.simplified_trajectory.getMat(), cv::Point(pt.x(), pt.y()), 3, 255, cv::FILLED);
-            }
-
-            // Connect points with lines
-            for (size_t i = 1; i < simplified_trajectory.size(); ++i)
-            {
-                const auto prev_pt = cv::Point(simplified_trajectory[i - 1].x(), simplified_trajectory[i - 1].y());
-                const auto current_pt = cv::Point(simplified_trajectory[i].x(), simplified_trajectory[i].y());
-                cv::line(m_debug.simplified_trajectory.getMat(), prev_pt, current_pt, 255, 1);
-            }
+            m_debug.simplified_trajectory = RoiMat(cv::Mat::zeros(skeleton.getOriginalSize(), CV_8UC1));
+            createTrajectoryVisualization(m_debug.simplified_trajectory.getMat(), simplified_trajectory, 255);
         }
 
         return simplified_trajectory;
+    }
+
+    [[nodiscard]] std::vector<Eigen::Vector2d> projectTrajectory(const std::span<const Eigen::Vector2i> trajectory)
+    {
+        const auto projected_trajectory = m_homography_sized_projection.project(trajectory);
+
+        if constexpr (tkDebug)
+        {
+            m_debug.projected_trajectory = RoiMat(createHomographyProjectionVisualization(m_frame_size, m_homography_sized_projection, projected_trajectory));
+        }
+
+        return projected_trajectory;
+    }
+
+    [[nodiscard]] std::vector<Eigen::Vector2d> filterTrajectory(const std::span<const Eigen::Vector2d> trajectory, std::chrono::duration<float> timestamp)
+    {
+        const auto filtered_trajectory = m_trajectory_filter.get().filter(trajectory, timestamp);
+        const auto simplified_filtered_trajectory = simplifyPath<double>(filtered_trajectory, 0.5f);
+
+        if constexpr (tkDebug)
+        {
+            m_debug.filtered_trajectory = RoiMat(createHomographyProjectionVisualization(m_frame_size, m_homography_sized_projection, filtered_trajectory));
+            m_debug.simplified_filtered_trajectory = RoiMat(createHomographyProjectionVisualization(m_frame_size, m_homography_sized_projection, simplified_filtered_trajectory));
+        }
+
+        return simplified_filtered_trajectory;
     }
 };
 

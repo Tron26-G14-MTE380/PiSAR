@@ -36,7 +36,6 @@ target_sources(pisar_core
     src/vision/thinning/thinning_ma_ren.cpp
     src/vision/debug_visualization.cpp
     src/vision/path_extraction.cpp
-    src/vision/path_simplification.cpp
     src/vision/utils.cpp
 )
 

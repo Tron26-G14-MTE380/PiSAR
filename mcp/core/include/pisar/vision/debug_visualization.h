@@ -1,15 +1,17 @@
 #pragma once
 
 #include "pisar/vision/homography.h"
-#include "pisar/vision/line_tracker.h"
+#include "pisar/vision/roi_mat.h"
 
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>
 
 namespace pisar::mcp {
 
+void createTrajectoryVisualization(cv::InputOutputArray output, const std::vector<Eigen::Vector2i>& points, const cv::Scalar& color);
+
 cv::Mat createHomographyProjectionVisualization(
-    cv::Size2i image_size,
+    cv::Size image_size,
     const HomographySizedProjection& projection,
     const std::vector<Eigen::Vector2d>& trajectory
 );

@@ -2,8 +2,26 @@
 
 namespace pisar::mcp {
 
+
+void createTrajectoryVisualization(cv::InputOutputArray output, const std::vector<Eigen::Vector2i>& points, const cv::Scalar& color)
+{
+    // Draw points
+    for (const auto& pt : points)
+    {
+        cv::circle(output, cv::Point(pt.x(), pt.y()), 1, color, cv::FILLED);
+    }
+
+    // Connect points with lines
+    for (size_t i = 1; i < points.size(); ++i)
+    {
+        const auto prev_pt = cv::Point(points[i - 1].x(), points[i - 1].y());
+        const auto current_pt = cv::Point(points[i].x(), points[i].y());
+        cv::line(output, prev_pt, current_pt, color, 1);
+    }
+}
+
 cv::Mat createHomographyProjectionVisualization(
-    cv::Size2i image_size,
+    cv::Size image_size,
     const HomographySizedProjection& projection,
     const std::vector<Eigen::Vector2d>& trajectory
 )
@@ -191,8 +209,6 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& de
     return grid_canvas;
 }
 
-#include <iostream>
-
 cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, RoiMat>>& debug_images, int max_size, int grid_padding)
 {
     if (debug_images.empty())
@@ -203,7 +219,6 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, RoiMat>>& deb
     std::vector<std::pair<std::string, cv::Mat>> processed_images;
     for (const auto& [name, roi_mat] : debug_images)
     {
-        std::cout << "Name: " << name  << ", Offset: " << roi_mat.getOffset() << ", size: " << roi_mat.getMat().size() << ", original size: " << roi_mat.getOriginalSize() << std::endl;
         cv::Mat restored = roi_mat.restoreToOriginalSize();
 
         // Convert grayscale to BGR to allow color overlays
