@@ -15,6 +15,7 @@ class RobotFacility
 {
 private:
     static constexpr size_t kPoseHistorySize = 128;
+    static constexpr size_t kImuFifoBatchSize = 64;
 
     DifferentialDriveController& m_drive_controller;
     Imu& m_imu;
@@ -25,6 +26,9 @@ private:
     Mutex m_kinematic_tracker_mutex;
 
     TaskHandle_t m_dc_update_task_handle;             ///< FreeRTOS task handle for drive controller update task.
+    TaskHandle_t m_kt_update_task_handle;             ///< FreeRTOS task handle for kinematic tracker update task.
+
+    BinarySemaphore m_imu_data_ready_sem;             ///< Semaphore to signal new IMU data is ready.
 
 public:
     /**
@@ -43,27 +47,57 @@ public:
     /**
      * @brief Initializes all hardware components.
      *
-     * @param dc_update_task_priority Priority of the drive controller update thread.
+     * @param dc_update_task_priority Priority of the drive controller update task.
+     * @param kt_update_task_priority Priority of the kinematic tracker update task.
+     * @return True if initialization was successful, false otherwise.
      */
-    inline void initialize(UBaseType_t dc_update_task_priority)
+    inline bool initialize(UBaseType_t dc_update_task_priority, UBaseType_t kt_update_task_priority)
     {
-        m_drive_controller.initialize();
-        m_imu.initialize();
-
         if (dc_update_task_priority < 0 || dc_update_task_priority > configMAX_PRIORITIES)
         {
             PISAR_LOG_ERROR("Drive controller update task priority %u is out of range", dc_update_task_priority);
-            return; // TODO ERROR CODE
+            return false; // TODO ERROR CODE
+        }
+
+        if (kt_update_task_priority < 0 || kt_update_task_priority > configMAX_PRIORITIES)
+        {
+            PISAR_LOG_ERROR("Kinematic tracker update task priority %u is out of range", kt_update_task_priority);
+            return false; // TODO ERROR CODE
+        }
+
+        m_drive_controller.initialize();
+        
+        if (!m_imu.initialize())
+        {
+            PISAR_LOG_ERROR("Failed to initialize IMU");
+            return false;
+        }
+
+        if (!m_imu.setFifoWatermarkInterrupt(kImuFifoBatchSize, [this]() {
+            BaseType_t higher_priority_task_woken = pdFALSE;
+            m_imu_data_ready_sem.unlockIsr(&higher_priority_task_woken);
+            portYIELD_FROM_ISR(higher_priority_task_woken);
+        }))
+        {
+            PISAR_LOG_ERROR("Failed to set IMU FIFO watermark interrupt");
+            return false;
         }
 
         // Spawn the processing task
-        if (xTaskCreate(driveControllerUpdateTaskEntry, "drive_controller_update_task", 2048, this, dc_update_task_priority, &m_dc_update_task_handle) != pdPASS)
+        if (xTaskCreate(driveControllerUpdateTaskEntry, "dc_update_task", 2048, this, dc_update_task_priority, &m_dc_update_task_handle) != pdPASS)
         {
             PISAR_LOG_ERROR("Failed to create drive controller update task");
-            return;
+            return false;
+        }
+
+        if (xTaskCreate(kinematicTrackerUpdateTaskEntry, "kt_update_task", 2048, this, kt_update_task_priority, &m_kt_update_task_handle) != pdPASS)
+        {
+            PISAR_LOG_ERROR("Failed to create kinematic tracker update task");
+            return false;
         }
 
         m_drive_controller.enable();
+        return true;
     }
 
     /// @brief Gets a reference to the robot motor controller.
@@ -135,17 +169,17 @@ private:
     void updateKinematicTracker();
 
     /**
-     * @brief Main loop for the processing task.
+     * @brief Entry point for the drive controller update task.
      */
-    static void driveControllerUpdateTaskEntry(void* param)
+    static inline void driveControllerUpdateTaskEntry(void* param)
     {
         reinterpret_cast<RobotFacility*>(param)->driveControllerUpdateTaskLoop();
     }
 
     /**
-     * @brief Main loop for the processing task.
+     * @brief Main loop for the drive controller update task.
      */
-    void driveControllerUpdateTaskLoop()
+    inline void driveControllerUpdateTaskLoop()
     {
         while (true)
         {
@@ -154,6 +188,29 @@ private:
                 m_drive_controller.update();
             }
             vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+
+    /**
+     * @brief Entry point for the kinematic tracker task.
+     */
+    static inline void kinematicTrackerUpdateTaskEntry(void* param)
+    {
+        reinterpret_cast<RobotFacility*>(param)->kinematicTrackerUpdateTaskLoop();
+    }
+
+    /**
+     * @brief Main loop for the kinematic tracker update task.
+     */
+    inline void kinematicTrackerUpdateTaskLoop()
+    {
+        while (true)
+        {
+            if (m_imu_data_ready_sem.lock())
+            {
+                PISAR_LOG_INFO("IMU data ready: %d", m_imu.fifoSamplesAvailable());
+                updateKinematicTracker();
+            }
         }
     }
 

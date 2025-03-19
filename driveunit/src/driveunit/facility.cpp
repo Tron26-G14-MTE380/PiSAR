@@ -7,7 +7,7 @@ void RobotFacility::updateKinematicTracker()
     using namespace std::chrono_literals;
     std::chrono::microseconds sample_time = 0us;
     std::chrono::microseconds time_stamp = 0us;
-    std::array<Imu::Data, 128> imu_data;
+    std::array<Imu::Data, kImuFifoBatchSize> imu_data;
     size_t data_samples = 0;
 
     Lock<Mutex> lock(m_kinematic_tracker_mutex);
