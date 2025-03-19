@@ -1,0 +1,1 @@
+*.mov !text !filter !merge !diff
