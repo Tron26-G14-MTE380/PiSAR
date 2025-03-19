@@ -69,4 +69,31 @@ cv::Mat resizeWithPadding(const cv::Mat& input, const cv::Size& target_size)
     return output;
 }
 
+cv::Mat downscaleToClosestSize(const cv::Mat &input, const cv::Size &target_size)
+{
+    if (input.empty())
+    {
+        throw std::runtime_error("Input image is empty");
+    }
+
+    int original_width = input.cols;
+    int original_height = input.rows;
+
+    // Compute scale factors for width and height
+    double scale_x = static_cast<double>(target_size.width) / original_width;
+    double scale_y = static_cast<double>(target_size.height) / original_height;
+
+    // Choose the closest uniform scaling factor to maintain aspect ratio
+    double scale_factor = std::min(scale_x, scale_y);
+
+    // Compute the new dimensions
+    cv::Size new_size(static_cast<int>(original_width * scale_factor),
+                      static_cast<int>(original_height * scale_factor));
+
+    cv::Mat output;
+    cv::resize(input, output, new_size, 0, 0, cv::INTER_AREA);
+
+    return output;
+}
+
 }

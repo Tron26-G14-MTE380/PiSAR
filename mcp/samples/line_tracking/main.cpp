@@ -17,7 +17,7 @@
 
 using namespace pisar::mcp;
 
-constexpr bool kDebug = true;
+constexpr bool kDebug = false;
 constexpr bool kProfile = false;
 constexpr uint64_t kProfileTimeMs = 10000;
 
@@ -44,7 +44,8 @@ const CameraCalibrationData kCameraCalibration {
     .skew = 0
 };
 
-
+const cv::Size kCaptureFrameSize = {1280, 960};
+const cv::Size kFrameSize = {320, 240};
 
 int main()
 {
@@ -56,21 +57,25 @@ int main()
     HomographyProjection projection = HomographyProjection(kCameraTransform, kAxisMapping, kCameraCalibration);
     TrajectoryFilter<double> filter;
 
-    auto line_tracker = LineTracker<kDebug>({640, 480}, std::span(kTapeHsvThresholds), projection, filter);
+    auto line_tracker = LineTracker<kDebug>(kFrameSize, std::span(kTapeHsvThresholds), projection, filter);
 
     //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
-    VideoFileSource video_source("../../sample_images/track_video.mp4");
-    video_source.start({640, 480});
+    //VideoFileSource video_source("../../sample_images/track_video.mp4");
+    LibcameraVideoSource video_source("/base/axi/pcie@120000/rp1/i2c@88000/imx219@10");
+
+    video_source.start(kCaptureFrameSize);
 
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
 
     std::optional<cv::Mat> captured_frame;
     while ((captured_frame = video_source.getFrame()).has_value())
     {
+
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
         const std::chrono::duration<float> frame_capture_time = loop_start.time_since_epoch();
 
-        const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(captured_frame.value(), frame_capture_time);
+        cv::Mat input_frame = downscaleToClosestSize(captured_frame.value(), kFrameSize);
+        const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(input_frame, frame_capture_time);
 
         const auto loop_end = std::chrono::high_resolution_clock::now(); // end time
         const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(loop_end - loop_start).count(); // Convert to milliseconds
@@ -81,7 +86,7 @@ int main()
         {
             auto debug_data = line_tracker.debugData();
             std::vector<std::pair<std::string, RoiMat>> debug_image_map = {
-                std::make_pair("1. Original", RoiMat(captured_frame.value_or(cv::Mat()))),
+                std::make_pair("1. Original", RoiMat(input_frame)),
                 std::make_pair("2. Preprocessed", debug_data.preprocessed),
                 std::make_pair("3. HSV Filtered", debug_data.hsvFiltered),
                 std::make_pair("4. Skeleton", debug_data.skeleton),
@@ -94,7 +99,7 @@ int main()
             };
 
 
-            displayDebug(createDebugCanvas(debug_image_map, 480));
+            displayDebug(createDebugCanvas(debug_image_map, 320));
         }
 
         if constexpr (kProfile)

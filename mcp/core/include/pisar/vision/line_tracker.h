@@ -143,7 +143,7 @@ private:
     [[nodiscard]] RoiMat applyHSVThreshold(const RoiMat& input)
     {
         EASY_FUNCTION();
-
+        
         cv::Mat hsv, mask;
         cv::cvtColor(input.getMat(), hsv, cv::COLOR_BGR2HSV);
         mask = cv::Mat::zeros(input.getMat().size(), CV_8U);

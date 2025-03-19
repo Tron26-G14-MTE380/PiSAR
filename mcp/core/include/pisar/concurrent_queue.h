@@ -18,31 +18,22 @@ template <typename T>
 class ConcurrentQueue
 {
 private:
-    std::queue<T> m_queue;               ///< Internal queue storage.
-    mutable std::mutex m_mutex;          ///< Mutex for synchronizing access.
-    std::condition_variable m_condition; ///< Condition variable for blocking pop/push.
+    std::queue<T> m_queue;                      ///< Internal queue storage.
+    mutable std::mutex m_mutex;                 ///< Mutex for synchronizing access.
+    std::condition_variable m_condition;        ///< Condition variable for blocking pop/push.
 
 public:
     /**
      * @brief Pushes an item into the queue.
      * @param item The item to add.
-     * @param timeout The maximum time to wait if the queue is full (std::nullopt = infinite wait, 0 = non-blocking).
-     * @return True if the item was pushed, false if the timeout was reached.
      */
     template <CIsChronoDuration TDuration = std::chrono::milliseconds>
-    bool push(T&& item, std::optional<TDuration> timeout = std::nullopt)
+    void push(T&& item)
     {
-        {
-            std::unique_lock lock(m_mutex);
-            if (timeout && !m_condition.wait_for(lock, *timeout, [this] { return true; }))
-            {
-                return false; // Timeout reached
-            }
 
-            m_queue.push(std::move(item));
-        }
+        std::lock_guard lock(m_mutex);
+        m_queue.push(std::move(item));
         m_condition.notify_one();
-        return true;
     }
 
     /**
@@ -59,7 +50,7 @@ public:
         {
             if (!m_condition.wait_for(lock, *timeout, [this] { return !m_queue.empty(); }))
             {
-                return std::nullopt; // Timed out
+                return std::nullopt; // Timeout expired, queue still empty
             }
         }
         else
@@ -78,7 +69,7 @@ public:
      */
     [[nodiscard]] inline bool empty() const
     {
-        std::scoped_lock lock(m_mutex);
+        std::lock_guard lock(m_mutex);
         return m_queue.empty();
     }
 
@@ -88,7 +79,7 @@ public:
      */
     [[nodiscard]] inline size_t size() const
     {
-        std::scoped_lock lock(m_mutex);
+        std::lock_guard lock(m_mutex);
         return m_queue.size();
     }
 
@@ -98,7 +89,7 @@ public:
      */
     [[nodiscard]] inline void clear()
     {
-        std::scoped_lock lock(m_mutex);
+        std::lock_guard lock(m_mutex);
         while (!m_queue.empty())
         {
             m_queue.pop();

@@ -220,18 +220,21 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, RoiMat>>& deb
     for (const auto& [name, roi_mat] : debug_images)
     {
         cv::Mat restored = roi_mat.restoreToOriginalSize();
-
-        // Convert grayscale to BGR to allow color overlays
-        if (restored.channels() == 1)
+        
+        if (!restored.empty())
         {
-            cv::cvtColor(restored, restored, cv::COLOR_GRAY2BGR);
-        }
+            // Convert grayscale to BGR to allow color overlays
+            if (restored.channels() == 1)
+            {
+                cv::cvtColor(restored, restored, cv::COLOR_GRAY2BGR);
+            }
 
-        if (roi_mat.getOffset() != cv::Point(0, 0) || roi_mat.getOriginalSize() != roi_mat.getMat().size())
-        {
-            // Draw a red border around the cropped area
-            cv::rectangle(restored, cv::Rect(roi_mat.getOffset(), roi_mat.getMat().size()), {0, 0, 255}, 5);
-        }
+            if (roi_mat.getOffset() != cv::Point(0, 0) || roi_mat.getOriginalSize() != roi_mat.getMat().size())
+            {
+                // Draw a red border around the cropped area
+                cv::rectangle(restored, cv::Rect(roi_mat.getOffset(), roi_mat.getMat().size()), {0, 0, 255}, 5);
+            }
+        }   
 
         processed_images.emplace_back(name, restored);
     }

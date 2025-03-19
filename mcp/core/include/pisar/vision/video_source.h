@@ -1,6 +1,17 @@
 #pragma once
 
 #include "pisar/vision/utils.h"
+#include "pisar/concurrent_queue.h"
+
+#include <opencv2/opencv.hpp>
+
+#ifdef __linux__
+#include <libcamera/libcamera.h>
+#include <libcamera/camera_manager.h>
+#include <libcamera/camera.h>
+#include <libcamera/request.h>
+#include <libcamera/framebuffer_allocator.h>
+#endif
 
 #include <memory>
 #include <stdexcept>
@@ -9,12 +20,7 @@
 #include <optional>
 #include <filesystem>
 #include <iostream>
-
-#include <opencv2/opencv.hpp>
-
-#ifdef __linux__
-
-#endif
+#include <string_view>
 
 namespace pisar::mcp {
 
@@ -111,24 +117,90 @@ public:
     inline void stopImpl() { m_img.release(); }
 };
 
-#ifdef __linux__
+/**
+ * @brief Video source from a camera feed.
+ */
+class VideoCameraSource : public VideoSource<VideoCameraSource> {
+private:
+    int m_camera_id;
+    cv::VideoCapture m_cap;
 
+public:
+    /**
+     * @brief Constructs a VideoCameraSource.
+     * @param width Image width.
+     * @param height Image height.
+     */
+    inline VideoCameraSource(int camera_id) : VideoSource(), m_camera_id(camera_id), m_cap() {}
 
+    /**
+     * @brief Starts the video capture.
+     * @throws std::runtime_error if the camera fails to open.
+     */
+    inline void startImpl(const cv::Size frame_size)
+    {
+        if (m_cap.isOpened())
+        {
+            throw std::runtime_error("Camera already opened");
+        }
+
+        if (!m_cap.open(m_camera_id))
+        {
+            throw std::runtime_error("Failed to open camera");
+        }
+
+        m_cap.set(cv::CAP_PROP_FRAME_WIDTH, frame_size.width);
+        m_cap.set(cv::CAP_PROP_FRAME_HEIGHT, frame_size.height);
+    }
+
+    /**
+     * @brief Captures a frame from the video source.
+     * @retval cv::Mat The captured frame is successful.
+     * @retval std::nullopt if no frame captured.
+     * @throws std::runtime_error on error.
+     */
+    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
+    {
+        if (!m_cap.isOpened())
+        {
+            throw std::runtime_error("Camera is not started");
+        }
+
+        cv::Mat frame;
+        while (!m_cap.read(frame))
+        {
+            return std::nullopt;
+        }
+
+        return frame;
+    }
+
+    /**
+     * @brief Stops the video capture and releases the camera.
+     */
+    inline void stopImpl()
+    {
+        if (m_cap.isOpened())
+        {
+            m_cap.release();
+        }
+    }
+};
 
 /**
  * @brief Video source using a camera feed (via GStreamer).
  */
-class VideoCameraSource : public VideoSource<VideoCameraSource> {
+class VideoCameraGStreamerSource : public VideoSource<VideoCameraGStreamerSource> {
 private:
     int m_camera_id;        ///< Camera ID (ignored for libcamera, but kept for compatibility).
     cv::VideoCapture m_cap; ///< OpenCV VideoCapture object using GStreamer.
 
 public:
     /**
-     * @brief Constructs a VideoCameraSource.
+     * @brief Constructs a VideoCameraGStreamerSource.
      * @param camera_id Camera index.
      */
-    inline explicit VideoCameraSource(int camera_id)
+    inline explicit VideoCameraGStreamerSource(int camera_id)
         : VideoSource(), m_camera_id(camera_id), m_cap() {}
 
     /**
@@ -199,76 +271,55 @@ public:
     }
 };
 
-#else
+#ifdef __linux__
 
 /**
- * @brief Video source from a camera feed.
+ * @brief Video source implementation using libcamera.
  */
-class VideoCameraSource : public VideoSource<VideoCameraSource> {
+class LibcameraVideoSource : public VideoSource<LibcameraVideoSource> {
 private:
-    int m_camera_id;
-    cv::VideoCapture m_cap;
+    float m_frame_rate;
+    size_t m_frame_buffer_size;
+
+    std::unique_ptr<libcamera::CameraManager> m_camera_manager;
+    std::shared_ptr<libcamera::Camera> m_camera;
+    std::unique_ptr<libcamera::CameraConfiguration> m_config;
+    std::unique_ptr<libcamera::FrameBufferAllocator> m_frame_buffer_allocator;
+    std::vector<std::unique_ptr<libcamera::Request>> m_requests;
+    ConcurrentQueue<cv::Mat> m_frame_queue;
+    std::atomic<bool> m_running{false};
 
 public:
     /**
-     * @brief Constructs a VideoCameraSource.
-     * @param width Image width.
-     * @param height Image height.
+     * @brief Constructs a LibcameraVideoSource instance.
      */
-    inline VideoCameraSource(int camera_id) : VideoSource(), m_camera_id(camera_id), m_cap() {}
+    LibcameraVideoSource(std::string_view camera_id, size_t frame_buffer_size = 10);
 
     /**
-     * @brief Starts the video capture.
-     * @throws std::runtime_error if the camera fails to open.
+     * @brief Destructs the video source and ensures cleanup.
      */
-    inline void startImpl(const cv::Size frame_size)
-    {
-        if (m_cap.isOpened())
-        {
-            throw std::runtime_error("Camera already opened");
-        }
+    ~LibcameraVideoSource();
 
-        if (!m_cap.open(m_camera_id))
-        {
-            throw std::runtime_error("Failed to open camera");
-        }
-
-        m_cap.set(cv::CAP_PROP_FRAME_WIDTH, frame_size.width);
-        m_cap.set(cv::CAP_PROP_FRAME_HEIGHT, frame_size.height);
-    }
+    /**
+     * @brief Starts the video source with a specified resolution.
+     * @param frame_size Frame size.
+     */
+    void startImpl(const cv::Size frame_size);
 
     /**
      * @brief Captures a frame from the video source.
-     * @retval cv::Mat The captured frame is successful.
-     * @retval std::nullopt if no frame captured.
-     * @throws std::runtime_error on error.
+     * @return The captured frame if successful, otherwise std::nullopt.
      */
-    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
-    {
-        if (!m_cap.isOpened())
-        {
-            throw std::runtime_error("Camera is not started");
-        }
-
-        cv::Mat frame;
-        while (!m_cap.read(frame))
-        {
-            return std::nullopt;
-        }
-
-        return frame;
-    }
+    [[nodiscard]] std::optional<cv::Mat> getFrameImpl();
 
     /**
-     * @brief Stops the video capture and releases the camera.
+     * @brief Stops the video source.
      */
-    inline void stopImpl()
-    {
-        if (m_cap.isOpened())
-        {
-            m_cap.release();
-        }
-    }
+    void stopImpl();
+
+private:
+    void requestComplete(libcamera::Request* request);
+    void processFrame(libcamera::FrameBuffer* buffer);
 };
 
 #endif
