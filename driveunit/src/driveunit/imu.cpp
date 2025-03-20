@@ -172,7 +172,7 @@ bool Imu::initialize()
         return false;
     }
 
-    if (m_imu.Set_X_FS(2) != LSM6DSO_OK)
+    if (m_imu.Set_X_FS(4) != LSM6DSO_OK)
     {
         PISAR_LOG_ERROR("Failed to set accelerometer range!");
         return false;

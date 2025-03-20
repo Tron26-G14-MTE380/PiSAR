@@ -109,7 +109,7 @@ public:
         SPIClassRP2040 &spi, 
         uint8_t cs_pin, uint8_t rx_pin, uint8_t tx_pin, uint8_t sck_pin, std::optional<uint8_t> int1_pin,
         std::string_view calibration_data_file_path, 
-        uint16_t sample_rate = 800, uint32_t spi_speed = 1'000'000
+        uint16_t sample_rate = 833, uint32_t spi_speed = 1'000'000
     );
 
     /// @brief Destructor

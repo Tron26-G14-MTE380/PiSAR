@@ -4,8 +4,6 @@
 #include "pisar/driveunit/pose_history.h"
 #include "pisar/low_pass_filter.h"
 
-#include <MadgwickAHRS.h>
-
 #include <cstdint>
 
 namespace pisar::driveunit {
@@ -32,15 +30,13 @@ public:
     using PoseHistoryT = PoseHistory<TimestampRepT, tkPoseHistorySize>;
 
 private:
-    TimestampRepT m_sample_time;                                    ///< IMU sampling time.
+    std::chrono::duration<float> m_sample_time;                     ///< IMU sampling time.
     TimestampRepT m_last_update_time;                               ///< Timestamp of last update.
     KinematicState m_current_state;                                 ///< The current kinematic state of the robot.
     PoseHistoryT m_pose_history;                                    ///< Tracks the pose history.
 
     LowPassFilter<Eigen::Vector3f> m_accel_filter;                  ///< Accelerometer data digital low pass filter.
     LowPassFilter<Eigen::Vector3f> m_gyro_filter;                   ///< Gyroscope data digital low pass filter.
-
-    Madgwick m_madgwick_filter;                                     ///< Madgwick filter for orientation estimation.
 
 public:
     /**
@@ -57,8 +53,7 @@ public:
         },
         m_pose_history(),
         m_accel_filter(15, sample_time),
-        m_gyro_filter(15, sample_time),
-        m_madgwick_filter()
+        m_gyro_filter(15, sample_time)
         {}
 
     /// @brief Destructor
@@ -75,29 +70,24 @@ public:
         if (m_last_update_time.count() == 0)
         {
             m_last_update_time = timestamp;
-            m_madgwick_filter.begin(1.0f / m_sample_time.count());
             return; // Skip first update
         }
 
         // --- APPLY LOW-PASS FILTERS TO ACCEL & GYRO ---
-        const auto filtered_accel_data = m_accel_filter.update(accel_data.values.cast<float>());
-        const auto filtered_gyro_data = m_gyro_filter.update(gyro_data.values.cast<float>());
+        const auto filtered_accel_data = m_accel_filter.update(accel_data.values);
+        const auto filtered_gyro_data = m_gyro_filter.update(gyro_data.values);
 
         m_current_state.angular_velocity = filtered_gyro_data.z();
-        m_current_state.acceleration = filtered_accel_data.head<2>(); // Take X and Z
-
-        // --- UPDATE ORIENTATION USING MADGWICK FILTER ---
-        m_madgwick_filter.updateIMU(
-            filtered_gyro_data.x(), filtered_gyro_data.y(), filtered_gyro_data.z(),
-            filtered_accel_data.x(), filtered_accel_data.y(), filtered_accel_data.z()
-        );
-        m_current_state.pose.orientation = m_madgwick_filter.getYawRadians(); // Extract yaw from quaternion
+        m_current_state.acceleration = filtered_accel_data.head<2>(); // Take X and Y
 
         // --- INTEGRATE VELOCITY ---
         m_current_state.velocity += m_current_state.acceleration * m_sample_time.count();
 
         // --- INTEGRATE POSITION ---
         m_current_state.pose.position += m_current_state.velocity * m_sample_time.count();
+
+        // -- INTEGRATE ANGULAR VELOCITY ---
+        m_current_state.pose.orientation += m_current_state.angular_velocity * m_sample_time.count();
 
         // Store updated state
         m_pose_history.addRecord(timestamp, m_current_state.pose);

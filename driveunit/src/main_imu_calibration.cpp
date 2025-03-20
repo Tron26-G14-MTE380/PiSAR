@@ -36,7 +36,7 @@ void setup()
     }
 
     // First, calibrate and save data
-    if (!imu.calibrate(10000, true)) // Simulate calibration
+    if (!imu.calibrate(50000, true)) // Simulate calibration
     {
         PISAR_LOG_ERROR("Calibration failed!");
         return;
