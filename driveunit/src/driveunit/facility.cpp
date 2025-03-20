@@ -21,16 +21,6 @@ void RobotFacility::updateKinematicTracker()
 
     for (int i = 0; i < data_samples; ++i)
     {
-        PISAR_LOG_INFO("Sample %d: Accel[%f, %f, %f] | Gyro[%f, %f, %f] | Timestamp: %lld",
-            i,
-            imu_data[i].accel_data.values.x(),
-            imu_data[i].accel_data.values.y(),
-            imu_data[i].accel_data.values.z(),
-            imu_data[i].gyro_data.values.x(),
-            imu_data[i].gyro_data.values.y(),
-            imu_data[i].gyro_data.values.z(),
-            time_stamp.count() - (data_samples - 1 - i) * sample_time.count());
-
         m_kinematic_tracker.onImuReading(
             imu_data[i].accel_data,
             imu_data[i].gyro_data,

@@ -30,9 +30,9 @@ void setup()
 
     plotter.AddTimeGraph("Acceleration", 500, "Accel X", accel_x, "Accel Y", accel_y);
     plotter.AddTimeGraph("Gyroscope", 500, "Gyro Z", gyro_z);
-    // plotter.AddTimeGraph("Velocity", 500, "Vel X", velocity_x, "Vel Y", velocity_y);
-    // plotter.AddTimeGraph("Position", 500, "Pos X", position_x, "Pos Y", position_y);
-    // plotter.AddTimeGraph("Orientation", 500, "Yaw", orientation);
+    plotter.AddTimeGraph("Velocity", 500, "Vel X", velocity_x, "Vel Y", velocity_y);
+    plotter.AddTimeGraph("Position", 500, "Pos X", position_x, "Pos Y", position_y);
+    plotter.AddTimeGraph("Orientation", 500, "Yaw", orientation);
 
     if (!LittleFS.begin())
     {
@@ -45,6 +45,10 @@ void setup()
         PISAR_LOG_ERROR("Failed to initialize robot facility!");
         return;
     }
+
+    auto calib_data = imu.getCalibration();
+    PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", calib_data.accel_offset.x(), calib_data.accel_offset.y(), calib_data.accel_offset.z());
+    PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", calib_data.gyro_offset.x(), calib_data.gyro_offset.y(), calib_data.gyro_offset.z());
 }
 
 void loop()
@@ -55,13 +59,13 @@ void loop()
 
     gyro_z = facility.getAngularVelocity();
 
-    // velocity_x = facility.getVelocity().x();
-    // velocity_y = facility.getVelocity().y();
+    velocity_x = facility.getVelocity().x();
+    velocity_y = facility.getVelocity().y();
 
-    // position_x = facility.getPosition().x();
-    // position_y = facility.getPosition().y();
+    position_x = facility.getPosition().x();
+    position_y = facility.getPosition().y();
 
-    // orientation = facility.getOrientation(); // Yaw in radians
+    orientation = facility.getOrientation(); // Yaw in radians
 
     // // Plot the data
     plotter.Plot();

@@ -243,7 +243,6 @@ private:
         {
             if (m_imu_data_ready_sem.lock())
             {
-                PISAR_LOG_INFO("IMU data ready: %d", m_imu.fifoSamplesAvailable());
                 updateKinematicTracker();
 
                 if (m_imu.fifoSamplesAvailable() > kImuFifoBatchSize)
