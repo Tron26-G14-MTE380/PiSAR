@@ -38,9 +38,9 @@ const Eigen::Matrix3d kAxisMapping {
 };
 
 const CameraCalibrationData kCameraCalibration {
-    .calibration_img_size_px = {640, 480},
-    .focal_length_px = {450, 450},
-    .principle_axis_offset_px = {320, 240},
+    .calibration_img_size_px = {3280, 1640},
+    .focal_length_px = {2630.73, 2621.95},
+    .principle_axis_offset_px = {1589.29, 1085.99},
     .skew = 0
 };
 
@@ -60,12 +60,12 @@ int main()
     auto line_tracker = LineTracker<kDebug>(kFrameSize, std::span(kTapeHsvThresholds), projection, filter);
 
     //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
-    //VideoFileSource video_source("../../sample_images/track_video.mp4");
+    VideoFileSource video_source("../../sample_images/track_video.mp4");
 
 #if __linux__
-    LibcameraVideoSource video_source("/base/axi/pcie@120000/rp1/i2c@88000/imx219@10");
+    //LibcameraVideoSource video_source("/base/axi/pcie@120000/rp1/i2c@88000/imx219@10");
 #else
-    CvCameraVideoSource video_source(0);
+    //CvCameraVideoSource video_source(0);
 #endif
 
     video_source.start(kCaptureFrameSize);
