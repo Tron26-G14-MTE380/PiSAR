@@ -269,13 +269,15 @@ bool Imu::calibrate(size_t num_samples, bool save)
 
     for (size_t i = 0; i < num_samples; i++)
     {
-        auto accel = readAccelRaw();
-        auto gyro = readGyroRaw();
+        AccelDataRaw accelDataRaw;
+        GyroDataRaw gyroDataRaw;
+        m_imu.Get_X_AxesRaw(accelDataRaw.values.data());
+        m_imu.Get_G_AxesRaw(gyroDataRaw.values.data());
 
-        if (accel.values.allFinite() && gyro.values.allFinite()) // Prevent accumulating bad data
+        if (accelDataRaw.values.allFinite() && gyroDataRaw.values.allFinite()) // Prevent accumulating bad data
         {
-            accel_sum += accel.values.cast<int32_t>();
-            gyro_sum += gyro.values.cast<int32_t>();
+            accel_sum += accelDataRaw.values.cast<int32_t>();
+            gyro_sum += gyroDataRaw.values.cast<int32_t>();
         }
         else
         {
@@ -291,8 +293,8 @@ bool Imu::calibrate(size_t num_samples, bool save)
     m_calibration_data.gyro_offset = (gyro_sum / static_cast<int32_t>(num_samples)).cast<int16_t>();
 
     PISAR_LOG_INFO("IMU Calibration complete.");
-    // PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", m_calibration_data.accel_offset.x(), m_calibration_data.accel_offset.y(), m_calibration_data.accel_offset.z());
-    // PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", m_calibration_data.gyro_offset.x(), m_calibration_data.gyro_offset.y(), m_calibration_data.gyro_offset.z());
+    PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", m_calibration_data.accel_offset.x(), m_calibration_data.accel_offset.y(), m_calibration_data.accel_offset.z());
+    PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", m_calibration_data.gyro_offset.x(), m_calibration_data.gyro_offset.y(), m_calibration_data.gyro_offset.z());
 
     if (save)
     {
@@ -393,7 +395,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
                     PISAR_LOG_ERROR("Failed to get FIFO accelerometer data");
                     return 0;
                 }
-                output[samples_read++].emplace<AccelData>((data.cast<float>() * getXSensitivity())/100.0f);
+                output[samples_read++].emplace<AccelData>((data.cast<float>() - m_calibration_data.accel_offset.cast<float>())/100.0f);
                 break;
             case LSM6DSO_GYRO_NC_TAG:
                 if (m_imu.Get_FIFO_G_Axes(data.data()) != LSM6DSO_OK)
@@ -401,7 +403,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
                     PISAR_LOG_ERROR("Failed to get FIFO gyro data");
                     return 0;
                 }
-                output[samples_read++].emplace<GyroData>((data.cast<float>() * getGSensitivity())/1000.0f);
+                output[samples_read++].emplace<GyroData>((data.cast<float>() - m_calibration_data.gyro_offset.cast<float>())/1000.0f);
                 break;
             default:
                 PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);
@@ -447,7 +449,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
                     PISAR_LOG_ERROR("Failed to get FIFO accelerometer data");
                     return 0;
                 }
-                accel_buffer.push({AccelData{(data.cast<float>() * getXSensitivity())/100.0f}, timestamp});
+                accel_buffer.push({AccelData{((data.cast<float>() - m_calibration_data.accel_offset.cast<float>())/100.0f)}, timestamp});
                 break;
             case LSM6DSO_GYRO_NC_TAG:
                 if (m_imu.Get_FIFO_G_Axes(data.data()) != LSM6DSO_OK)
@@ -455,7 +457,7 @@ bool Imu::calibrate(size_t num_samples, bool save)
                     PISAR_LOG_ERROR("Failed to get FIFO gyro data");
                     return 0;
                 }
-                gyro_buffer.push({GyroData{(data.cast<float>() * getGSensitivity())/1000.0f}, timestamp});
+                gyro_buffer.push({GyroData{((data.cast<float>() - m_calibration_data.gyro_offset.cast<float>())/1000.0f)}, timestamp});
                 break;
             default:
                 PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);

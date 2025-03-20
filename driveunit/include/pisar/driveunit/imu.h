@@ -32,6 +32,8 @@ public:
     struct AccelData { Eigen::Vector3<DataValueT> values; };
     struct GyroDataRaw { Eigen::Vector3<DataRawValueT> values; };
     struct GyroData { Eigen::Vector3<DataValueT> values; };
+    struct TestDataAccel { Eigen::Vector3<int32_t> values; };
+    struct TestDataGyro { Eigen::Vector3<int32_t> values; };
 
     struct DataRaw
     {
@@ -180,16 +182,11 @@ public:
      */
     [[nodiscard]] inline AccelData readAccel()
     {
-        AccelDataRaw rawData;
-        if (m_imu.Get_X_AxesRaw(rawData.values.data()) != LSM6DSO_OK)
-        {
-            PISAR_LOG_ERROR("Failed to read raw accelerometer data");
-            return {};
-        }
+        AccelDataRaw rawData = readAccelRaw();
 
-        float sensitivity = getXSensitivity();
+        float sensitivity = getXSensitivity()/100.0f;
 
-        return AccelData{((rawData.values.cast<float>() - m_calibration_data.accel_offset.cast<float>()) * sensitivity)/100.0f};
+        return AccelData {.values = rawData.values.cast<float>()*sensitivity};
     }
 
     /**
@@ -217,16 +214,11 @@ public:
      */
     [[nodiscard]] inline GyroData readGyro()
     {
-        GyroDataRaw rawData;
-        if (m_imu.Get_G_AxesRaw(rawData.values.data()) != LSM6DSO_OK)
-        {
-            PISAR_LOG_ERROR("Failed to read gyroscope data");
-            return {};
-        }
+        GyroDataRaw rawData = readGyroRaw();
 
-        float sensitivity = getGSensitivity();
+        float sensitivity = getGSensitivity()/1000.0f;
 
-        return GyroData{((rawData.values.cast<float>() - m_calibration_data.gyro_offset.cast<float>()) * sensitivity)/1000.0f};
+        return GyroData {.values = rawData.values.cast<float>()*sensitivity};
     }
 
     /**
