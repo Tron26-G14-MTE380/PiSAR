@@ -63,11 +63,61 @@ void OperatingModeFollowTrajectory::onExitImpl()
 
 ////////////////////////////////////////////////// OperatingModeRotate /////////////////////////////////////////////////
 
-OperatingModeRotate::OperatingModeRotate(RobotFacility& facility, float rotation_deg) :
-    m_facility(facility), m_rotation_deg(rotation_deg) {}
+OperatingModeRotate::OperatingModeRotate(RobotFacility& facility, const float rotation_deg) :
+    m_facility(facility), m_rotation_deg(rotation_deg), m_last_update_time{0} {}
 
-void OperatingModeRotate::onEnterImpl() { m_facility.get().driveStop(); }
-[[nodiscard]] bool OperatingModeRotate::updateImpl() { return true; }
-void OperatingModeRotate::onExitImpl() { m_facility.get().driveStop(); }
+void OperatingModeRotate::onEnterImpl() 
+{ 
+    m_integral = 0.0f;
+    m_last_error = 0.0f;
+}
+[[nodiscard]] bool OperatingModeRotate::updateImpl() 
+{ 
+
+    float current_angle = m_facility.get().getOrientation();
+
+    float error = m_rotation_deg - current_angle;
+
+    // Normalize error to [-180, 180] for shortest rotation path
+    while (error > 180.0f) error -= 360.0f;
+    while (error < -180.0f) error += 360.0f;
+
+    auto current_time = std::chrono::milliseconds(millis());
+    std::chrono::duration<float> elapsed = current_time - m_last_update_time;
+    float dt = elapsed.count();
+
+    // Compute PID terms
+    m_integral += error * dt;
+    float derivative = (error - m_last_error) / dt;
+
+    // Compute PID output
+    float pid_output = (m_kp * error) + (m_ki * m_integral) + (m_kd * derivative);
+
+    // negative PID means left, positive means right
+    float left_speed = -pid_output;
+    float right_speed = pid_output;
+
+    // Clamp speeds to [-1.0, 1.0]
+    left_speed = std::clamp(left_speed, -1.0f, 1.0f);
+    right_speed = std::clamp(right_speed, -1.0f, 1.0f);
+
+    m_facility.get().tankDrive(left_speed, right_speed);
+
+    m_last_error = error;
+    m_last_update_time = std::chrono::milliseconds(millis());
+
+    if (std::abs(error) < 1.0f)
+    {
+        m_facility.get().driveStop();
+        return true;
+    }
+
+    return false;
+}
+void OperatingModeRotate::onExitImpl() 
+{   
+    PISAR_LOG_INFO("Exiting Rotate mode");
+    m_facility.get().driveStop(); 
+}
 
 } // namespace pisar::driveunit

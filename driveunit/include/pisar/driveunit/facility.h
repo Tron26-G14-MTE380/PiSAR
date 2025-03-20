@@ -183,7 +183,7 @@ public:
         return m_kinematic_tracker.getPosition();
     }
 
-    /// @brief Retrieves the robot's calculated orientation in degrees (thread-safe).
+    /// @brief Retrieves the robot's calculated orientation in deg/s (thread-safe).
     [[nodiscard]] float getOrientation()
     {
         Lock<Mutex> lock(m_kinematic_tracker_mutex);
