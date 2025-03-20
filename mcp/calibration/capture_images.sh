@@ -24,16 +24,10 @@ echo "Press 's' to capture an image, 'q' to quit."
 
 # Start libcamera-still with proper preview resolution
 while true; do
-    libcamera-still --width "$width" --height "$height" --preview 0,0,"$width","$height" --timeout 0 --keypress
+    libcamera-still --width "$width" --height "$height" --preview 0,0,640,480 --timeout 0 --keypress
     
-    read -n1 key
-    if [[ "$key" == "q" ]]; then
-        echo -e "\nExiting..."
-        break
-    elif [[ "$key" == "s" ]]; then
-        filename="$output_dir/image_${index}_${width}x${height}.jpg"
-        libcamera-still --width "$width" --height "$height" -o "$filename"
-        echo "Saved: $filename"
-        index=$((index + 1))  # Increment index for next capture
-    fi
+    filename="$output_dir/image_${index}_${width}x${height}.jpg"
+    libcamera-still --width "$width" --height "$height" --nopreview -o "$filename"
+    echo "Saved: $filename"
+    index=$((index + 1))  # Increment index for next capture
 done
