@@ -10,3 +10,6 @@
 [submodule "mcp/thirdparty/easy_profile/easy_profile"]
 	path = thirdparty/easy_profiler/easy_profiler
 	url = https://github.com/yse/easy_profiler.git
+[submodule "thirdparty/arduino_plotter/arduino_plotter"]
+	path = thirdparty/arduino_plotter/arduino_plotter
+	url = https://github.com/devinaconley/arduino-plotter.git

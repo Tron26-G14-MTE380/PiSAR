@@ -2,6 +2,7 @@
 
 #include "Arduino.h"
 #include <LittleFS.h>
+#include <Plotter.h>
 
 
 using namespace pisar::driveunit;
@@ -9,9 +10,17 @@ using namespace pisar::driveunit;
 // IMU instance
 Imu imu(SPI1, 13, 12, 11, 10, 14, "/calibration_data.bin");
 
+Plotter plotter;
+float accel_x = 0, accel_y = 0, accel_z = 0;
+float gyro_x = 0, gyro_y = 0, gyro_z = 0;
+
 void setup()
 {
     initLogging(115200, LogLevel::kInfo, true);
+    plotter.Begin();
+
+    plotter.AddTimeGraph("Accel Data", 500, "Accel x", accel_x, "Accel y", accel_y, "Accel z", accel_z);
+    plotter.AddTimeGraph("Gyro Data", 500, "Gyro x", gyro_x, "Gyro y", gyro_y, "Gyro z", gyro_z);
 
     if(!LittleFS.begin())
     {
@@ -33,17 +42,20 @@ void setup()
         return;
     }
 
+
 }
 
 void loop()
 {
-    auto accelData = imu.readAccel();
-    PISAR_LOG_INFO("Accel Data: x = %f, y = %f, z = %f",
-                   accelData.values.x(), accelData.values.y(), accelData.values.z()); 
-    
-    auto gyroData = imu.readGyro();
-    PISAR_LOG_INFO("Gyro Data: x = %f, y = %f, z = %f",
-        gyroData.values.x(), gyroData.values.y(), gyroData.values.z());
+    auto accel_data = imu.readAccel();
+    accel_x = accel_data.values.x();
+    accel_y = accel_data.values.y();
+    accel_z = accel_data.values.z();
 
-    delay(250);
+    auto gyro_data = imu.readGyro();
+    gyro_x = gyro_data.values.x();
+    gyro_y = gyro_data.values.y();
+    gyro_z = gyro_data.values.z();
+
+    plotter.Plot();
 }
