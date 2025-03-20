@@ -182,11 +182,9 @@ public:
      */
     [[nodiscard]] inline AccelData readAccel()
     {
-        AccelDataRaw rawData = readAccelRaw();
-
-        float sensitivity = getXSensitivity()/100.0f;
-
-        return AccelData {.values = rawData.values.cast<float>()*sensitivity};
+        const AccelDataRaw rawData = readAccelRaw();
+        // TODO error check sensitivity
+        return AccelData {.values = accelSensitivityAdjustment<Eigen::Vector3f>(rawData.values.cast<float>()).value()};
     }
 
     /**
@@ -214,11 +212,9 @@ public:
      */
     [[nodiscard]] inline GyroData readGyro()
     {
-        GyroDataRaw rawData = readGyroRaw();
-
-        float sensitivity = getGSensitivity()/1000.0f;
-
-        return GyroData {.values = rawData.values.cast<float>()*sensitivity};
+        const GyroDataRaw rawData = readGyroRaw();
+        // TODO error check sensitivity
+        return GyroData {.values = gyroSensitivityAdjustment<Eigen::Vector3f>(rawData.values.cast<float>()).value()};
     }
 
     /**
@@ -285,32 +281,64 @@ public:
      * @brief Gets the accelerometer sensitivity.
      * @return The accelerometer sensitivity if successful, otherwise -1.0f to indicate failure.
      */
-    [[nodiscard]] inline float getXSensitivity()
+    [[nodiscard]] inline std::optional<float> getAccelSensitivity()
     {
         float sensitivity = 0;
         if (m_imu.Get_X_Sensitivity(&sensitivity) != LSM6DSO_OK)
         {
             PISAR_LOG_ERROR("Failed to get accelerometer sensitivity.");
-            return -1.0f;;
+            return std::nullopt;
         }
 
-        return sensitivity;
+        return sensitivity / 100.0;
     }
 
     /**
      * @brief Gets the gyroscope sensitivity.
      * @return The gyroscope sensitivity if successful, otherwise -1.0f to indicate failure.
      */
-    [[nodiscard]] inline float getGSensitivity()
+    [[nodiscard]] inline std::optional<float> getGyroSensitivity()
     {
         float sensitivity = 0.0;
         if (m_imu.Get_G_Sensitivity(&sensitivity) != LSM6DSO_OK)
         {
             PISAR_LOG_ERROR("Failed to get gyro sensitivity.");
-            return -1.0f;;
+            return std::nullopt;
         }
 
-        return sensitivity;
+        return sensitivity / 1000.0f;
+    }
+
+    /**
+     * @brief Gets the accelerometer sensitivity.
+     * @return The accelerometera sensitivity if successful, otherwise -1.0f to indicate failure.
+     */
+    template<typename T>
+    [[nodiscard]] inline std::optional<T> accelSensitivityAdjustment(const T&& value)
+    {
+        auto sensitivity = getAccelSensitivity();
+        if (!sensitivity)
+        {
+            return std::nullopt;
+        }
+
+        return T(value * sensitivity.value());
+    }
+
+    /**
+     * @brief Gets the gyroscope sensitivity.
+     * @return The gyroscope sensitivity if successful, otherwise -1.0f to indicate failure.
+     */
+    template<typename T>
+    [[nodiscard]] inline std::optional<T> gyroSensitivityAdjustment(const T&& value)
+    {
+        auto sensitivity = getGyroSensitivity();
+        if (!sensitivity)
+        {
+            return std::nullopt;
+        }
+
+        return T(value * sensitivity.value());
     }
 
     /**
@@ -393,7 +421,62 @@ public:
     [[nodiscard]] std::vector<Data> readFifoBuffered();
 
 private:
+    /**
+     * @brief Gets the raw data from the FIFO buffer.
+     */
+    [[nodiscard]] inline Eigen::Vector3<DataRawValueT> getDataFifoRaw()
+    {
+        uint8_t data[6];
 
+        if(m_imu.Get_FIFO_Data(data) != LSM6DSO_OK)
+        {
+            PISAR_LOG_ERROR("Failed to get FIFO data");
+            return {};
+        }
+
+        return Eigen::Vector3<DataRawValueT> {
+            static_cast<DataRawValueT>(((int16_t)data[1] << 8) | data[0]),
+            static_cast<DataRawValueT>(((int16_t)data[3] << 8) | data[2]),
+            static_cast<DataRawValueT>(((int16_t)data[5] << 8) | data[4])
+        };
+    }
+
+    /**
+     * @brief Gets the raw accelerometer data from the FIFO buffer.
+     */
+    [[nodiscard]] inline AccelDataRaw getAccelDataFifoRaw()
+    {
+        return AccelDataRaw { .values = getDataFifoRaw() - m_calibration_data.accel_offset };
+    }
+
+    /**
+     * @brief Gets the accelerometer data from the FIFO buffer.
+     */
+    [[nodiscard]] inline AccelData getAccelDataFifo()
+    {
+        const AccelDataRaw rawData = getAccelDataFifoRaw();
+        // TODO error check sensitivity
+        return AccelData {.values = accelSensitivityAdjustment<Eigen::Vector3f>(rawData.values.cast<float>()).value()};
+    }
+
+    /**
+     * @brief Gets the raw gyroscope data from the FIFO buffer.
+     */
+    [[nodiscard]] inline GyroDataRaw getGyroDataFifoRaw()
+    {
+        return GyroDataRaw { .values = getDataFifoRaw() - m_calibration_data.gyro_offset };
+    }
+
+    /**
+     * @brief Gets the gyroscope data from the FIFO buffer.
+     */
+    [[nodiscard]] inline GyroData getGyroDataFifo()
+    {
+        const GyroDataRaw rawData = getGyroDataFifoRaw();
+        // TODO error check sensitivity
+        return GyroData {.values = gyroSensitivityAdjustment<Eigen::Vector3f>(rawData.values.cast<float>()).value()};
+    }
+    
     static inline void interruptHandler1(Imu* p_context)
     {
         if (p_context->m_interrupt_callback)

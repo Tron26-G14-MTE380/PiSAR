@@ -82,5 +82,6 @@
         "variant": "cpp",
         "core": "cpp",
         "specialfunctions": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "C:/Users/gabev/Downloads/380Project/PiSAR/common"
 }
