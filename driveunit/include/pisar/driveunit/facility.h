@@ -90,7 +90,7 @@ public:
             return false;
         }
 
-        if (xTaskCreate(kinematicTrackerUpdateTaskEntry, "kt_update_task", 2048, this, kt_update_task_priority, &m_kt_update_task_handle) != pdPASS)
+        if (xTaskCreate(kinematicTrackerUpdateTaskEntry, "kt_update_task", 16384, this, kt_update_task_priority, &m_kt_update_task_handle) != pdPASS)
         {
             PISAR_LOG_ERROR("Failed to create kinematic tracker update task");
             return false;
@@ -162,6 +162,41 @@ public:
         m_drive_controller.hardStop();
     }
 
+    /// @brief Retrieves the robot's calculated velocity in m/s (thread-safe).
+    [[nodiscard]] Eigen::Vector2f getVelocity()
+    {
+        Lock<Mutex> lock(m_kinematic_tracker_mutex);
+        return m_kinematic_tracker.getVelocity();
+    }
+
+    /// @brief Retrieves the robot's acceleration in m/s^2 (thread-safe).
+    [[nodiscard]] Eigen::Vector2f getAcceleration()
+    {
+        Lock<Mutex> lock(m_kinematic_tracker_mutex);
+        return m_kinematic_tracker.getAcceleration();
+    }
+
+    /// @brief Retrieves the robot's calculated position (thread-safe).
+    [[nodiscard]] Eigen::Vector2f getPosition()
+    {
+        Lock<Mutex> lock(m_kinematic_tracker_mutex);
+        return m_kinematic_tracker.getPosition();
+    }
+
+    /// @brief Retrieves the robot's calculated orientation in degrees (thread-safe).
+    [[nodiscard]] float getOrientation()
+    {
+        Lock<Mutex> lock(m_kinematic_tracker_mutex);
+        return m_kinematic_tracker.getOrientation();
+    }
+
+    /// @brief Retrieves the robot's angular velocity in deg/s (thread-safe).
+    [[nodiscard]] float getAngularVelocity()
+    {
+        Lock<Mutex> lock(m_kinematic_tracker_mutex);
+        return m_kinematic_tracker.getAngularVelocity();
+    }
+
 private:
     /**
      * @brief Reads IMU data and updates IMU kinematic tracker in a thread-safe way.
@@ -210,6 +245,11 @@ private:
             {
                 PISAR_LOG_INFO("IMU data ready: %d", m_imu.fifoSamplesAvailable());
                 updateKinematicTracker();
+
+                if (m_imu.fifoSamplesAvailable() > kImuFifoBatchSize)
+                {
+                    m_imu_data_ready_sem.unlock();
+                }
             }
         }
     }

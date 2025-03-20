@@ -326,33 +326,20 @@ bool Imu::calibrate(size_t num_samples, bool save)
     for (int i = 0; i < total_samples_to_read; ++i)
     {
         uint8_t tag = 0;
-        uint8_t data[6];
-
+        
         if(m_imu.Get_FIFO_Tag(&tag) != LSM6DSO_OK)
         {
             PISAR_LOG_ERROR("Failed to get FIFO tag");
             return 0;
         }
 
-        if(m_imu.Get_FIFO_Data(data) != LSM6DSO_OK)
-        {
-            PISAR_LOG_ERROR("Failed to get FIFO data");
-            return 0;
-        }
-
-        const Eigen::Vector3<DataRawValueT> raw_data {
-            ((int16_t)data[1] << 8) | data[0],
-            ((int16_t)data[3] << 8) | data[2],
-            ((int16_t)data[5] << 8) | data[4]
-        };
-
         switch(tag)
         {
             case LSM6DSO_XL_NC_TAG:
-                output[samples_read++].emplace<AccelDataRaw>(raw_data);
+                output[samples_read++] = getAccelDataFifoRaw();
                 break;
             case LSM6DSO_GYRO_NC_TAG:
-                output[samples_read++].emplace<GyroDataRaw>(raw_data);
+                output[samples_read++] = getGyroDataFifoRaw();
                 break;
             default:
                 PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);
@@ -379,7 +366,6 @@ bool Imu::calibrate(size_t num_samples, bool save)
     for (int i = 0; i < total_samples_to_read; ++i)
     {
         uint8_t tag = 0;
-        Eigen::Vector3<int32_t> data;
 
         if(m_imu.Get_FIFO_Tag(&tag) != LSM6DSO_OK)
         {
@@ -390,20 +376,10 @@ bool Imu::calibrate(size_t num_samples, bool save)
         switch(tag)
         {
             case LSM6DSO_XL_NC_TAG:
-                if (m_imu.Get_FIFO_X_Axes(data.data()) != LSM6DSO_OK)
-                {
-                    PISAR_LOG_ERROR("Failed to get FIFO accelerometer data");
-                    return 0;
-                }
-                output[samples_read++].emplace<AccelData>((data.cast<float>() - m_calibration_data.accel_offset.cast<float>())/100.0f);
+                output[samples_read++] = getAccelDataFifo();
                 break;
             case LSM6DSO_GYRO_NC_TAG:
-                if (m_imu.Get_FIFO_G_Axes(data.data()) != LSM6DSO_OK)
-                {
-                    PISAR_LOG_ERROR("Failed to get FIFO gyro data");
-                    return 0;
-                }
-                output[samples_read++].emplace<GyroData>((data.cast<float>() - m_calibration_data.gyro_offset.cast<float>())/1000.0f);
+                output[samples_read++] = getGyroDataFifo();
                 break;
             default:
                 PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);
@@ -433,7 +409,6 @@ bool Imu::calibrate(size_t num_samples, bool save)
     while((data_samples + accel_buffer.size() + gyro_buffer.size()) < output.size() && samples_available)
     {
         uint8_t tag = 0;
-        Eigen::Vector3<int32_t> data;
 
         if(m_imu.Get_FIFO_Tag(&tag) != LSM6DSO_OK)
         {
@@ -444,20 +419,10 @@ bool Imu::calibrate(size_t num_samples, bool save)
         switch(tag)
         {
             case LSM6DSO_XL_NC_TAG:
-                if (m_imu.Get_FIFO_X_Axes(data.data()) != LSM6DSO_OK)
-                {
-                    PISAR_LOG_ERROR("Failed to get FIFO accelerometer data");
-                    return 0;
-                }
-                accel_buffer.push({AccelData{((data.cast<float>() - m_calibration_data.accel_offset.cast<float>())/100.0f)}, timestamp});
+                accel_buffer.push({getAccelDataFifo(), timestamp});
                 break;
             case LSM6DSO_GYRO_NC_TAG:
-                if (m_imu.Get_FIFO_G_Axes(data.data()) != LSM6DSO_OK)
-                {
-                    PISAR_LOG_ERROR("Failed to get FIFO gyro data");
-                    return 0;
-                }
-                gyro_buffer.push({GyroData{((data.cast<float>() - m_calibration_data.gyro_offset.cast<float>())/1000.0f)}, timestamp});
+                gyro_buffer.push({getGyroDataFifo(), timestamp});
                 break;
             default:
                 PISAR_LOG_ERROR("Unknown IMU FIFO tag: %u", tag);
@@ -495,23 +460,35 @@ bool Imu::calibrate(size_t num_samples, bool save)
     // Handle remaining unmatched samples (use last known values)
     while (!accel_buffer.empty() && data_samples < output.size())
     {
-        if (gyro_buffer.empty())
+        GyroData gyro_data;
+        if (data_samples == 0)
         {
             PISAR_LOG_WARN("No gyro data available to pair with remaining accel data!");
+            gyro_data = {};
+        }
+        else
+        {
+            gyro_data = output[data_samples - 1].gyro_data;
         }
 
-        output[data_samples++] = Data{accel_buffer.front().first, gyro_buffer.empty() ? GyroData{} : gyro_buffer.back().first};
+        output[data_samples++] = Data{accel_buffer.front().first, gyro_data};
         accel_buffer.pop();
     }
 
     while (!gyro_buffer.empty() && data_samples < output.size())
     {
-        if (accel_buffer.empty())
+        AccelData accel_data;
+        if (data_samples == 0)
         {
             PISAR_LOG_WARN("No accel data available to pair with remaining gyro data!");
+            accel_data = {};
+        }
+        else
+        {
+            accel_data = output[data_samples - 1].accel_data;
         }
 
-        output[data_samples++] = Data{accel_buffer.empty() ? AccelData{} : accel_buffer.back().first, gyro_buffer.front().first};
+        output[data_samples++] = Data{accel_data, gyro_buffer.front().first};
         gyro_buffer.pop();
     }
     return data_samples;
