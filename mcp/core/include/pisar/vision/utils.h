@@ -16,13 +16,13 @@ namespace pisar::mcp {
      * @return The resized and padded image.
      */
     cv::Mat resizeWithPadding(const cv::Mat& input, const cv::Size& target_size);
-    
+
     /**
-     * @brief Downscale an image to the closest possible size while maintaining aspect ratio.
+     * @brief Downscale an image to fit the target size using a single scale factor, cropping excess areas.
      * @param input The input high-resolution image.
      * @param target_size The desired target size as cv::Size.
-     * @return The downscaled image.
+     * @return The downscaled and cropped image.
      */
-    cv::Mat downscaleToClosestSize(const cv::Mat &input, const cv::Size &target_size);
+    cv::Mat downscaleCrop(const cv::Mat &input, const cv::Size &target_size);
 
 }

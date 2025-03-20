@@ -69,7 +69,7 @@ cv::Mat resizeWithPadding(const cv::Mat& input, const cv::Size& target_size)
     return output;
 }
 
-cv::Mat downscaleToClosestSize(const cv::Mat &input, const cv::Size &target_size)
+cv::Mat downscaleCrop(const cv::Mat &input, const cv::Size &target_size)
 {
     if (input.empty())
     {
@@ -83,17 +83,25 @@ cv::Mat downscaleToClosestSize(const cv::Mat &input, const cv::Size &target_size
     double scale_x = static_cast<double>(target_size.width) / original_width;
     double scale_y = static_cast<double>(target_size.height) / original_height;
 
-    // Choose the closest uniform scaling factor to maintain aspect ratio
-    double scale_factor = std::min(scale_x, scale_y);
+    // ✅ Choose the **larger** scaling factor to **fill the entire target_size**
+    double scale_factor = std::max(scale_x, scale_y);
 
-    // Compute the new dimensions
+    // Compute the new scaled dimensions
     cv::Size new_size(static_cast<int>(original_width * scale_factor),
                       static_cast<int>(original_height * scale_factor));
 
-    cv::Mat output;
-    cv::resize(input, output, new_size, 0, 0, cv::INTER_AREA);
+    // Resize the image with the new scaled size
+    cv::Mat scaled_image;
+    cv::resize(input, scaled_image, new_size, 0, 0, cv::INTER_AREA);
 
-    return output;
+    // ✅ Crop the center region to match the exact target size
+    int crop_x = (new_size.width - target_size.width) / 2;
+    int crop_y = (new_size.height - target_size.height) / 2;
+
+    cv::Rect crop_region(crop_x, crop_y, target_size.width, target_size.height);
+    cv::Mat cropped_output = scaled_image(crop_region);
+
+    return cropped_output;
 }
 
 }

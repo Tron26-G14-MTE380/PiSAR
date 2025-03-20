@@ -120,18 +120,18 @@ public:
 /**
  * @brief Video source from a camera feed.
  */
-class VideoCameraSource : public VideoSource<VideoCameraSource> {
+class CvCameraVideoSource : public VideoSource<CvCameraVideoSource> {
 private:
     int m_camera_id;
     cv::VideoCapture m_cap;
 
 public:
     /**
-     * @brief Constructs a VideoCameraSource.
+     * @brief Constructs a CvCameraVideoSource.
      * @param width Image width.
      * @param height Image height.
      */
-    inline VideoCameraSource(int camera_id) : VideoSource(), m_camera_id(camera_id), m_cap() {}
+    inline CvCameraVideoSource(int camera_id) : VideoSource(), m_camera_id(camera_id), m_cap() {}
 
     /**
      * @brief Starts the video capture.
@@ -190,17 +190,17 @@ public:
 /**
  * @brief Video source using a camera feed (via GStreamer).
  */
-class VideoCameraGStreamerSource : public VideoSource<VideoCameraGStreamerSource> {
+class GStreamerCameraVideoSource : public VideoSource<GStreamerCameraVideoSource> {
 private:
     int m_camera_id;        ///< Camera ID (ignored for libcamera, but kept for compatibility).
     cv::VideoCapture m_cap; ///< OpenCV VideoCapture object using GStreamer.
 
 public:
     /**
-     * @brief Constructs a VideoCameraGStreamerSource.
+     * @brief Constructs a GStreamerCameraVideoSource.
      * @param camera_id Camera index.
      */
-    inline explicit VideoCameraGStreamerSource(int camera_id)
+    inline explicit GStreamerCameraVideoSource(int camera_id)
         : VideoSource(), m_camera_id(camera_id), m_cap() {}
 
     /**

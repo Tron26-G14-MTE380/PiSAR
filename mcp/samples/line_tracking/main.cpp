@@ -61,7 +61,12 @@ int main()
 
     //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
     //VideoFileSource video_source("../../sample_images/track_video.mp4");
+
+#if __linux__
     LibcameraVideoSource video_source("/base/axi/pcie@120000/rp1/i2c@88000/imx219@10");
+#else
+    CvCameraVideoSource video_source(0);
+#endif
 
     video_source.start(kCaptureFrameSize);
 
@@ -74,7 +79,7 @@ int main()
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
         const std::chrono::duration<float> frame_capture_time = loop_start.time_since_epoch();
 
-        cv::Mat input_frame = downscaleToClosestSize(captured_frame.value(), kFrameSize);
+        cv::Mat input_frame = downscaleCrop(captured_frame.value(), kFrameSize);
         const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(input_frame, frame_capture_time);
 
         const auto loop_end = std::chrono::high_resolution_clock::now(); // end time
