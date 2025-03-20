@@ -1,0 +1,22 @@
+{
+    "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
+    "name": "arduino_plotter",
+    "version": "2.4.1",
+    "description": "Plotter is an Arduino library for easy graphing on host computer via serial communication.",
+    "authors": [
+      {
+        "name": "devinaconley"
+      }
+    ],
+    "license": "MIT",
+    "dependencies": [],
+    "build": {
+        "includeDir": "arduino_plotter/src",
+        "srcFilter": [
+          "+<src/*.cpp>",
+          "+<include/*.h>",
+          "+<include/*.hpp>"
+        ],
+        "srcDir": "arduino_plotter"
+    }
+}
