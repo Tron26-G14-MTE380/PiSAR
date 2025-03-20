@@ -100,6 +100,15 @@ private:
     std::reference_wrapper<RobotFacility> m_facility;
     float m_rotation_deg;
 
+    
+    float m_kp = 0.02f;
+    float m_ki = 0.0f;
+    float m_kd = 0.0f;
+
+    float m_integral;
+    float m_last_error;
+    std::chrono::milliseconds m_last_update_time;;
+
 public:
     OperatingModeRotate(RobotFacility& facility, float rotation_deg);
     void onEnterImpl();
