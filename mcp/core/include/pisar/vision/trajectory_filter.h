@@ -15,6 +15,7 @@ template<typename T>
 class TrajectoryFilter
 {
 private:
+    std::chrono::duration<float> m_reset_timeout;
     float m_max_jump_distance;
     int m_min_persistence_frames;
     int m_fixed_sample_size;
@@ -23,23 +24,27 @@ private:
     std::deque<std::pair<std::chrono::duration<float>, std::vector<Eigen::Vector2d>>> m_past_trajectories; ///< Stores past trajectories
     std::vector<Eigen::Vector2d> m_smoothed_trajectory; ///< Stores the last valid trajectory
     std::vector<Eigen::Vector2<T>> m_output_trajectory; ///< Smoothed trajectory casted to output type
+    std::optional<std::chrono::duration<float>> m_last_valid_trajectory_time;
 
 public:
 
     /**
      * @brief Constructs a TrajectoryFilter.
+     * @param reset_timeout The timeout for consecutive empty trajectories that causes filter to reset its state.
      * @param max_jump_distance Maximum allowed jump distance between consecutive frames.
      * @param min_persistence_frames Minimum number of frames a trajectory must be consistent.
      * @param fixed_sample_size Number of points used for arc-length parameterization.
-     * @param ema_alpha Smoothing factor for exponential moving average (EMA). 0 = no smoothing, 1.0 = instant update.
      */
     explicit TrajectoryFilter(
+        std::chrono::duration<float> reset_timeout = std::chrono::milliseconds(500),
         float max_jump_distance = 30.0f,
         int min_persistence_frames = 3,
         int fixed_sample_size = 20)
-        : m_max_jump_distance(max_jump_distance),
+        : m_reset_timeout(reset_timeout),
+          m_max_jump_distance(max_jump_distance),
           m_min_persistence_frames(min_persistence_frames),
-          m_fixed_sample_size(fixed_sample_size)
+          m_fixed_sample_size(fixed_sample_size),
+          m_last_valid_trajectory_time(std::nullopt)
           {
             m_kalman_filters.resize(m_fixed_sample_size);
           }
@@ -51,6 +56,20 @@ public:
      */
     [[nodiscard]] std::vector<Eigen::Vector2<T>> filter(const std::span<const Eigen::Vector2<T>>& trajectory, std::chrono::duration<float> timestamp)
     {
+        if (trajectory.size() < 2)
+        {
+            if (m_last_valid_trajectory_time.has_value() && (timestamp - m_last_valid_trajectory_time.value()) > m_reset_timeout)
+            {
+                // If the trajectory has been missing for too long, reset the filter.
+                reset();
+            }
+        }
+        else
+        {
+            // Valid trajectory detected → Update tracking
+            m_last_valid_trajectory_time = timestamp;
+        }
+
         auto trajectory_casted_view = trajectory | std::views::transform([](const Eigen::Vector2<T>& p) -> Eigen::Vector2d { return p.template cast<double>(); });
         std::vector<Eigen::Vector2d> trajectory_casted(trajectory_casted_view.begin(), trajectory_casted_view.end());
 
@@ -65,7 +84,6 @@ public:
         // {
         //     return m_output_trajectory.empty() ? trajectory : m_output_trajectory;
         // }
-
 
         // **Apply Arc-Length Parameterization**
         std::vector<Eigen::Vector2d> resampled = arcLengthResample(trajectory_casted);
@@ -90,6 +108,21 @@ public:
         });
 
         return m_output_trajectory;
+    }
+
+    void reset()
+    {
+        // Clear stored trajectories
+        m_past_trajectories.clear();
+        m_smoothed_trajectory.clear();
+        m_output_trajectory.clear();
+
+        // Reset Kalman filters
+        m_kalman_filters.clear();
+        m_kalman_filters.resize(m_fixed_sample_size); // Reinitialize Kalman filters
+
+        // Clear last valid trajectory timestamp
+        m_last_valid_trajectory_time.reset();
     }
 
 private:

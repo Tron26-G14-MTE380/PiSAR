@@ -17,7 +17,7 @@
 
 using namespace pisar::mcp;
 
-constexpr bool kDebug = false;
+constexpr bool kDebug = true;
 constexpr bool kProfile = false;
 constexpr uint64_t kProfileTimeMs = 10000;
 
@@ -77,7 +77,7 @@ int main()
     {
 
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
-        const std::chrono::duration<float> frame_capture_time = loop_start.time_since_epoch();
+        const std::chrono::duration<float> frame_capture_time = loop_start - start;
 
         cv::Mat input_frame = downscaleCrop(captured_frame.value(), kFrameSize);
         const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(input_frame, frame_capture_time);

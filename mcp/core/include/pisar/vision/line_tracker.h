@@ -85,6 +85,22 @@ public:
     {
         EASY_FUNCTION();
 
+        if (tkDebug)
+        {
+            const RoiMat empty_img = RoiMat(cv::Mat::zeros(m_frame_size, CV_8UC3));
+            m_debug = {
+                .preprocessed = empty_img,
+                .hsvFiltered = empty_img,
+                .skeleton = empty_img,
+                .filtered_skeleton = empty_img,
+                .trajectory = empty_img,
+                .simplified_trajectory = empty_img,
+                .projected_trajectory = empty_img,
+                .filtered_trajectory = empty_img,
+                .simplified_filtered_trajectory = empty_img
+            };
+        }
+
         if (frame.size() != m_frame_size)
         {
             std::cerr << "Input frame size (" << frame.size() << ") doesn't match expected frame size (" << m_frame_size << ")" << std::endl;
@@ -143,7 +159,7 @@ private:
     [[nodiscard]] RoiMat applyHSVThreshold(const RoiMat& input)
     {
         EASY_FUNCTION();
-        
+
         cv::Mat hsv, mask;
         cv::cvtColor(input.getMat(), hsv, cv::COLOR_BGR2HSV);
         mask = cv::Mat::zeros(input.getMat().size(), CV_8U);
