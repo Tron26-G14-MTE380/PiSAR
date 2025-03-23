@@ -37,41 +37,47 @@ projection_instance = RobotHomographyProjection(
 # Initialize the Bullseye Detector
 detector = BullseyeDetector(projection_instance)
 
-# Paths to test images
-image_paths = [
-    os.path.join("sample_images", "bullseye_with_lego.jpg"),
-    os.path.join("sample_images", "home_made_bullseye.jpg")
-]
+# Path to video file
+video_path = os.path.join("..", "sample_videos", "lego_on_bullseye.mp4")
 
-for image_path in image_paths:
-    # Load image
-    frame = cv2.imread(image_path)
+# Open video file
+cap = cv2.VideoCapture(video_path)
 
-    if frame is None:
-        print(f"Error: Could not open image {image_path}")
-        continue
+if not cap.isOpened():
+    print(f"Error: Could not open video {video_path}")
+    exit()
 
-    # Detect bullseye
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        print("End of video or error reading frame.")
+        break
+
+    # Optional crop like the safe zone code
+    height, width, _ = frame.shape
+    crop_start = height // 3
+    frame = frame[crop_start:, :]
+
+    # Bullseye Detection
     detected = detector.is_bullseye_in_scene(frame)
     center = detector.find_bullseye(frame) if detected else None
 
-    print(f"Processing {image_path}")
     print(f"Bullseye Detected: {detected}")
     print(f"Bullseye Center: {center}")
 
-    # Draw detected bullseye center
     if center:
-        cv2.circle(frame, (int(center[0]), int(center[1])), 20, (0, 255, 0), 4)
-        cv2.putText(frame, "Bullseye", (int(center[0]) - 40, int(center[1]) - 20),
+        adjusted_center = (center[0], center[1] + crop_start)
+        cv2.circle(frame, center, 20, (0, 255, 0), 4)
+        cv2.putText(frame, "Bullseye", (center[0] - 40, center[1] - 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-    # Display the processed image
-    cv2.imshow(f"Bullseye Detection - {os.path.basename(image_path)}", frame)
+    # Display the frame
+    cv2.imshow("Bullseye Detection (Cropped)", frame)
 
-    # (Optional) Save the processed images with detections
-    output_path = f"processed_{os.path.basename(image_path)}"
-    cv2.imwrite(output_path, frame)
+    # Break if 'q' is pressed
+    if cv2.waitKey(30) & 0xFF == ord('q'):
+        break
 
-# Wait for a key press and close all windows
-cv2.waitKey(0)
+# Cleanup
+cap.release()
 cv2.destroyAllWindows()

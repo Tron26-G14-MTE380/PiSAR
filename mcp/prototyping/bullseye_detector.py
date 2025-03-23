@@ -16,23 +16,14 @@ class BullseyeDetector:
         return center is not None  # Only return True if we actually found a bullseye center
 
     def _hsv_filter(self, frame: np.ndarray) -> np.ndarray:
-        """Applies HSV filtering to extract bullseye colors with noise reduction."""
-        print("HSV FILTERING")
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        white_mask = cv2.inRange(hsv, (0, 0, 220), (180, 40, 255))
 
-        # Define color masks
-        blue_mask = cv2.inRange(hsv, (90, 50, 50), (130, 255, 255))
-        red_mask1 = cv2.inRange(hsv, (0, 50, 50), (10, 255, 255))
-        red_mask2 = cv2.inRange(hsv, (170, 50, 50), (180, 255, 255))
-        white_mask = cv2.inRange(hsv, (0, 0, 200), (180, 40, 255))
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        white_mask = cv2.morphologyEx(white_mask, cv2.MORPH_OPEN, kernel)
 
-        # Combine masks
-        combined_mask = cv2.bitwise_or(blue_mask, red_mask1)
-        combined_mask = cv2.bitwise_or(combined_mask, red_mask2)
-        combined_mask = cv2.bitwise_or(combined_mask, white_mask)
-
-        cv2.imshow("Combined_mask", combined_mask)
-        return combined_mask
+        cv2.imshow("white mask", white_mask)
+        return white_mask
 
     def find_bullseye(self, frame):
         """Finds and returns the center of the bullseye target with improved accuracy."""
@@ -68,7 +59,7 @@ class BullseyeDetector:
                 y = int(M["m01"] / M["m00"])
                 radius = int(np.sqrt(area / np.pi))  # Approximate radius
                 print(f"DEBUG: Centroid at ({x}, {y}) with estimated radius {radius}")
-                if 30 < radius < 800:
+                if 15 < radius < 800:
                     max_radius = max(max_radius, radius)
                     best_center = (x, y)   
                     pixel_point = np.array([[x, y]])
