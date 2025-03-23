@@ -29,7 +29,7 @@ public:
      * @param decel Deceleration rate.
      */
     DifferentialDriveController(MotorDriver& left_motor, MotorDriver& right_motor,
-                    const float wheel_base, const float accel = 0.5f, const float decel = 0.8f);
+                    const float wheel_base, const float accel = 0.5f, const float decel = 2.0f);
 
     /**
      * @brief Initializes the drive controller
@@ -42,6 +42,13 @@ public:
         m_left_profile.reset();
         m_right_profile.reset();
     }
+
+    const MotorDriver& getLeftMotor() const { return m_left_motor; }
+    const MotorDriver& getRightMotor() const { return m_right_motor; }
+
+    [[nodiscard]] inline float getMinSpeed() const { return m_left_motor.getMinSpeed(); }
+    [[nodiscard]] inline float getMaxSpeed() const { return m_left_motor.getMaxSpeed(); } 
+    [[nodiscard]] inline float getSpeedRange() const { return m_left_motor.getSpeedRange(); } 
 
     /**
      * @brief Drives the robot using tank-style controls.
