@@ -41,6 +41,7 @@ void setup()
         PISAR_LOG_ERROR("Calibration failed!");
         return;
     }
+    PISAR_LOG_ERROR("Calibration done!");
 
 
 }

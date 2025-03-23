@@ -138,7 +138,8 @@
 			"openglsupport": "cpp",
 			"specialfunctions": "cpp",
 			"splines": "cpp",
-			"*.impl": "cpp"
+			"*.impl": "cpp",
+			"*.inc": "cpp"
 		},
 		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json"
 	},

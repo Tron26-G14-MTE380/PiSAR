@@ -97,9 +97,11 @@ void DifferentialDriveController::driveArc(const float radius, const float speed
 
 void DifferentialDriveController::update()
 {
-    const std::chrono::microseconds current_time = static_cast<std::chrono::microseconds>(micros());
+    const std::chrono::microseconds current_time = std::chrono::microseconds(micros());
     const float left_speed = m_left_profile.update(current_time);
     const float right_speed = m_right_profile.update(current_time);
+
+    //PISAR_LOG_INFO("%u: %f/%f", micros(), left_speed, right_speed);
 
     m_left_motor.setSpeed(left_speed);
     m_right_motor.setSpeed(right_speed);

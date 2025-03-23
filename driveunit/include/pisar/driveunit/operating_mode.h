@@ -100,14 +100,21 @@ private:
     std::reference_wrapper<RobotFacility> m_facility;
     float m_rotation_deg;
 
-    
-    float m_kp = 0.02f;
-    float m_ki = 0.0f;
-    float m_kd = 0.0f;
+    static constexpr float kPidkp = 0.0007f;
+    static constexpr float kPidki = 0.0f;
+    static constexpr float kPidkd = 0.0001f;
+
+    static constexpr float kTolerance = 3.0f;
+    static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(500);
+
+    float m_adj_kp;
+    float m_adj_ki;
+    float m_adj_kd;
 
     float m_integral;
     float m_last_error;
-    std::chrono::milliseconds m_last_update_time;;
+    std::chrono::milliseconds m_last_update_time;
+    std::optional<std::chrono::milliseconds> m_on_target_timestamp;
 
 public:
     OperatingModeRotate(RobotFacility& facility, float rotation_deg);

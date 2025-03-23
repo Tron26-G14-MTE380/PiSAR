@@ -21,9 +21,9 @@ private:
     Imu& m_imu;
     ImuPlanarKinematicTracker<kPoseHistorySize> m_kinematic_tracker;
 
-    Mutex m_drive_mutex;
-    Mutex m_imu_mutex;
-    Mutex m_kinematic_tracker_mutex;
+    mutable Mutex m_drive_mutex;
+    mutable Mutex m_imu_mutex;
+    mutable Mutex m_kinematic_tracker_mutex;
 
     TaskHandle_t m_dc_update_task_handle;             ///< FreeRTOS task handle for drive controller update task.
     TaskHandle_t m_kt_update_task_handle;             ///< FreeRTOS task handle for kinematic tracker update task.
@@ -162,6 +162,24 @@ public:
         m_drive_controller.hardStop();
     }
 
+    [[nodiscard]] inline float getMinSpeed() const 
+    { 
+        Lock<Mutex> lock(m_drive_mutex);
+        return m_drive_controller.getMinSpeed(); 
+    }
+
+    [[nodiscard]] inline float getMaxSpeed() const 
+    { 
+        Lock<Mutex> lock(m_drive_mutex);
+        return m_drive_controller.getMaxSpeed(); 
+    } 
+
+    [[nodiscard]] inline float getSpeedRange() const 
+    { 
+        Lock<Mutex> lock(m_drive_mutex);
+        return m_drive_controller.getSpeedRange(); 
+    } 
+
     /// @brief Retrieves the robot's calculated velocity in m/s (thread-safe).
     [[nodiscard]] Eigen::Vector2f getVelocity()
     {
@@ -195,6 +213,18 @@ public:
     {
         Lock<Mutex> lock(m_kinematic_tracker_mutex);
         return m_kinematic_tracker.getAngularVelocity();
+    }
+
+    void setPoseReference()
+    {
+        Lock<Mutex> lock(m_kinematic_tracker_mutex);
+        m_kinematic_tracker.setPoseReference();
+    }
+
+    void setPoseReference(const KinematicPose& ref)
+    {
+        Lock<Mutex> lock(m_kinematic_tracker_mutex);
+        m_kinematic_tracker.setPoseReference(ref);
     }
 
 private:
@@ -239,6 +269,7 @@ private:
      */
     inline void kinematicTrackerUpdateTaskLoop()
     {
+        auto start = micros();
         while (true)
         {
             if (m_imu_data_ready_sem.lock())

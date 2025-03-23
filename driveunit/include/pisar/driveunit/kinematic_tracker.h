@@ -87,7 +87,7 @@ public:
         m_current_state.pose.position += m_current_state.velocity * m_sample_time.count();
 
         // -- INTEGRATE ANGULAR VELOCITY ---
-        m_current_state.pose.orientation += m_current_state.angular_velocity * m_sample_time.count();
+        m_current_state.pose.orientation += m_current_state.angular_velocity * m_sample_time.count() * 0.5f;
 
         // Store updated state
         m_pose_history.addRecord(timestamp, m_current_state.pose);

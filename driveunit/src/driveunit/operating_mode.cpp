@@ -64,16 +64,34 @@ void OperatingModeFollowTrajectory::onExitImpl()
 ////////////////////////////////////////////////// OperatingModeRotate /////////////////////////////////////////////////
 
 OperatingModeRotate::OperatingModeRotate(RobotFacility& facility, const float rotation_deg) :
-    m_facility(facility), m_rotation_deg(rotation_deg), m_last_update_time{0} {}
+    m_facility(facility), 
+    m_rotation_deg(rotation_deg), 
+    m_adj_kp(0.0f),
+    m_adj_ki(0.0f),
+    m_adj_kd(0.0f),
+    m_integral(0.0f),
+    m_last_error(0.0f),
+    m_last_update_time{0},
+    m_on_target_timestamp(std::nullopt)
+    {}
 
 void OperatingModeRotate::onEnterImpl() 
-{ 
+{
+    m_facility.get().driveStop();
+
+    const float pid_adj_scale = 1.0f / m_facility.get().getSpeedRange();
+    m_adj_kp = kPidkp * pid_adj_scale;
+    m_adj_ki = kPidki * pid_adj_scale;
+    m_adj_kd = kPidkd * pid_adj_scale;
+
     m_integral = 0.0f;
-    m_last_error = 0.0f;
+    m_last_error = m_rotation_deg;
+    m_on_target_timestamp = std::nullopt;
+    m_facility.get().setPoseReference();
 }
+
 [[nodiscard]] bool OperatingModeRotate::updateImpl() 
 { 
-
     float current_angle = m_facility.get().getOrientation();
 
     float error = m_rotation_deg - current_angle;
@@ -86,34 +104,49 @@ void OperatingModeRotate::onEnterImpl()
     std::chrono::duration<float> elapsed = current_time - m_last_update_time;
     float dt = elapsed.count();
 
-    // Compute PID terms
-    m_integral += error * dt;
-    float derivative = (error - m_last_error) / dt;
 
-    // Compute PID output
-    float pid_output = (m_kp * error) + (m_ki * m_integral) + (m_kd * derivative);
-
-    // negative PID means left, positive means right
-    float left_speed = -pid_output;
-    float right_speed = pid_output;
-
-    // Clamp speeds to [-1.0, 1.0]
-    left_speed = std::clamp(left_speed, -1.0f, 1.0f);
-    right_speed = std::clamp(right_speed, -1.0f, 1.0f);
-
-    m_facility.get().tankDrive(left_speed, right_speed);
-
-    m_last_error = error;
-    m_last_update_time = std::chrono::milliseconds(millis());
-
-    if (std::abs(error) < 1.0f)
+    if (std::abs(error) > kTolerance)
     {
-        m_facility.get().driveStop();
-        return true;
+        m_on_target_timestamp = std::nullopt;
+
+        // Compute PID terms
+        m_integral += error * dt;
+        float derivative = (error - m_last_error) / dt;
+
+        // Compute PID output
+        float pid_output = (m_adj_kp * error) + (m_adj_ki * m_integral) + (m_adj_kd * derivative);
+
+        // negative PID means left, positive means right
+        float left_speed = -pid_output;
+        float right_speed = pid_output;
+
+        // Clamp speeds to [-1.0, 1.0]
+        left_speed = std::clamp(left_speed, -1.0f, 1.0f);
+        right_speed = std::clamp(right_speed, -1.0f, 1.0f);
+
+        //PISAR_LOG_INFO("error %f -> %f/%f", error, left_speed, right_speed);
+
+        m_facility.get().tankDrive(left_speed, right_speed);
+    }
+    else
+    {
+        if (!m_on_target_timestamp.has_value())
+        {
+            m_on_target_timestamp = current_time;
+            m_facility.get().driveHardStop();
+        }
+        else if (current_time - m_on_target_timestamp.value() >= kOnTargetDurationTolerance)
+        {
+            m_facility.get().driveHardStop();
+            return true;
+        }
     }
 
+    m_last_error = error;
+    m_last_update_time = current_time;
     return false;
 }
+
 void OperatingModeRotate::onExitImpl() 
 {   
     PISAR_LOG_INFO("Exiting Rotate mode");

@@ -92,7 +92,7 @@ Imu::Imu(
     m_int1_pin(int1_pin),
     m_calibration_data_file_path(calibration_data_file_path),
     m_sample_rate(sample_rate),
-    m_sample_time(static_cast<std::chrono::microseconds::rep>(1E6f / sample_rate)),
+    m_sample_time(static_cast<int64_t>(1E6f / sample_rate)),
     m_imu(&spi, cs_pin, spi_speed),
     m_interrupt_callback(std::nullopt)
 {}
@@ -166,7 +166,7 @@ bool Imu::initialize()
         return false;
     }
 
-    if (m_imu.Set_X_ODR(m_sample_rate) != LSM6DSO_OK) // Maps to 833 Hz
+    if (m_imu.Set_X_ODR(m_sample_rate) != LSM6DSO_OK)
     {
         PISAR_LOG_ERROR("Failed to set accelerometer data rate!");
         return false;
@@ -184,13 +184,13 @@ bool Imu::initialize()
         return false;
     }
 
-    if (m_imu.Set_G_ODR(m_sample_rate) != LSM6DSO_OK) // Maps to 833 Hz
+    if (m_imu.Set_G_ODR(m_sample_rate) != LSM6DSO_OK)
     {
         PISAR_LOG_ERROR("Failed to set gyroscope data rate!");
         return false;
     }
 
-    if (m_imu.Set_G_FS(125) != LSM6DSO_OK)
+    if (m_imu.Set_G_FS(1000) != LSM6DSO_OK)
     {
         PISAR_LOG_ERROR("Failed to set gyroscope range!");
         return false;
@@ -405,6 +405,9 @@ bool Imu::calibrate(size_t num_samples, bool save)
 
     std::chrono::microseconds timestamp = 0ms;
 
+    int num_x = 0;
+    int num_g = 0;
+
     // Read all available FIFO samples
     while((data_samples + accel_buffer.size() + gyro_buffer.size()) < output.size() && samples_available)
     {
@@ -419,9 +422,11 @@ bool Imu::calibrate(size_t num_samples, bool save)
         switch(tag)
         {
             case LSM6DSO_XL_NC_TAG:
+                num_x++;
                 accel_buffer.push({getAccelDataFifo(), timestamp});
                 break;
             case LSM6DSO_GYRO_NC_TAG:
+                num_g++;
                 gyro_buffer.push({getGyroDataFifo(), timestamp});
                 break;
             default:
