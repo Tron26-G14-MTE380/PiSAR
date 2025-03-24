@@ -1,8 +1,8 @@
 #pragma once
 
-#include "pisar/driveunit_transport.h"
-#include "pisar/driveunit_controller.h"
-#include "pisar/concurrent_queue.h"
+#include "pisar/mcp/driveunit/transport.h"
+#include "pisar/mcp/driveunit/controller.h"
+#include "pisar/mcp/utils/concurrent_queue.h"
 
 #include <unordered_map>
 #include <thread>

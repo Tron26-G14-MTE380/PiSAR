@@ -1,11 +1,11 @@
 
-#include "pisar/config.h"
-#include "pisar/vision/video_source.h"
-#include "pisar/vision/line_tracker.h"
-#include "pisar/vision/homography.h"
-#include "pisar/vision/roi_mat.h"
-#include "pisar/vision/debug_visualization.h"
-#include "pisar/vision/trajectory_filter.h"
+#include "pisar/mcp/config.h"
+#include "pisar/mcp/vision/video_source.h"
+#include "pisar/mcp/vision/line_tracker.h"
+#include "pisar/mcp/vision/homography.h"
+#include "pisar/mcp/vision/roi_mat.h"
+#include "pisar/mcp/vision/debug_visualization.h"
+#include "pisar/mcp/vision/trajectory_filter.h"
 
 #include <easy/profiler.h>
 
@@ -50,7 +50,7 @@ int main()
     auto line_tracker = LineTracker<kDebug>(
         gkFrameSize,
         gkRedTapeHsvThresholds,
-        projection.for_image(gkFrameSize, video_source.getCaptureRect()),
+        projection.for_image(gkFrameSize),
         filter
     );
 

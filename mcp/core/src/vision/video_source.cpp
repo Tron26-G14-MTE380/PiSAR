@@ -1,4 +1,4 @@
-#include "pisar/vision/video_source.h"
+#include "pisar/mcp/vision/video_source.h"
 
 #ifdef __linux__
 #include <libcamera/stream.h>

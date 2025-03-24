@@ -2,7 +2,7 @@
 
 #include <span>
 #include <Eigen/Dense>
-#include "pisar/vision/camera.h"
+#include "pisar/mcp/vision/camera.h"
 
 namespace pisar::mcp {
 

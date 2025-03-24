@@ -1,4 +1,4 @@
-#include "pisar/vision/path_extraction.h"
+#include "pisar/mcp/vision/path_extraction.h"
 
 #include <easy/profiler.h>
 

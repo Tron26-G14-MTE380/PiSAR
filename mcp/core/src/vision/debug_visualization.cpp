@@ -1,4 +1,4 @@
-#include "pisar/vision/debug_visualization.h"
+#include "pisar/mcp/vision/debug_visualization.h"
 
 namespace pisar::mcp {
 

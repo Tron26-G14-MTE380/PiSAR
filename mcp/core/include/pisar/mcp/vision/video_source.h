@@ -1,7 +1,7 @@
 #pragma once
 
-#include "pisar/vision/utils.h"
-#include "pisar/concurrent_queue.h"
+#include "pisar/mcp/vision/utils.h"
+#include "pisar/mcp/utils/concurrent_queue.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -247,7 +247,7 @@ public:
             throw std::runtime_error("Failed to open camera via GStreamer.");
         }
 
-        m_capture_rect = {m_cap.get(cv::CAP_PROP_FRAME_WIDTH), m_cap.get(cv::CAP_PROP_FRAME_HEIGHT)};
+        m_capture_rect = {0, 0, m_cap.get(cv::CAP_PROP_FRAME_WIDTH), m_cap.get(cv::CAP_PROP_FRAME_HEIGHT)};
     }
 
     bool isBlackImage(const cv::Mat& img)
@@ -372,7 +372,7 @@ public:
         : VideoSource(),
           m_file_path(std::filesystem::absolute(file_path)),
           m_cap(),
-          m_original_size(0, 0, 0, 0),
+          m_original_size(0, 0),
           m_repeat(repeat),
           m_size(0, 0)
           {}

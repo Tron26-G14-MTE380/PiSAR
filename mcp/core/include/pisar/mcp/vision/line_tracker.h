@@ -1,13 +1,13 @@
 #pragma once
 
-#include "pisar/vision/thinning.h"
-#include "pisar/vision/path_extraction.h"
-#include "pisar/vision/path_simplification.h"
-#include "pisar/vision/roi_mat.h"
-#include "pisar/vision/utils.h"
-#include "pisar/vision/debug_visualization.h"
-#include "pisar/vision/trajectory_filter.h"
-#include "pisar/vision/homography.h"
+#include "pisar/mcp/vision/thinning.h"
+#include "pisar/mcp/vision/path_extraction.h"
+#include "pisar/mcp/vision/path_simplification.h"
+#include "pisar/mcp/vision/roi_mat.h"
+#include "pisar/mcp/vision/utils.h"
+#include "pisar/mcp/vision/debug_visualization.h"
+#include "pisar/mcp/vision/trajectory_filter.h"
+#include "pisar/mcp/vision/homography.h"
 
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>

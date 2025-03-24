@@ -1,7 +1,7 @@
 
-#include "pisar/vision/homography.h"
-#include "pisar/vision/debug_visualization.h"
-#include "pisar/config.h"
+#include "pisar/mcp/vision/homography.h"
+#include "pisar/mcp/vision/debug_visualization.h"
+#include "pisar/mcp/config.h"
 
 #include <numbers>
 #include <iostream>

@@ -1,4 +1,4 @@
-#include "pisar/vision/utils.h"
+#include "pisar/mcp/vision/utils.h"
 
 namespace pisar::mcp {
 

@@ -1,9 +1,9 @@
-#include "pisar/math.h"
-#include "pisar/vision/video_source.h"
-#include "pisar/vision/line_tracker.h"
-#include "pisar/vision/homography.h"
-#include "pisar/vision/debug_visualization.h"
-#include "pisar/driveunit_controller.h"
+#include "pisar/mcp/utils/math.h"
+#include "pisar/mcp/vision/video_source.h"
+#include "pisar/mcp/vision/line_tracker.h"
+#include "pisar/mcp/vision/homography.h"
+#include "pisar/mcp/vision/debug_visualization.h"
+#include "pisar/mcp/driveunit/controller.h"
 
 #include <easy/profiler.h>
 
