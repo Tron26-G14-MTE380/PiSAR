@@ -91,7 +91,6 @@ public:
 
     [[nodiscard]] bool initialize(BaseType_t update_task_priority);
 
-    [[nodiscard]] CalibrationData calibrateImpl(const size_t num_batches, const size_t slope_sample_batch_size);
     [[nodiscard]] bool calibrate(const size_t num_batches, const size_t slope_sample_batch_size, const bool save = true);
 
     /**
@@ -238,6 +237,7 @@ public:
     }
 
 private:
+    [[nodiscard]] CalibrationData calibrateImpl(const size_t num_batches, const size_t slope_sample_batch_size);
 
     /**
      * @brief Entry point for the kinematic tracker task.
