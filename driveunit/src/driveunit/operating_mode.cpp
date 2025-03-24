@@ -5,53 +5,106 @@ namespace pisar::driveunit {
 
 ///////////////////////////////////////////// OperatingModeFollowTrajectory ////////////////////////////////////////////
 
-OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(
-    RobotFacility& facility,
-    const std::span<const Eigen::Vector2f> trajectory,
-    const std::chrono::duration<float> reference_time
-) : m_facility(facility), m_trajectory(trajectory.begin(), trajectory.end()), m_ref_time(reference_time), m_start_time(0) {}
+OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& facility, const std::span<const Eigen::Vector2f> trajectory) :
+    m_facility(facility),
+    m_trajectory(trajectory.begin(), trajectory.end()),
+    m_adj_kp(0.0f),
+    m_adj_ki(0.0f),
+    m_adj_kd(0.0f),
+    m_target_index(0),
+    m_distance_to_target(0.0f),
+    m_target_heading(0.0f),
+    m_integral_angle(0.0f),
+    m_last_angle_error(0.0f),
+    m_last_update_time{0},
+    m_on_target_timestamp(std::nullopt)
+    {}
 
 void OperatingModeFollowTrajectory::onEnterImpl()
 {
-    PISAR_LOG_INFO("Entering Follow Trajectory mode with %zu waypoints", m_trajectory.size());
+    m_facility.get().driveStop();
 
-    if (m_trajectory.empty())
-    {
-        PISAR_LOG_WARN("Trajectory is empty, stopping immediately.");
-        m_facility.get().driveStop();
-        return;
-    }
+    const float pid_adj_scale = 1.0f / m_facility.get().getSpeedRange();
+    m_adj_kp = kPidkp * pid_adj_scale;
+    m_adj_ki = kPidki * pid_adj_scale;
+    m_adj_kd = kPidkd * pid_adj_scale;
 
-     // Move towards the first waypoint
-     Eigen::Vector2f target = m_trajectory.front().normalized();
+    // Set target
+    m_target_index = 0;
+    m_distance_to_target = getCurrentTarget().norm();
+    m_target_heading = std::atan2(getCurrentTarget().x(), getCurrentTarget().y()) * 180.0f / M_PI; // might have to adjust due to imu axis directions
 
-     float forward_movement = std::clamp(target.y(), 0.0f, 1.0f);  // Forward distance
-     float sideways_movement = std::clamp(-target.x(), -1.0f, 1.0f); // Sideways movement
+    m_integral_angle = 0.0f;
+    m_last_angle_error = m_target_heading;
+    m_on_target_timestamp = std::nullopt;
+    // ELEPHANT do a lot of bs with ash about distance travelled after image vs actual travel attempt
+    m_facility.get().setPoseReference();
 
-     // Convert sideways movement into turning (assumption: positive = right, negative = left)
-     const float base_speed = 1.0f;
-     float turn_speed = std::clamp(sideways_movement * 0.5f, -1.0f, 1.0f);
-
-     float left_speed = base_speed - turn_speed;
-     float right_speed = base_speed + turn_speed;
-
-     // Clamp speeds
-     left_speed = std::clamp(left_speed, -1.0f, 1.0f);
-     right_speed = std::clamp(right_speed, -1.0f, 1.0f);
-
-     // Set speed and move forward (very basic)
-     m_facility.get().tankDrive(left_speed, right_speed);
-
-     m_start_time = std::chrono::milliseconds(millis());
 }
 
 [[nodiscard]] bool OperatingModeFollowTrajectory::updateImpl()
 {
-    if (millis() - m_start_time.count() > 500)
+    auto current_pose = m_facility.get().getPose();
+    auto current_position = current_pose.position;
+    auto current_heading = current_pose.orientation;
+
+    Eigen::Vector2f error_vec = getCurrentTarget() - current_position;
+    float distance_error = error_vec.norm();
+    float angle_error = m_target_heading - current_heading;
+
+    // Normalize angle error to [-180, 180]
+    while (angle_error > 180.0f) angle_error -= 360.0f;
+    while (angle_error < -180.0f) angle_error += 360.0f;
+
+    auto current_time = std::chrono::milliseconds(millis());
+    std::chrono::duration<float> elapsed = current_time - m_last_update_time;
+    float dt = elapsed.count();
+
+    if (std::abs(angle_error) > thetaTolerance || std::abs(distance_error) > distTolerance)
     {
-        return true;
+        m_on_target_timestamp = std::nullopt;
+
+        // Compute PID terms
+        m_integral_angle += angle_error * dt;
+        float derivative_angle = (angle_error - m_last_angle_error) / dt;
+
+        // Sharing Kp for now, this could change to be individual and most likely will
+        // PID outputs
+        float angular_output = (m_adj_kp * angle_error) + (m_adj_kd * derivative_angle) + (m_adj_ki * m_integral_angle);
+
+        // Forward speed (only proportional for now)
+        float forward_output = m_adj_kp * distance_error;
+
+        // Clamp speeds
+        angular_output = std::clamp(angular_output, -1.0f, 1.0f);
+        forward_output = std::clamp(forward_output, 0.0f, 1.0f); // no reversing
+
+        // Blended drive — arc forward
+        float left_speed = forward_output - angular_output;
+        float right_speed = forward_output + angular_output;
+
+        left_speed = std::clamp(left_speed, -1.0f, 1.0f);
+        right_speed = std::clamp(right_speed, -1.0f, 1.0f);
+
+        m_facility.get().tankDrive(left_speed, right_speed);
+
+    }
+    else
+    {
+        if (!m_on_target_timestamp.has_value())
+        {
+            m_on_target_timestamp = current_time;
+            m_facility.get().driveHardStop();
+        }
+        else if (current_time - m_on_target_timestamp.value() >= kOnTargetDurationTolerance)
+        {
+            m_facility.get().driveHardStop();
+            return true;
+        }
     }
 
+    m_last_angle_error = angle_error;
+    m_last_update_time = current_time;
     return false;
 }
 
@@ -64,8 +117,8 @@ void OperatingModeFollowTrajectory::onExitImpl()
 ////////////////////////////////////////////////// OperatingModeRotate /////////////////////////////////////////////////
 
 OperatingModeRotate::OperatingModeRotate(RobotFacility& facility, const float rotation_deg) :
-    m_facility(facility), 
-    m_rotation_deg(rotation_deg), 
+    m_facility(facility),
+    m_rotation_deg(rotation_deg),
     m_adj_kp(0.0f),
     m_adj_ki(0.0f),
     m_adj_kd(0.0f),
@@ -75,7 +128,7 @@ OperatingModeRotate::OperatingModeRotate(RobotFacility& facility, const float ro
     m_on_target_timestamp(std::nullopt)
     {}
 
-void OperatingModeRotate::onEnterImpl() 
+void OperatingModeRotate::onEnterImpl()
 {
     m_facility.get().driveStop();
 
@@ -90,8 +143,8 @@ void OperatingModeRotate::onEnterImpl()
     m_facility.get().setPoseReference();
 }
 
-[[nodiscard]] bool OperatingModeRotate::updateImpl() 
-{ 
+[[nodiscard]] bool OperatingModeRotate::updateImpl()
+{
     float current_angle = m_facility.get().getOrientation();
 
     float error = m_rotation_deg - current_angle;
@@ -147,10 +200,10 @@ void OperatingModeRotate::onEnterImpl()
     return false;
 }
 
-void OperatingModeRotate::onExitImpl() 
-{   
+void OperatingModeRotate::onExitImpl()
+{
     PISAR_LOG_INFO("Exiting Rotate mode");
-    m_facility.get().driveStop(); 
+    m_facility.get().driveStop();
 }
 
 } // namespace pisar::driveunit
