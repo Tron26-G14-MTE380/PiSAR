@@ -1,4 +1,5 @@
-#include "pisar/math.h"
+
+#include "pisar/config.h"
 #include "pisar/vision/video_source.h"
 #include "pisar/vision/line_tracker.h"
 #include "pisar/vision/homography.h"
@@ -21,32 +22,6 @@ constexpr bool kDebug = true;
 constexpr bool kProfile = false;
 constexpr uint64_t kProfileTimeMs = 10000;
 
-const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> kTapeHsvThresholds = {
-    std::make_pair(cv::Scalar(0, 120, 70), cv::Scalar(10, 255, 255)),
-    std::make_pair(cv::Scalar(170, 120, 70), cv::Scalar(180, 255, 255))
-};
-
-const CameraTransform kCameraTransform {
-    .position = {0, 5, 12},
-    .tilt = Eigen::AngleAxisd(pisar::mcp::deg_to_rad<double>(-45), Eigen::Vector3d::UnitX())
-};
-
-const Eigen::Matrix3d kAxisMapping {
-    {1, 0, 0},
-    {0, 0, 1},
-    {0, 1, 0}
-};
-
-const CameraCalibrationData kCameraCalibration {
-    .calibration_img_size_px = {3280, 1640},
-    .focal_length_px = {2630.73, 2621.95},
-    .principle_axis_offset_px = {1589.29, 1085.99},
-    .skew = 0
-};
-
-const cv::Size kCaptureFrameSize = {1280, 960};
-const cv::Size kFrameSize = {320, 240};
-
 int main()
 {
     if constexpr(kProfile)
@@ -54,21 +29,30 @@ int main()
         EASY_PROFILER_ENABLE;
     }
 
-    HomographyProjection projection = HomographyProjection(kCameraTransform, kAxisMapping, kCameraCalibration);
-    TrajectoryFilter<double> filter;
+    HomographyProjection projection = HomographyProjection(
+        gkCameraTransform,
+        gkCameraAxisMapping,
+        gkCameraCalibration
+    );
 
-    auto line_tracker = LineTracker<kDebug>(kFrameSize, std::span(kTapeHsvThresholds), projection, filter);
+    TrajectoryFilter<double> filter;
 
     //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
     VideoFileSource video_source("../../sample_images/track_video.mp4");
+    #if __linux__
+        //LibcameraVideoSource video_source("/base/axi/pcie@120000/rp1/i2c@88000/imx219@10");
+    #else
+        //CvCameraVideoSource video_source(0);
+    #endif
 
-#if __linux__
-    //LibcameraVideoSource video_source("/base/axi/pcie@120000/rp1/i2c@88000/imx219@10");
-#else
-    //CvCameraVideoSource video_source(0);
-#endif
+    video_source.start(gkCaptureFrameSize);
 
-    video_source.start(kCaptureFrameSize);
+    auto line_tracker = LineTracker<kDebug>(
+        gkFrameSize,
+        gkRedTapeHsvThresholds,
+        projection.for_image(gkFrameSize, video_source.getCaptureRect()),
+        filter
+    );
 
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
 
@@ -79,7 +63,7 @@ int main()
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
         const std::chrono::duration<float> frame_capture_time = loop_start - start;
 
-        cv::Mat input_frame = downscaleCrop(captured_frame.value(), kFrameSize);
+        cv::Mat input_frame = downscaleCrop(captured_frame.value(), gkFrameSize);
         const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(input_frame, frame_capture_time);
 
         const auto loop_end = std::chrono::high_resolution_clock::now(); // end time

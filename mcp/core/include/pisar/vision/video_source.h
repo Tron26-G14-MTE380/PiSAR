@@ -57,6 +57,9 @@ public:
      * @brief Stops the video source.
      */
     inline void stop() { static_cast<TDerived*>(this)->stopImpl(); }
+
+    /// @brief Get the camera capture rect indicating cropping from full-res.
+    [[nodiscard]] inline cv::Rect getCaptureRect() const { return static_cast<TDerived*>(this)->getCaptureRectImpl(); }
 };
 
 /**
@@ -65,6 +68,7 @@ public:
 class RepeatedImageFileSource : public VideoSource<RepeatedImageFileSource> {
 private:
     std::string m_filePath;
+    cv::Size m_original_image_size;
     cv::Mat m_img;
 
 public:
@@ -75,7 +79,7 @@ public:
      * @param height Image height.
      */
     inline RepeatedImageFileSource(const std::string& file_path)
-        : VideoSource(), m_filePath(file_path) {}
+        : VideoSource(), m_filePath(file_path), m_original_image_size(0, 0) {}
 
     /**
      * @brief Starts the image source by loading the file.
@@ -93,6 +97,9 @@ public:
         {
             throw std::runtime_error("Failed to load image: " + m_filePath);
         }
+
+        m_original_image_size = m_img.size();
+
         cv::Mat resized;
         cv::resize(m_img, resized, frame_size);
         m_img = resized;
@@ -115,6 +122,9 @@ public:
      * @brief Stops the image source.
      */
     inline void stopImpl() { m_img.release(); }
+
+    /// @brief Get the camera capture rect indicating cropping from full-res.
+    [[nodiscard]] inline cv::Rect getCaptureRect() const { return cv::Rect(0, 0, m_original_image_size.width, m_original_image_size.height); }
 };
 
 /**
@@ -123,6 +133,7 @@ public:
 class CvCameraVideoSource : public VideoSource<CvCameraVideoSource> {
 private:
     int m_camera_id;
+    cv::Size m_original_size;
     cv::VideoCapture m_cap;
 
 public:
@@ -148,6 +159,8 @@ public:
         {
             throw std::runtime_error("Failed to open camera");
         }
+
+        m_original_size = {m_cap.get(cv::CAP_PROP_FRAME_WIDTH), m_cap.get(cv::CAP_PROP_FRAME_HEIGHT)};
 
         m_cap.set(cv::CAP_PROP_FRAME_WIDTH, frame_size.width);
         m_cap.set(cv::CAP_PROP_FRAME_HEIGHT, frame_size.height);
@@ -185,6 +198,9 @@ public:
             m_cap.release();
         }
     }
+
+    /// @brief Get the camera capture rect indicating cropping from full-res.
+    [[nodiscard]] inline cv::Rect getCaptureRect() const { return cv::Rect(0, 0, m_original_size.width, m_original_size.height); }
 };
 
 /**
@@ -192,8 +208,9 @@ public:
  */
 class GStreamerCameraVideoSource : public VideoSource<GStreamerCameraVideoSource> {
 private:
-    int m_camera_id;        ///< Camera ID (ignored for libcamera, but kept for compatibility).
-    cv::VideoCapture m_cap; ///< OpenCV VideoCapture object using GStreamer.
+    int m_camera_id;            ///< Camera ID (ignored for libcamera, but kept for compatibility).
+    cv::Rect m_capture_rect;    ///< The rect of the original frame.
+    cv::VideoCapture m_cap;     ///< OpenCV VideoCapture object using GStreamer.
 
 public:
     /**
@@ -201,7 +218,7 @@ public:
      * @param camera_id Camera index.
      */
     inline explicit GStreamerCameraVideoSource(int camera_id)
-        : VideoSource(), m_camera_id(camera_id), m_cap() {}
+        : VideoSource(), m_camera_id(camera_id), m_capture_rect(0, 0, 0, 0), m_cap() {}
 
     /**
      * @brief Starts the video capture.
@@ -229,6 +246,8 @@ public:
         if (!m_cap.isOpened()) {
             throw std::runtime_error("Failed to open camera via GStreamer.");
         }
+
+        m_capture_rect = {m_cap.get(cv::CAP_PROP_FRAME_WIDTH), m_cap.get(cv::CAP_PROP_FRAME_HEIGHT)};
     }
 
     bool isBlackImage(const cv::Mat& img)
@@ -269,6 +288,9 @@ public:
             m_cap.release();
         }
     }
+
+    /// @brief Get the camera capture rect indicating cropping from full-res.
+    [[nodiscard]] inline cv::Rect getCaptureRect() const { return m_capture_rect; }
 };
 
 #ifdef __linux__
@@ -280,6 +302,8 @@ class LibcameraVideoSource : public VideoSource<LibcameraVideoSource> {
 private:
     float m_frame_rate;
     size_t m_frame_buffer_size;
+
+    cv::Rect m_capture_rect;
 
     std::unique_ptr<libcamera::CameraManager> m_camera_manager;
     std::shared_ptr<libcamera::Camera> m_camera;
@@ -317,6 +341,9 @@ public:
      */
     void stopImpl();
 
+    /// @brief Get the camera capture rect indicating cropping from full-res.
+    [[nodiscard]] inline cv::Rect getCaptureRect() const { return m_capture_rect; }
+
 private:
     void requestComplete(libcamera::Request* request);
     void processFrame(libcamera::FrameBuffer* buffer);
@@ -330,6 +357,7 @@ private:
 class VideoFileSource : public VideoSource<VideoFileSource> {
 private:
     std::filesystem::path m_file_path;
+    cv::Size m_original_size;
     cv::VideoCapture m_cap;
     bool m_repeat;
     cv::Size m_size;
@@ -341,7 +369,13 @@ public:
      * @param repeat Whether to loop the video after reaching the end.
      */
     inline VideoFileSource(const std::filesystem::path& file_path, bool repeat = false)
-        : VideoSource(), m_file_path(std::filesystem::absolute(file_path)), m_cap(), m_repeat(repeat), m_size(0, 0) {}
+        : VideoSource(),
+          m_file_path(std::filesystem::absolute(file_path)),
+          m_cap(),
+          m_original_size(0, 0, 0, 0),
+          m_repeat(repeat),
+          m_size(0, 0)
+          {}
 
     /**
      * @brief Starts the video capture.
@@ -361,6 +395,7 @@ public:
             throw std::runtime_error("Failed to open video file: " + m_file_path.string());
         }
 
+        m_original_size = {m_cap.get(cv::CAP_PROP_FRAME_WIDTH), m_cap.get(cv::CAP_PROP_FRAME_HEIGHT)};
         m_size = frame_size;
     }
 
@@ -409,6 +444,9 @@ public:
             m_cap.release();
         }
     }
+
+    /// @brief Get the camera capture rect indicating cropping from full-res.
+    [[nodiscard]] inline cv::Rect getCaptureRect() const { return cv::Rect(0, 0, m_original_size.width, m_original_size.height); }
 };
 
 }

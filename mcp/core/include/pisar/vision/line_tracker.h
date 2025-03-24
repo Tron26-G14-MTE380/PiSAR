@@ -50,7 +50,6 @@ private:
     cv::Size m_frame_size;
     std::vector<std::pair<cv::Scalar, cv::Scalar>> m_hsv_masks;
 
-    std::reference_wrapper<HomographyProjection> m_homography_projection;
     HomographySizedProjection m_homography_sized_projection;
     std::reference_wrapper<TrajectoryFilter<double>> m_trajectory_filter;
 
@@ -60,6 +59,7 @@ public:
 
     /**
      * @brief Constructs a LineTracker with multiple HSV masks and validation parameters.
+     * @param frame_size The input frame size.
      * @param hsv_masks List of HSV threshold pairs (lower and upper bounds).
      * @param homography_projection Reference to homography projection to use.
      * @param trajectory_filter Reference to trajectory filter.
@@ -67,13 +67,12 @@ public:
     explicit LineTracker(
         const cv::Size& frame_size,
         const std::span<const std::pair<cv::Scalar, cv::Scalar>>& hsv_masks,
-        HomographyProjection& homography_projection,
+        const HomographySizedProjection& homography_projection,
         TrajectoryFilter<double>& trajectory_filter
     )
         : m_frame_size(frame_size),
           m_hsv_masks(hsv_masks.begin(), hsv_masks.end()),
-          m_homography_projection(homography_projection),
-          m_homography_sized_projection(homography_projection.for_image({frame_size.width, frame_size.height})),
+          m_homography_sized_projection(homography_projection),
           m_trajectory_filter(trajectory_filter) {}
 
     /**

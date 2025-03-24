@@ -6,11 +6,6 @@
 
 namespace pisar::mcp {
 
-struct CameraTransform {
-    Eigen::Vector3d position;
-    Eigen::AngleAxisd tilt;
-};
-
 class HomographySizedProjection {
 private:
     Eigen::Vector3d m_camera_position;
@@ -31,8 +26,9 @@ public:
         const Eigen::Vector3d cam_position,
         const Eigen::Matrix3d& inverse_world_to_camera_transformation,
         const CameraCalibrationData& cam_calib,
-        const Eigen::Vector2i& image_size_px
-    ) : HomographySizedProjection(cam_position, inverse_world_to_camera_transformation, cam_calib.get_transformation(image_size_px))
+        const cv::Size& image_size_px,
+        const std::optional<cv::Rect> crop_in_calibrated_image = std::nullopt
+    ) : HomographySizedProjection(cam_position, inverse_world_to_camera_transformation, cam_calib.get_transformation(image_size_px, crop_in_calibrated_image))
     {
     }
 
@@ -52,8 +48,9 @@ public:
         const CameraTransform cam_transform,
         const Eigen::Matrix3d& axis_mapping,
         const CameraCalibrationData& cam_calib,
-        const Eigen::Vector2i& image_size_px
-    ) : HomographySizedProjection(cam_transform, axis_mapping, cam_calib.get_transformation(image_size_px))
+        const cv::Size& image_size_px,
+        const std::optional<cv::Rect> crop_in_calibrated_image = std::nullopt
+    ) : HomographySizedProjection(cam_transform, axis_mapping, cam_calib.get_transformation(image_size_px, crop_in_calibrated_image))
     {
     }
 
@@ -109,13 +106,16 @@ public:
     }
 
     [[nodiscard]]
-    inline HomographySizedProjection for_image(const Eigen::Vector2i& image_size_px) const
+    inline HomographySizedProjection for_image(
+        const cv::Size& image_size_px,
+        const std::optional<cv::Rect> crop_in_calibrated_image = std::nullopt) const
     {
         return HomographySizedProjection(
             m_camera_position,
             m_inverse_world_to_camera_transformation,
             m_cam_calibration,
-            image_size_px
+            image_size_px,
+            crop_in_calibrated_image
         );
     }
 

@@ -17,7 +17,10 @@ namespace pisar::mcp {
  * @brief Constructs a LibcameraVideoSource instance.
  */
 LibcameraVideoSource::LibcameraVideoSource(std::string_view camera_id, float frame_rate, size_t frame_buffer_size)
-    : m_camera_manager(std::make_unique<libcamera::CameraManager>()), m_frame_rate(frame_rate), m_frame_buffer_size(frame_buffer_size)
+    : m_capture_rect(0, 0, 0, 0),
+      m_camera_manager(std::make_unique<libcamera::CameraManager>()),
+      m_frame_rate(frame_rate),
+      m_frame_buffer_size(frame_buffer_size)
 {
     if (m_camera_manager->start())
     {
@@ -91,6 +94,14 @@ void LibcameraVideoSource::startImpl(const cv::Size frame_size)
     {
         throw std::runtime_error("Invalid camera configuration");
     }
+
+    cv::Size validated_size = {m_config->at(0).size.width, m_config->at(0).size.height};
+    if (validated_size != frame_size)
+    {
+        throw std::runtime_error("Set size doesn't match validated size")
+    }
+
+    m_capture_rect = cv::Rect(0, 0, validated_size.width, validated_size.height);
 
     if (m_camera->configure(m_config.get()) < 0)
     {
