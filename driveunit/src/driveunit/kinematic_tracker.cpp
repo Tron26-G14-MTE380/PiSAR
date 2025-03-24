@@ -98,6 +98,7 @@ void ImuPlanarKinematicTracker::onImuReading(const Imu::AccelData& accel_data, c
     if (m_last_update_time.count() == 0)
     {
         m_last_update_time = timestamp;
+        m_current_state = KinematicState::zero(); // ensure clean state
         return; // Skip first update
     }
 
@@ -125,8 +126,8 @@ void ImuPlanarKinematicTracker::onImuReading(const Imu::AccelData& accel_data, c
 {
     const std::chrono::duration<float> batch_time = m_sample_time * slope_sample_batch_size;
 
-    Eigen::Vector2f velocity_slope_sum = {0, 0};
-    Eigen::Vector2f position_slope_sum = {0, 0};
+    Eigen::Vector2f velocity_slope_sum = Eigen::Vector2f::Zero();
+    Eigen::Vector2f position_slope_sum = Eigen::Vector2f::Zero();
 
     for (size_t batch_num = 0; batch_num < num_batches; ++batch_num)
     {

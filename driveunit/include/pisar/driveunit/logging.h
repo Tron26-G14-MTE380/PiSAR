@@ -1,5 +1,6 @@
 #pragma once
 
+#include <tuple>
 #include <cstdint>
 #include <cstdio>
 #include <array>
@@ -93,7 +94,7 @@ struct SourceLocation {
 template <typename... TArgs>
 struct LogMessage {
     std::string_view format;
-    std::tuple<TArgs...> args;
+    std::tuple<std::decay_t<TArgs>...> args;
     SourceLocation loc;
 
     /**
@@ -103,7 +104,7 @@ struct LogMessage {
      * @param l The source location of the log.
      */
     explicit inline constexpr LogMessage(std::string_view fmt, TArgs&&... as, SourceLocation l = {})
-        : format(fmt), args(std::forward<TArgs>(as)...), loc(l) {}
+        : format(fmt), args(std::make_tuple(static_cast<std::decay_t<TArgs>>(as)...)), loc(l) {}
 };
 
 /**
