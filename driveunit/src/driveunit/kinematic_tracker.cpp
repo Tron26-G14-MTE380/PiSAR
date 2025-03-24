@@ -121,7 +121,7 @@ void ImuPlanarKinematicTracker::onImuReading(const Imu::AccelData& accel_data, c
     m_pose_history.addRecord(timestamp, m_current_state.pose);
 }
 
-[[nodiscard]] std::optional<ImuPlanarKinematicTracker::CalibrationData> ImuPlanarKinematicTracker::calibrateImpl(const size_t num_batches, const size_t slope_sample_batch_size)
+[[nodiscard]] ImuPlanarKinematicTracker::CalibrationData ImuPlanarKinematicTracker::calibrateImpl(const size_t num_batches, const size_t slope_sample_batch_size)
 {
     const std::chrono::duration<float> batch_time = m_sample_time * slope_sample_batch_size;
 
@@ -165,22 +165,14 @@ void ImuPlanarKinematicTracker::onImuReading(const Imu::AccelData& accel_data, c
     // Calibrate velocity
     {
         auto calib_data = calibrateImpl(num_batches, slope_sample_batch_size);
-        if (!calib_data)
-        {
-            return false;
-        }
-        calibration_data.velocity_slope = calib_data.value().velocity_slope;
+        calibration_data.velocity_slope = calib_data.velocity_slope;
         setCalibration(calibration_data);
     }
 
     // Calibrate position
     {
         auto calib_data = calibrateImpl(num_batches, slope_sample_batch_size);
-        if (!calib_data)
-        {
-            return false;
-        }
-        calibration_data.position_slope = calib_data.value().position_slope;
+        calibration_data.position_slope = calib_data.position_slope;
         setCalibration(calibration_data);
     }
 

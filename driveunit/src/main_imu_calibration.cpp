@@ -26,15 +26,6 @@ auto last_reset_time = std::chrono::milliseconds(0);
 void setup()
 {
     initLogging(115200, LogLevel::kInfo, true);
-    plotter.Begin();
-
-
-    plotter.AddTimeGraph("Accel Data", 500, "Accel x", accel_x, "Accel y", accel_y);
-    plotter.AddTimeGraph("Velocity", 1000, "Vel X", velocity_x, "Vel Y", velocity_y);
-    plotter.AddTimeGraph("Position", 1500, "Pos X", position_x, "Pos Y", position_y);
-
-    plotter.AddTimeGraph("Gyro Data", 1000, "Gyro z", gyro_z);
-    plotter.AddTimeGraph("Orientation", 1500, "Yaw", orientation);
 
     if(!LittleFS.begin())
     {
@@ -54,6 +45,7 @@ void setup()
         PISAR_LOG_ERROR("IMU Calibration failed!");
         return;
     }
+    
     PISAR_LOG_INFO("IMU Calibration done!");
 
     if (!kinematic_tracker.initialize(5))
@@ -69,6 +61,17 @@ void setup()
     }
 
     PISAR_LOG_INFO("Kinematic tracker calibration done!");
+
+    plotter.Begin();
+
+
+    plotter.AddTimeGraph("Accel Data", 500, "Accel x", accel_x, "Accel y", accel_y);
+    plotter.AddTimeGraph("Velocity", 1000, "Vel X", velocity_x, "Vel Y", velocity_y);
+    plotter.AddTimeGraph("Position", 1500, "Pos X", position_x, "Pos Y", position_y);
+
+    plotter.AddTimeGraph("Gyro Data", 1000, "Gyro z", gyro_z);
+    plotter.AddTimeGraph("Orientation", 1500, "Yaw", orientation);
+
 }
 
 

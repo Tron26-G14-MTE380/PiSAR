@@ -91,7 +91,7 @@ public:
 
     [[nodiscard]] bool initialize(BaseType_t update_task_priority);
 
-    [[nodiscard]] std::optional<CalibrationData> calibrateImpl(const size_t num_batches, const size_t slope_sample_batch_size);
+    [[nodiscard]] CalibrationData calibrateImpl(const size_t num_batches, const size_t slope_sample_batch_size);
     [[nodiscard]] bool calibrate(const size_t num_batches, const size_t slope_sample_batch_size, const bool save = true);
 
     /**
