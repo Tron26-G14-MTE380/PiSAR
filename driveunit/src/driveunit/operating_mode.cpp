@@ -22,9 +22,9 @@ OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& faci
 
 void OperatingModeFollowTrajectory::onEnterImpl()
 {
-    m_facility.get().driveStop();
+    m_facility.get().getDriveController().stop();
 
-    const float pid_adj_scale = 1.0f / m_facility.get().getSpeedRange();
+    const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
     m_adj_kp = kPidkp * pid_adj_scale;
     m_adj_ki = kPidki * pid_adj_scale;
     m_adj_kd = kPidkd * pid_adj_scale;
@@ -38,13 +38,13 @@ void OperatingModeFollowTrajectory::onEnterImpl()
     m_last_angle_error = m_target_heading;
     m_on_target_timestamp = std::nullopt;
     // ELEPHANT do a lot of bs with ash about distance travelled after image vs actual travel attempt
-    m_facility.get().setPoseReference();
+    m_facility.get().getKinematicTracker().reset(false);
 
 }
 
 [[nodiscard]] bool OperatingModeFollowTrajectory::updateImpl()
 {
-    auto current_pose = m_facility.get().getPose();
+    auto current_pose = m_facility.get().getKinematicTracker().getPose();
     auto current_position = current_pose.position;
     auto current_heading = current_pose.orientation;
 
@@ -86,7 +86,7 @@ void OperatingModeFollowTrajectory::onEnterImpl()
         left_speed = std::clamp(left_speed, -1.0f, 1.0f);
         right_speed = std::clamp(right_speed, -1.0f, 1.0f);
 
-        m_facility.get().tankDrive(left_speed, right_speed);
+        m_facility.get().getDriveController().tankDrive(left_speed, right_speed);
 
     }
     else
@@ -94,11 +94,11 @@ void OperatingModeFollowTrajectory::onEnterImpl()
         if (!m_on_target_timestamp.has_value())
         {
             m_on_target_timestamp = current_time;
-            m_facility.get().driveHardStop();
+            m_facility.get().getDriveController().hardStop();
         }
         else if (current_time - m_on_target_timestamp.value() >= kOnTargetDurationTolerance)
         {
-            m_facility.get().driveHardStop();
+            m_facility.get().getDriveController().hardStop();
             return true;
         }
     }
@@ -110,8 +110,7 @@ void OperatingModeFollowTrajectory::onEnterImpl()
 
 void OperatingModeFollowTrajectory::onExitImpl()
 {
-    PISAR_LOG_INFO("Exiting Follow Trajectory mode");
-    m_facility.get().driveStop();
+    m_facility.get().getDriveController().stop();
 }
 
 ////////////////////////////////////////////////// OperatingModeRotate /////////////////////////////////////////////////
@@ -130,9 +129,9 @@ OperatingModeRotate::OperatingModeRotate(RobotFacility& facility, const float ro
 
 void OperatingModeRotate::onEnterImpl()
 {
-    m_facility.get().driveStop();
+    m_facility.get().getDriveController().stop();
 
-    const float pid_adj_scale = 1.0f / m_facility.get().getSpeedRange();
+    const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
     m_adj_kp = kPidkp * pid_adj_scale;
     m_adj_ki = kPidki * pid_adj_scale;
     m_adj_kd = kPidkd * pid_adj_scale;
@@ -140,12 +139,12 @@ void OperatingModeRotate::onEnterImpl()
     m_integral = 0.0f;
     m_last_error = m_rotation_deg;
     m_on_target_timestamp = std::nullopt;
-    m_facility.get().setPoseReference();
+    m_facility.get().getKinematicTracker().reset();
 }
 
 [[nodiscard]] bool OperatingModeRotate::updateImpl()
 {
-    float current_angle = m_facility.get().getOrientation();
+    float current_angle = m_facility.get().getKinematicTracker().getOrientation();
 
     float error = m_rotation_deg - current_angle;
 
@@ -177,20 +176,18 @@ void OperatingModeRotate::onEnterImpl()
         left_speed = std::clamp(left_speed, -1.0f, 1.0f);
         right_speed = std::clamp(right_speed, -1.0f, 1.0f);
 
-        //PISAR_LOG_INFO("error %f -> %f/%f", error, left_speed, right_speed);
-
-        m_facility.get().tankDrive(left_speed, right_speed);
+        m_facility.get().getDriveController().tankDrive(left_speed, right_speed);
     }
     else
     {
         if (!m_on_target_timestamp.has_value())
         {
             m_on_target_timestamp = current_time;
-            m_facility.get().driveHardStop();
+            m_facility.get().getDriveController().hardStop();
         }
         else if (current_time - m_on_target_timestamp.value() >= kOnTargetDurationTolerance)
         {
-            m_facility.get().driveHardStop();
+            m_facility.get().getDriveController().hardStop();
             return true;
         }
     }
@@ -202,8 +199,7 @@ void OperatingModeRotate::onEnterImpl()
 
 void OperatingModeRotate::onExitImpl()
 {
-    PISAR_LOG_INFO("Exiting Rotate mode");
-    m_facility.get().driveStop();
+    m_facility.get().getDriveController().stop();
 }
 
 } // namespace pisar::driveunit

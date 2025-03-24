@@ -15,18 +15,48 @@ DifferentialDriveController::DifferentialDriveController(MotorDriver& left_motor
     : m_left_motor(left_motor), m_right_motor(right_motor),
       m_left_profile(accel, decel, accel, decel),
       m_right_profile(accel, decel, accel, decel),
-      m_wheel_base(wheel_base)
+      m_wheel_base(wheel_base),
+      m_update_task_handle(nullptr)
 {
+}
+
+[[nodiscard]] bool DifferentialDriveController::initialize(BaseType_t update_task_priority)
+{
+    if (update_task_priority < 0 || update_task_priority > configMAX_PRIORITIES)
+    {
+        PISAR_LOG_ERROR("Drive controller update task priority %u is out of range", update_task_priority);
+        return false; // TODO ERROR CODE
+    }
+
+    m_left_motor.initialize();
+    m_right_motor.initialize();
+    m_left_profile.reset();
+    m_right_profile.reset();
+
+    // Spawn the processing task
+    if (xTaskCreate(updateTaskEntry, "dc_update_task", 2048, this, update_task_priority, &m_update_task_handle) != pdPASS)
+    {
+        PISAR_LOG_ERROR("Failed to create drive controller update task");
+        return false;
+    }
+
+    enable();
+
+    return true;
 }
 
 void DifferentialDriveController::tankDrive(const float left_speed, const float right_speed)
 {
+    Lock<Mutex> lock(m_mutex);
+
     m_left_profile.setTargetSpeed(left_speed);
     m_right_profile.setTargetSpeed(right_speed);
 }
 
 void DifferentialDriveController::arcadeDrive(const float forward, const float rotation)
 {
+    Lock<Mutex> lock(m_mutex);
+
     float left_speed = forward + rotation;
     float right_speed = forward - rotation;
 
@@ -38,6 +68,8 @@ void DifferentialDriveController::arcadeDrive(const float forward, const float r
 
 void DifferentialDriveController::curvatureDrive(const float speed, const float curvature, const bool allow_reverse)
 {
+    Lock<Mutex> lock(m_mutex);
+
     const float radius = 1.0f / curvature; // Convert curvature to radius
 
     if (std::abs(radius) < kCurvatureRadiusSpinThreshold)
@@ -59,6 +91,8 @@ void DifferentialDriveController::curvatureDrive(const float speed, const float 
 
 void DifferentialDriveController::rotate(const float angular_velocity)
 {
+    Lock<Mutex> lock(m_mutex);
+
     float left_speed = angular_velocity;
     float right_speed = -angular_velocity;
 
@@ -67,6 +101,8 @@ void DifferentialDriveController::rotate(const float angular_velocity)
 
 void DifferentialDriveController::driveArc(const float radius, const float speed)
 {
+    Lock<Mutex> lock(m_mutex);
+
     if (std::abs(radius) < kCurvatureRadiusSpinThreshold)
     {
         rotate(speed); // If radius is too small, just rotate in place
@@ -97,11 +133,11 @@ void DifferentialDriveController::driveArc(const float radius, const float speed
 
 void DifferentialDriveController::update()
 {
+    Lock<Mutex> lock(m_mutex);
+
     const std::chrono::microseconds current_time = std::chrono::microseconds(micros());
     const float left_speed = m_left_profile.update(current_time);
     const float right_speed = m_right_profile.update(current_time);
-
-    //PISAR_LOG_INFO("%u: %f/%f", micros(), left_speed, right_speed);
 
     m_left_motor.setSpeed(left_speed);
     m_right_motor.setSpeed(right_speed);

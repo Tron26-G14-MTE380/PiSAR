@@ -66,11 +66,10 @@ private:
 
 public:
     OperatingModeIdle(RobotFacility& facility) : m_facility(facility) {}
-    inline void onEnterImpl() { m_facility.get().driveStop(); }
+    inline void onEnterImpl() { m_facility.get().getDriveController().hardStop(); }
     [[nodiscard]] inline bool updateImpl() { return false; }
-    inline void onExitImpl() { m_facility.get().driveStop(); }
+    inline void onExitImpl() { m_facility.get().getDriveController().hardStop(); }
 };
-
 
 // Actual operating modes here
 
