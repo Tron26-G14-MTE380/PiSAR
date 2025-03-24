@@ -23,7 +23,7 @@ float orientation = 0;
 
 auto last_reset_time = std::chrono::milliseconds(0);
 
-void setup()
+void pisarSetup()
 {
     initLogging(115200, LogLevel::kInfo, true);
 
@@ -45,7 +45,7 @@ void setup()
         PISAR_LOG_ERROR("IMU Calibration failed!");
         return;
     }
-    
+
     PISAR_LOG_INFO("IMU Calibration done!");
 
     if (!kinematic_tracker.initialize(5))
@@ -75,7 +75,7 @@ void setup()
 }
 
 
-void loop()
+void pisarLoop()
 {
     auto now = std::chrono::milliseconds(millis());
     if (now - last_reset_time > kTrackerResetTime)
