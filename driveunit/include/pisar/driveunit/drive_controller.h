@@ -12,12 +12,15 @@ namespace pisar::driveunit
 class DifferentialDriveController
 {
 private:
-    MotorDriver& m_left_motor;      ///< Left motor instance
-    MotorDriver& m_right_motor;     ///< Right motor instance
-    SpeedProfile m_left_profile;    ///< Speed profile for left motor
-    SpeedProfile m_right_profile;   ///< Speed profile for right motor
+    MotorDriver& m_left_motor;          ///< Left motor instance
+    MotorDriver& m_right_motor;         ///< Right motor instance
+    SpeedProfile m_left_profile;        ///< Speed profile for left motor
+    SpeedProfile m_right_profile;       ///< Speed profile for right motor
 
-    float m_wheel_base;             ///< Distance between wheels in meters
+    float m_wheel_base;                 ///< Distance between wheels in meters
+
+    mutable Mutex m_mutex;              ///< Synchronization mutex
+    TaskHandle_t m_update_task_handle;  ///< FreeRTOS task handle for drive controller update task.
 
 public:
     /**
@@ -33,19 +36,12 @@ public:
 
     /**
      * @brief Initializes the drive controller
-     *
+     * @param update_task_priority Priority ofthe update task.
+     * @return True if initialization was successful, false otherwise.
      */
-    inline void initialize()
-    {
-        m_left_motor.initialize();
-        m_right_motor.initialize();
-        m_left_profile.reset();
-        m_right_profile.reset();
-    }
-
-    const MotorDriver& getLeftMotor() const { return m_left_motor; }
-    const MotorDriver& getRightMotor() const { return m_right_motor; }
-
+    [[nodiscard]] bool initialize(BaseType_t update_task_priority);
+    
+    // Assuming left and right motor share the same speed.
     [[nodiscard]] inline float getMinSpeed() const { return m_left_motor.getMinSpeed(); }
     [[nodiscard]] inline float getMaxSpeed() const { return m_left_motor.getMaxSpeed(); } 
     [[nodiscard]] inline float getSpeedRange() const { return m_left_motor.getSpeedRange(); } 
@@ -89,12 +85,16 @@ public:
     /// @brief Stops both motors smoothly.
     void stop()
     {
+        Lock<Mutex> lock(m_mutex);
+
         m_left_profile.setTargetSpeed(0.0f);
         m_right_profile.setTargetSpeed(0.0f);
     }
 
     void hardStop()
     {
+        Lock<Mutex> lock(m_mutex);
+
         m_left_motor.stop();
         m_right_motor.stop();
 
@@ -105,6 +105,8 @@ public:
     /// @brief Enables the motor drivers.
     void enable()
     {
+        Lock<Mutex> lock(m_mutex);
+        
         m_left_motor.enable();
         m_right_motor.enable();
     }
@@ -112,6 +114,8 @@ public:
     /// @brief Disables the motor drivers.
     void disable()
     {
+        Lock<Mutex> lock(m_mutex);
+
         m_left_motor.disable();
         m_right_motor.disable();
 
@@ -119,8 +123,29 @@ public:
         m_right_profile.reset();
     }
 
+private:
     /// @brief Updates motor speeds, applying acceleration/deceleration profiles.
     void update();
+
+    /**
+     * @brief Entry point for the drive controller update task.
+     */
+    static inline void updateTaskEntry(void* param)
+    {
+        reinterpret_cast<DifferentialDriveController*>(param)->updateTaskLoop();
+    }
+
+    /**
+     * @brief Main loop for the drive controller update task.
+     */
+    inline void updateTaskLoop()
+    {
+        while (true)
+        {
+            update();
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
 };
 
 } // namespace pisar::driveunit

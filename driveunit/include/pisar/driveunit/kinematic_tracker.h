@@ -162,15 +162,23 @@ public:
         m_current_state.pose.orientation = 0.0f;
     }
 
-    inline void reset()
+    /**
+     * @brief Resets the tracker state.
+     * @param clear_history Whether to clear the pose history.
+     */
+    inline void reset(bool clear_history = false)
     {
         Lock<Mutex> lock(m_mutex);
 
         m_current_state = KinematicState::zero();
         m_last_update_time = TimestampT(0);
-        //m_pose_history = PoseHistoryT();
         m_accel_filter = LowPassFilter<Eigen::Vector3f>(kAccelLpfCutoffFreq, m_sample_time);
         m_gyro_filter = LowPassFilter<Eigen::Vector3f>(kGyroLpfCutoffFreq, m_sample_time);
+
+        if (clear_history)
+        {
+            m_pose_history.clearHistory();
+        }
     }
 
     /// @brief Gets the current kinematic state (all variables).
