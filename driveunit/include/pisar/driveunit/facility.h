@@ -14,21 +14,13 @@ namespace pisar::driveunit
 class RobotFacility
 {
 private:
-    static constexpr size_t kPoseHistorySize = 128;
-    static constexpr size_t kImuFifoBatchSize = 64;
-
-    DifferentialDriveController& m_drive_controller;
-    Imu& m_imu;
-    ImuPlanarKinematicTracker<kPoseHistorySize> m_kinematic_tracker;
+    std::reference_wrapper<DifferentialDriveController> m_drive_controller;
+    std::reference_wrapper<ImuPlanarKinematicTracker> m_kinematic_tracker;
 
     mutable Mutex m_drive_mutex;
-    mutable Mutex m_imu_mutex;
-    mutable Mutex m_kinematic_tracker_mutex;
 
     TaskHandle_t m_dc_update_task_handle;             ///< FreeRTOS task handle for drive controller update task.
-    TaskHandle_t m_kt_update_task_handle;             ///< FreeRTOS task handle for kinematic tracker update task.
 
-    BinarySemaphore m_imu_data_ready_sem;             ///< Semaphore to signal new IMU data is ready.
 
 public:
     /**
@@ -38,9 +30,9 @@ public:
      */
     inline RobotFacility(
         DifferentialDriveController& drive_controller,
-        Imu& imu
+        ImuPlanarKinematicTracker& kinematic_tracker
     )
-        : m_drive_controller(drive_controller), m_imu(imu), m_kinematic_tracker(imu.getSampleTime()), m_dc_update_task_handle(nullptr)
+        : m_drive_controller(drive_controller), m_kinematic_tracker(kinematic_tracker), m_dc_update_task_handle(nullptr)
     {
     }
 
@@ -59,30 +51,6 @@ public:
             return false; // TODO ERROR CODE
         }
 
-        if (kt_update_task_priority < 0 || kt_update_task_priority > configMAX_PRIORITIES)
-        {
-            PISAR_LOG_ERROR("Kinematic tracker update task priority %u is out of range", kt_update_task_priority);
-            return false; // TODO ERROR CODE
-        }
-
-        m_drive_controller.initialize();
-        
-        if (!m_imu.initialize())
-        {
-            PISAR_LOG_ERROR("Failed to initialize IMU");
-            return false;
-        }
-
-        if (!m_imu.setFifoWatermarkInterrupt(kImuFifoBatchSize, [this]() {
-            BaseType_t higher_priority_task_woken = pdFALSE;
-            m_imu_data_ready_sem.unlockIsr(&higher_priority_task_woken);
-            portYIELD_FROM_ISR(higher_priority_task_woken);
-        }))
-        {
-            PISAR_LOG_ERROR("Failed to set IMU FIFO watermark interrupt");
-            return false;
-        }
-
         // Spawn the processing task
         if (xTaskCreate(driveControllerUpdateTaskEntry, "dc_update_task", 2048, this, dc_update_task_priority, &m_dc_update_task_handle) != pdPASS)
         {
@@ -90,20 +58,14 @@ public:
             return false;
         }
 
-        if (xTaskCreate(kinematicTrackerUpdateTaskEntry, "kt_update_task", 16384, this, kt_update_task_priority, &m_kt_update_task_handle) != pdPASS)
-        {
-            PISAR_LOG_ERROR("Failed to create kinematic tracker update task");
-            return false;
-        }
-
-        m_drive_controller.enable();
+        m_drive_controller.get().enable();
         return true;
     }
 
     /// @brief Gets a reference to the robot motor controller.
     inline DifferentialDriveController& getMotorController()
     {
-        return m_drive_controller;
+        return m_drive_controller.get();
     }
 
     /// @brief Gets a refernce to the robot motor controller mutex primitive.
@@ -112,28 +74,10 @@ public:
         return m_drive_mutex;
     }
 
-    /// @brief Gets a reference to the robot IMU sensor.
-    inline Imu& getImu()
-    {
-        return m_imu;
-    }
-
-    /// @brief Gets a refernce to the robot IMU sensor mutex primitive.
-    inline Mutex& getImuMutex()
-    {
-        return m_imu_mutex;
-    }
-
     /// @brief Gets a reference to the robot kinematic tracker.
-    inline ImuPlanarKinematicTracker<kPoseHistorySize>& getKinematicTracker()
+    inline ImuPlanarKinematicTracker& geImuPlanarKinematicTracker()
     {
         return m_kinematic_tracker;
-    }
-
-    /// @brief Gets a refernce to the kinematic tracker mutex primitive.
-    inline Mutex& getKinematicTrackerMutex()
-    {
-        return m_kinematic_tracker_mutex;
     }
 
     /**
@@ -145,86 +89,85 @@ public:
     inline void tankDrive(const float left_speed, const float right_speed)
     {
         Lock<Mutex> lock(m_drive_mutex);
-        m_drive_controller.tankDrive(left_speed, right_speed);
+        m_drive_controller.get().tankDrive(left_speed, right_speed);
     }
 
     /// @brief Stops robot smoothly.
     inline void driveStop()
     {
         Lock<Mutex> lock(m_drive_mutex);
-        m_drive_controller.stop();
+        m_drive_controller.get().stop();
     }
 
     /// @brief Stops robot abruptly.
     inline void driveHardStop()
     {
         Lock<Mutex> lock(m_drive_mutex);
-        m_drive_controller.hardStop();
+        m_drive_controller.get().hardStop();
     }
 
     [[nodiscard]] inline float getMinSpeed() const 
     { 
         Lock<Mutex> lock(m_drive_mutex);
-        return m_drive_controller.getMinSpeed(); 
+        return m_drive_controller.get().getMinSpeed(); 
     }
 
     [[nodiscard]] inline float getMaxSpeed() const 
     { 
         Lock<Mutex> lock(m_drive_mutex);
-        return m_drive_controller.getMaxSpeed(); 
+        return m_drive_controller.get().getMaxSpeed(); 
     } 
 
     [[nodiscard]] inline float getSpeedRange() const 
     { 
         Lock<Mutex> lock(m_drive_mutex);
-        return m_drive_controller.getSpeedRange(); 
+        return m_drive_controller.get().getSpeedRange(); 
     } 
 
     /// @brief Retrieves the robot's calculated velocity in m/s (thread-safe).
-    [[nodiscard]] Eigen::Vector2f getVelocity()
+    [[nodiscard]] Eigen::Vector2f getVelocity() const
     {
-        Lock<Mutex> lock(m_kinematic_tracker_mutex);
-        return m_kinematic_tracker.getVelocity();
+        return m_kinematic_tracker.get().getVelocity();
     }
 
     /// @brief Retrieves the robot's acceleration in m/s^2 (thread-safe).
-    [[nodiscard]] Eigen::Vector2f getAcceleration()
+    [[nodiscard]] Eigen::Vector2f getAcceleration() const
     {
-        Lock<Mutex> lock(m_kinematic_tracker_mutex);
-        return m_kinematic_tracker.getAcceleration();
+        return m_kinematic_tracker.get().getAcceleration();
+    }
+
+    /// @brief Retrieves the robot's pose.
+    [[nodiscard]] KinematicPose getPose() const
+    {
+        return m_kinematic_tracker.get().getPose();
     }
 
     /// @brief Retrieves the robot's calculated position (thread-safe).
-    [[nodiscard]] Eigen::Vector2f getPosition()
+    [[nodiscard]] Eigen::Vector2f getPosition() const
     {
-        Lock<Mutex> lock(m_kinematic_tracker_mutex);
-        return m_kinematic_tracker.getPosition();
+        return m_kinematic_tracker.get().getPosition();
     }
 
     /// @brief Retrieves the robot's calculated orientation in deg/s (thread-safe).
-    [[nodiscard]] float getOrientation()
+    [[nodiscard]] float getOrientation() const
     {
-        Lock<Mutex> lock(m_kinematic_tracker_mutex);
-        return m_kinematic_tracker.getOrientation();
+        return m_kinematic_tracker.get().getOrientation();
     }
 
     /// @brief Retrieves the robot's angular velocity in deg/s (thread-safe).
-    [[nodiscard]] float getAngularVelocity()
+    [[nodiscard]] float getAngularVelocity() const
     {
-        Lock<Mutex> lock(m_kinematic_tracker_mutex);
-        return m_kinematic_tracker.getAngularVelocity();
+        return m_kinematic_tracker.get().getAngularVelocity();
     }
 
     void setPoseReference()
     {
-        Lock<Mutex> lock(m_kinematic_tracker_mutex);
-        m_kinematic_tracker.setPoseReference();
+        m_kinematic_tracker.get().setPoseReference();
     }
 
     void setPoseReference(const KinematicPose& ref)
     {
-        Lock<Mutex> lock(m_kinematic_tracker_mutex);
-        m_kinematic_tracker.setPoseReference(ref);
+        m_kinematic_tracker.get().setPoseReference(ref);
     }
 
 private:
@@ -250,37 +193,9 @@ private:
         {
             {
                 Lock<Mutex> lock(m_drive_mutex);
-                m_drive_controller.update();
+                m_drive_controller.get().update();
             }
             vTaskDelay(pdMS_TO_TICKS(10));
-        }
-    }
-
-    /**
-     * @brief Entry point for the kinematic tracker task.
-     */
-    static inline void kinematicTrackerUpdateTaskEntry(void* param)
-    {
-        reinterpret_cast<RobotFacility*>(param)->kinematicTrackerUpdateTaskLoop();
-    }
-
-    /**
-     * @brief Main loop for the kinematic tracker update task.
-     */
-    inline void kinematicTrackerUpdateTaskLoop()
-    {
-        auto start = micros();
-        while (true)
-        {
-            if (m_imu_data_ready_sem.lock())
-            {
-                updateKinematicTracker();
-
-                if (m_imu.fifoSamplesAvailable() > kImuFifoBatchSize)
-                {
-                    m_imu_data_ready_sem.unlock();
-                }
-            }
         }
     }
 

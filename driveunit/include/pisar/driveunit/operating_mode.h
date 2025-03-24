@@ -79,15 +79,37 @@ class OperatingModeFollowTrajectory : public OperatingMode<OperatingModeFollowTr
 private:
     std::reference_wrapper<RobotFacility> m_facility;
     std::vector<Eigen::Vector2f> m_trajectory;
-    std::chrono::duration<float> m_ref_time;
 
-    std::chrono::milliseconds m_start_time;
+    static constexpr float thetaTolerance = 3.0f;
+    static constexpr float distTolerance = 0.02f;
+    static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(500);
+
+    static constexpr float kPidkp = 0.0007f;
+    static constexpr float kPidki = 0.0f;
+    static constexpr float kPidkd = 0.0001f;
+
+    float m_adj_kp;
+    float m_adj_ki;
+    float m_adj_kd;
+
+    int m_target_index;
+    float m_distance_to_target;
+    float m_target_heading;
+
+    float m_integral_angle;
+    float m_last_angle_error;
+    std::chrono::milliseconds m_last_update_time;
+    std::optional<std::chrono::milliseconds> m_on_target_timestamp;
+
+    [[nodiscard]] inline const Eigen::Vector2f& getCurrentTarget() const
+    {
+        return m_trajectory[m_target_index];
+    }
 
 public:
     OperatingModeFollowTrajectory(
         RobotFacility& facility,
-        const std::span<const Eigen::Vector2f> trajectory,
-        const std::chrono::duration<float> reference_time
+        const std::span<const Eigen::Vector2f> trajectory
     );
     void onEnterImpl();
     [[nodiscard]] bool updateImpl();

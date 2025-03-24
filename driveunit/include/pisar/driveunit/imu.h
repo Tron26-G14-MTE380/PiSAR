@@ -1,13 +1,12 @@
 #pragma once
 
-#include "pisar/driveunit/logging.h"
-
 #include <Eigen/Dense>
-#include <zpp_bits.h>
+
+#include "pisar/driveunit/logging.h"
+#include "pisar/driveunit/filesystem_saveable.h"
 
 #include <SPI.h>
 #include <LSM6DSOSensor.h>
-#include <LittleFS.h>
 
 #include <cstdint>
 #include <span>
@@ -50,26 +49,12 @@ public:
     /**
      * @brief Stores calibration offsets for accelerometer and gyroscope.
      */
-    struct CalibrationData
+    struct CalibrationData : FileSystemSaveable<CalibrationData>
     {
         using serialize = zpp::bits::members<2>;
 
         Eigen::Vector3<DataRawValueT> accel_offset; ///< Accelerometer offset values
         Eigen::Vector3<DataRawValueT> gyro_offset;  ///< Gyroscope offset values
-
-        /**
-         * @brief Saves IMU calibration data to LittleFS.
-         * @param file_path The location to save to.
-         * @return True if the data was successfully saved, false otherwise.
-         */
-        [[nodiscard]] bool save(std::string_view file_path) const;
-
-        /**
-         * @brief Loads IMU calibration data from LittleFS.
-         * @param file_path The location to load from.
-         * @return True if the data was successfully loaded, false otherwise.
-         */
-        [[nodiscard]] bool load(std::string_view file_path);
     };
 
     using InterruptCallback = std::function<void()>;
