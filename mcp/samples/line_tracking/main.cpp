@@ -48,14 +48,6 @@ int main()
         std::optional<cv::Rect> frame_crop = std::nullopt;
     #endif
 
-    std::cout << "frame_crop = (x=" << frame_crop.value().x
-    << ", y=" << frame_crop.value().y
-    << ", w=" << frame_crop.value().width
-    << ", h=" << frame_crop.value().height << ")" << std::endl;
-
-    std::cout << gkCameraCalibration.get_transformation(gkFullFrameSize) << std::endl;
-    std::cout << gkCameraCalibration.get_transformation(gkFrameSize, frame_crop) << std::endl;
-
     video_source.start(gkCaptureFrameSize);
 
     auto line_tracker = LineTracker<kDebug>(
