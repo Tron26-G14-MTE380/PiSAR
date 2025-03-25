@@ -39,6 +39,7 @@ public:
         RoiMat filtered_skeleton;
         RoiMat trajectory;
         RoiMat simplified_trajectory;
+        RoiMat ordered_trajectory;
         RoiMat projected_trajectory;
         RoiMat filtered_trajectory;
         RoiMat simplified_filtered_trajectory;
@@ -94,6 +95,7 @@ public:
                 .filtered_skeleton = empty_img,
                 .trajectory = empty_img,
                 .simplified_trajectory = empty_img,
+                .ordered_trajectory = empty_img,
                 .projected_trajectory = empty_img,
                 .filtered_trajectory = empty_img,
                 .simplified_filtered_trajectory = empty_img
@@ -298,22 +300,53 @@ private:
         }
 
         // Order the points in trajectory
-        const std::vector<Eigen::Vector2i> ordered_points = extractLongestPath(points);
+        const std::vector<Eigen::Vector2i> trajectory = extractLongestPath(points);
 
 
         // Simplify the trajectory
-        const std::vector<Eigen::Vector2i> simplified_trajectory = simplifyPath(std::span(ordered_points), 3);
+        const std::vector<Eigen::Vector2i> simplified_trajectory = simplifyPath(std::span(trajectory), 3);
 
         // Orient the trajectory
-        // TODO
+
+        std::vector<Eigen::Vector2i> ordered_trajectory;
+        if (!simplified_trajectory.empty())
+        {
+            const Eigen::Vector2i ref_point(skeleton.getOriginalSize().width/2, skeleton.getOriginalSize().height);
+            const double first_point_distance = (simplified_trajectory.front() - ref_point).norm();
+            const double last_point_distance = (simplified_trajectory.back() - ref_point).norm();
+
+            if (first_point_distance > last_point_distance)
+            {
+                ordered_trajectory = std::vector<Eigen::Vector2i>(simplified_trajectory.rbegin(), simplified_trajectory.rend());
+            }
+            else
+            {
+                ordered_trajectory = simplified_trajectory;
+            }
+        }
 
         if constexpr (tkDebug)
         {
-            m_debug.trajectory = RoiMat(cv::Mat::zeros(skeleton.getOriginalSize(), CV_8UC1));
-            createTrajectoryVisualization(m_debug.trajectory.getMat(), ordered_points, 255);
+            m_debug.trajectory = RoiMat(
+                createTrajectoryVisualization(
+                    skeleton.getOriginalSize(), trajectory,
+                    cv::Scalar(255, 255, 255), std::nullopt, std::nullopt
+                )
+            );
 
-            m_debug.simplified_trajectory = RoiMat(cv::Mat::zeros(skeleton.getOriginalSize(), CV_8UC1));
-            createTrajectoryVisualization(m_debug.simplified_trajectory.getMat(), simplified_trajectory, 255);
+            m_debug.simplified_trajectory = RoiMat(
+                createTrajectoryVisualization(
+                    skeleton.getOriginalSize(), simplified_trajectory,
+                    cv::Scalar(255, 255, 255), std::nullopt, std::nullopt
+                )
+            );
+
+            m_debug.ordered_trajectory = RoiMat(
+                createTrajectoryVisualization(
+                    skeleton.getOriginalSize(), ordered_trajectory,
+                    cv::Scalar(255, 255, 255), std::nullopt, std::nullopt
+                )
+            );
         }
 
         return simplified_trajectory;

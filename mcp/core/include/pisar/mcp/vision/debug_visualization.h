@@ -8,7 +8,13 @@
 
 namespace pisar::mcp {
 
-void createTrajectoryVisualization(cv::InputOutputArray output, const std::vector<Eigen::Vector2i>& points, const cv::Scalar& color);
+cv::Mat createTrajectoryVisualization(
+    const cv::Size& image_size,
+    const std::vector<Eigen::Vector2i>& points,
+    const cv::Scalar& color,
+    const std::optional<cv::Scalar>& first_point_color,
+    const std::optional<cv::Scalar>& last_point_color
+);
 
 cv::Mat createHomographyProjectionVisualization(
     cv::Size image_size,

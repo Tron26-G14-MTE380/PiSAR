@@ -3,13 +3,23 @@
 namespace pisar::mcp {
 
 
-void createTrajectoryVisualization(cv::InputOutputArray output, const std::vector<Eigen::Vector2i>& points, const cv::Scalar& color)
+cv::Mat createTrajectoryVisualization(
+    const cv::Size& image_size,
+    const std::vector<Eigen::Vector2i>& points,
+    const cv::Scalar& color,
+    const std::optional<cv::Scalar>& first_point_color,
+    const std::optional<cv::Scalar>& last_point_color
+)
 {
-    // Draw points
-    for (const auto& pt : points)
+    if (points.empty())
     {
-        cv::circle(output, cv::Point(pt.x(), pt.y()), 1, color, cv::FILLED);
+        return {};
     }
+
+    cv::Mat output = cv::Mat::zeros(image_size.height, image_size.width, CV_8UC3);
+
+    const cv::Scalar first_color = first_point_color.value_or(cv::Scalar(0, 255, 0));
+    const cv::Scalar last_color = last_point_color.value_or(cv::Scalar(0, 0, 255));
 
     // Connect points with lines
     for (size_t i = 1; i < points.size(); ++i)
@@ -18,6 +28,18 @@ void createTrajectoryVisualization(cv::InputOutputArray output, const std::vecto
         const auto current_pt = cv::Point(points[i].x(), points[i].y());
         cv::line(output, prev_pt, current_pt, color, 1);
     }
+
+    // Draw points
+    for (int i = 0; i < points.size(); ++i)
+    {
+        const auto& pt = points[i];
+        const auto c = i == 0 ? first_color : (i == points.size() - 1 ? last_color : color);
+        const int point_size = (i == 0 || i == points.size() - 1) ? 2 : 1;
+
+        cv::circle(output, cv::Point(pt.x(), pt.y()), point_size, c, cv::FILLED);
+    }
+
+    return output;
 }
 
 cv::Mat createHomographyProjectionVisualization(
@@ -26,6 +48,11 @@ cv::Mat createHomographyProjectionVisualization(
     const std::vector<Eigen::Vector2d>& trajectory
 )
 {
+    if (trajectory.empty())
+    {
+        return {};
+    }
+
     // Create a blank image
     cv::Mat visualization = cv::Mat::zeros(image_size.height, image_size.width, CV_8UC3);
 

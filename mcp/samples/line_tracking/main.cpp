@@ -21,6 +21,8 @@ using namespace pisar::mcp;
 constexpr bool kDebug = true;
 constexpr bool kProfile = false;
 constexpr uint64_t kProfileTimeMs = 10000;
+constexpr double kFrameRateLimit = 1.0;
+constexpr auto kFrameDurationLimit = std::chrono::duration<double>(1.0 / kFrameRateLimit);
 
 int main()
 {
@@ -62,7 +64,6 @@ int main()
     std::optional<cv::Mat> captured_frame;
     while ((captured_frame = video_source.getFrame()).has_value())
     {
-
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
         const std::chrono::duration<float> frame_capture_time = loop_start - start;
 
@@ -70,8 +71,7 @@ int main()
         cv::Mat input_frame = downscaleCrop(captured_frame.value(), gkFrameSize);
         const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(input_frame, frame_capture_time);
 
-        const auto loop_end = std::chrono::high_resolution_clock::now(); // end time
-        const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(loop_end - loop_start).count(); // Convert to milliseconds
+        const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - loop_start).count(); // Convert to milliseconds
         const double fps = 1000000.0 / elapsed;
         std::cout << "FPS: " << fps << std::endl;
 
@@ -86,13 +86,14 @@ int main()
                 std::make_pair("5. Filtered Skeleton", debug_data.filtered_skeleton),
                 std::make_pair("6. Trajectory", debug_data.trajectory),
                 std::make_pair("7. Simplified Trajectory", debug_data.simplified_trajectory),
-                std::make_pair("8. Projected Trajectory", debug_data.projected_trajectory),
-                std::make_pair("9. Filtered Trajectory", debug_data.filtered_trajectory),
-                std::make_pair("10. Simplified Trajectory", debug_data.simplified_filtered_trajectory)
+                std::make_pair("8. Ordered Trajectory", debug_data.ordered_trajectory),
+                std::make_pair("9. Projected Trajectory", debug_data.projected_trajectory),
+                std::make_pair("10. Filtered Trajectory", debug_data.filtered_trajectory),
+                std::make_pair("11. Simplified Trajectory", debug_data.simplified_filtered_trajectory)
             };
 
 
-            displayDebug(createDebugCanvas(debug_image_map, 640));
+            displayDebug(createDebugCanvas(debug_image_map, 320));
         }
 
         if constexpr (kProfile)
@@ -105,6 +106,14 @@ int main()
                 profiler::dumpBlocksToFile("profile.prof");
                 break;
             }
+        }
+
+        auto loop_end = std::chrono::high_resolution_clock::now();
+        auto loop_duration = std::chrono::duration_cast<std::chrono::duration<double>>(loop_end - loop_start);
+        while (loop_duration < kFrameDurationLimit)
+        {
+            loop_end = std::chrono::high_resolution_clock::now();
+            loop_duration = std::chrono::duration_cast<std::chrono::duration<double>>(loop_end - loop_start);
         }
     }
 
