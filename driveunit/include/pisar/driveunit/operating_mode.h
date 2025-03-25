@@ -79,21 +79,27 @@ private:
     std::reference_wrapper<RobotFacility> m_facility;
     std::vector<Eigen::Vector2f> m_trajectory;
 
-    static constexpr float thetaTolerance = 3.0f;
-    static constexpr float distTolerance = 0.02f;
-    static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(500);
+    static constexpr float kThetaTolerance = 5.0f;
+    static constexpr float kDistTolerance = 0.01f;
+    static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(1);
+    static constexpr float kDotProductTolerance = 120.0f;
 
-    static constexpr float kPidkp = 0.0007f;
-    static constexpr float kPidki = 0.0f;
-    static constexpr float kPidkd = 0.0001f;
+    static constexpr float kPidkpRotation = 0.0001f;
+    static constexpr float kPidkiRotation = 0.0f;
+    static constexpr float kPidkdRotation = 0.0001f;
 
-    float m_adj_kp;
-    float m_adj_ki;
-    float m_adj_kd;
+    static constexpr float kPidkpTravel = 0.0007f;
+
+    float m_adj_kp_rotation;
+    float m_adj_ki_rotation;
+    float m_adj_kd_rotation;
+
+    float m_adj_kp_travel;
 
     int m_target_index;
     float m_distance_to_target;
     float m_target_heading;
+    int m_trajectry_points;
 
     float m_integral_angle;
     float m_last_angle_error;
