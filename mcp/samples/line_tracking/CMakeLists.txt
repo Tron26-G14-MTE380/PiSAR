@@ -17,6 +17,7 @@ set(pisar_build_opencv ON)
 set(pisar_build_eigen ON)
 set(pisar_build_easy_profiler ON)
 set(pisar_build_zpp_bits ON)
+set(pisar_build_sml ON)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../../thirdparty/import.cmake)
 include_directories(${OpenCV_INCLUDE_DIRS})
