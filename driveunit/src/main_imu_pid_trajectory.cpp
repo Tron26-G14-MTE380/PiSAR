@@ -5,8 +5,17 @@
 #include "Arduino.h"
 #include <LittleFS.h>
 #include <Plotter.h>
+#include "test_data.h"
 
 using namespace pisar::driveunit;
+
+////////////////////////////////////////////////////TESTING////////////////////////////////////////////////////////
+
+size_t currentSampleIndex = 0;
+float nowOffset = 0;
+bool first_time = true;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // IMU Instance
 Imu imu(SPI1, 13, 12, 11, 10, 14, "/imu_calibration_data.bin");
@@ -32,25 +41,25 @@ using OperatingModeManagerT = OperatingModeManager<OperatingModeIdle, OperatingM
 OperatingModeManagerT operating_mode_manager(createDefaultMode);
 
 // Visualization (verify every time you make changes... Gabe)
-Plotter plotter;
-float accel_x = 0, accel_y = 0;
-float gyro_z = 0;
-float velocity_x = 0, velocity_y = 0;
-float position_x = 0, position_y = 0;
-float orientation = 0;
+// Plotter plotter;
+// float accel_x = 0, accel_y = 0;
+// float gyro_z = 0;
+// float velocity_x = 0, velocity_y = 0;
+// float position_x = 0, position_y = 0;
+// float orientation = 0;
 
 // IMU zeroing still not perfect, force after a certain amount of time
 auto last_reset_time = std::chrono::milliseconds(1500);
 
 void pisarSetup()
 {
-    initLogging(115200, LogLevel::kInfo, false);
+    initLogging(115200, LogLevel::kInfo, true);
 
-    plotter.AddTimeGraph("Acceleration", 500, "Accel X", accel_x, "Accel Y", accel_y);
-    plotter.AddTimeGraph("Velocity", 500, "Vel X", velocity_x, "Vel Y", velocity_y);
-    plotter.AddTimeGraph("Position", 500, "Pos X", position_x, "Pos Y", position_y);
-    plotter.AddTimeGraph("Gyroscope", 500, "Gyro Z", gyro_z);
-    plotter.AddTimeGraph("Orientation", 500, "Yaw", orientation);
+    // plotter.AddTimeGraph("Acceleration", 500, "Accel X", accel_x, "Accel Y", accel_y);
+    // plotter.AddTimeGraph("Velocity", 500, "Vel X", velocity_x, "Vel Y", velocity_y);
+    // plotter.AddTimeGraph("Position", 500, "Pos X", position_x, "Pos Y", position_y);
+    // plotter.AddTimeGraph("Gyroscope", 500, "Gyro Z", gyro_z);
+    // plotter.AddTimeGraph("Orientation", 500, "Yaw", orientation);
 
     if (!LittleFS.begin())
     {
@@ -108,15 +117,49 @@ void pisarSetup()
     // delay(3000);
     PISAR_LOG_INFO("Starting....");
 
+
+    // Test data ELEPHANT
+    // for(int i = 0; i < kTestData.size(); i++)
+    // {
+    //     ParsedData data = kTestData[i];
+    //     PISAR_LOG_INFO("Timestamp: %f", data.timestamp);
+    //     for(int j = 0; j < data.trajectory.size(); j++)
+    //     {
+    //         PISAR_LOG_INFO("Vector %d: %f, %f", j, data.trajectory[j].x(), data.trajectory[j].y());
+    //     }
+    // }
+
     std::array<Eigen::Vector2f, 1> penis1 = {Eigen::Vector2f(0.04, 0.0)};    
     // std::array<Eigen::Vector2f, 1> penis2 = {Eigen::Vector2f(0.08, 0.06)};
-    // std::array<Eigen::Vector2f, 1> penis2 = {Eigen::Vector2f(0.08, -0.06)};    
-
-    operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, std::span(penis1)));
+    // std::array<Eigen::Vector2f, 1> penis2 = {Eigen::Vector2f(0.08, -0.06)};
+    operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, penis1));
 }
 
 void pisarLoop()
 {
+
+    // if (first_time) 
+    // {
+    //     nowOffset = static_cast<float>(micros()) / 1000000.0f;
+    //     first_time = false;
+    // }
+
+    // // Test data refresh
+    // if (currentSampleIndex < kTestData.size())
+    // { 
+    //     auto now = (static_cast<float>(micros()) / 1000000.0f) - nowOffset;
+
+    //     const auto& data = kTestData[currentSampleIndex];
+
+    //     if(now > data.timestamp)
+    //     {
+    //         // Debug ELEPHANT
+    //         // PISAR_LOG_INFO("Timestamp: %f, Now: %f", data.timestamp, now);
+    //         operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, data.trajectory));
+    //         currentSampleIndex++;
+    //     }
+    // }
+
     // auto now = std::chrono::milliseconds(millis());
     // if (now - last_reset_time > kTrackerResetTime)
     // {

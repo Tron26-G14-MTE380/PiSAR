@@ -80,15 +80,15 @@ private:
     std::vector<Eigen::Vector2f> m_trajectory;
 
     static constexpr float kThetaTolerance = 5.0f;
-    static constexpr float kDistTolerance = 0.01f;
+    static constexpr float kDistTolerance = 0.0000001f;
     static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(1);
     static constexpr float kDotProductTolerance = 120.0f;
 
-    static constexpr float kPidkpRotation = 0.0001f;
+    static constexpr float kPidkpRotation = 0.000005f;
     static constexpr float kPidkiRotation = 0.0f;
     static constexpr float kPidkdRotation = 0.0001f;
 
-    static constexpr float kPidkpTravel = 0.0007f;
+    static constexpr float kPidkpTravel = 0.01f;
 
     float m_adj_kp_rotation;
     float m_adj_ki_rotation;
@@ -115,6 +115,47 @@ public:
     OperatingModeFollowTrajectory(
         RobotFacility& facility,
         const std::span<const Eigen::Vector2f> trajectory
+    );
+    void onEnterImpl();
+    [[nodiscard]] bool updateImpl();
+    void onExitImpl();
+};
+
+class OperatingModeGoToTarget : public OperatingMode<OperatingModeGoToTarget>
+{
+private:
+    std::reference_wrapper<RobotFacility> m_facility;
+    Eigen::Vector2f m_target;
+
+    static constexpr float kThetaTolerance = 5.0f;
+    static constexpr float kDistTolerance = 0.0000001f;
+    static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(1);
+    static constexpr float kDotProductTolerance = 120.0f;
+
+    static constexpr float kPidkpRotation = 0.000005f;
+    static constexpr float kPidkiRotation = 0.0f;
+    static constexpr float kPidkdRotation = 0.0001f;
+
+    static constexpr float kPidkpTravel = 0.01f;
+
+    float m_adj_kp_rotation;
+    float m_adj_ki_rotation;
+    float m_adj_kd_rotation;
+
+    float m_adj_kp_travel;
+
+    float m_distance_to_target;
+    float m_target_heading;
+
+    float m_integral_angle;
+    float m_last_angle_error;
+    std::chrono::milliseconds m_last_update_time;
+    std::optional<std::chrono::milliseconds> m_on_target_timestamp;
+
+public:
+    OperatingModeGoToTarget(
+        RobotFacility& facility,
+        const Eigen::Vector2f target
     );
     void onEnterImpl();
     [[nodiscard]] bool updateImpl();

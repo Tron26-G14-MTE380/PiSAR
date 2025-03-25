@@ -40,7 +40,7 @@ void pisarSetup()
     }
     
     // First, calibrate and save data
-    if (!imu.calibrate(1000, true)) // Simulate calibration
+    if (!imu.calibrate(5000, true)) // Simulate calibration
     {
         PISAR_LOG_ERROR("IMU Calibration failed!");
         return;
