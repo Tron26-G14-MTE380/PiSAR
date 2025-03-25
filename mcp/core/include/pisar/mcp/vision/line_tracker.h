@@ -1,13 +1,15 @@
 #pragma once
 
+#include "pisar/mcp/vision/roi_mat.h"
+#include "pisar/mcp/vision/roi_tracker.h"
+#include "pisar/mcp/vision/color_extractor.h"
 #include "pisar/mcp/vision/thinning.h"
 #include "pisar/mcp/vision/path_extraction.h"
 #include "pisar/mcp/vision/path_simplification.h"
-#include "pisar/mcp/vision/roi_mat.h"
+#include "pisar/mcp/vision/homography.h"
+#include "pisar/mcp/vision/trajectory_filter.h"
 #include "pisar/mcp/vision/utils.h"
 #include "pisar/mcp/vision/debug_visualization.h"
-#include "pisar/mcp/vision/trajectory_filter.h"
-#include "pisar/mcp/vision/homography.h"
 
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>
@@ -29,12 +31,12 @@ namespace pisar::mcp {
 /**
  * @brief Extracts a fitted trajectory from a skeletonized path.
  */
-template<bool tkDebug>
+template<bool tkDebug, class TColorExtractor>
 class LineTracker {
 public:
     struct DebugData {
         RoiMat preprocessed;
-        RoiMat hsvFiltered;
+        RoiMat extractedColor;
         RoiMat skeleton;
         RoiMat filtered_skeleton;
         RoiMat trajectory;
@@ -49,8 +51,10 @@ private:
     using DebugDataT = typename std::conditional_t<tkDebug, DebugData, std::monostate>;
 
     cv::Size m_frame_size;
-    std::vector<std::pair<cv::Scalar, cv::Scalar>> m_hsv_masks;
+    std::vector<std::pair<cv::Scalar, cv::Scalar>> m_yuv_masks;
 
+    RoiTracker m_roi_tracker;
+    std::reference_wrapper<const TColorExtractor> m_color_extractor;
     HomographySizedProjection m_homography_sized_projection;
     std::reference_wrapper<TrajectoryFilter<double>> m_trajectory_filter;
 
@@ -59,22 +63,23 @@ private:
 public:
 
     /**
-     * @brief Constructs a LineTracker with multiple HSV masks and validation parameters.
+     * @brief Constructs a LineTracker.
      * @param frame_size The input frame size.
-     * @param hsv_masks List of HSV threshold pairs (lower and upper bounds).
+     * @param yuv_masks List of YUV threshold pairs (lower and upper bounds).
      * @param homography_projection Reference to homography projection to use.
      * @param trajectory_filter Reference to trajectory filter.
      */
     explicit LineTracker(
         const cv::Size& frame_size,
-        const std::span<const std::pair<cv::Scalar, cv::Scalar>>& hsv_masks,
+        const TColorExtractor& color_extractor,
         const HomographySizedProjection& homography_projection,
         TrajectoryFilter<double>& trajectory_filter
     )
         : m_frame_size(frame_size),
-          m_hsv_masks(hsv_masks.begin(), hsv_masks.end()),
+          m_color_extractor(color_extractor),
           m_homography_sized_projection(homography_projection),
-          m_trajectory_filter(trajectory_filter) {}
+          m_trajectory_filter(trajectory_filter)
+          {}
 
     /**
      * @brief Processes the input frame to extract a fitted trajectory.
@@ -90,7 +95,7 @@ public:
             const RoiMat empty_img = RoiMat(cv::Mat::zeros(m_frame_size, CV_8UC3));
             m_debug = {
                 .preprocessed = empty_img,
-                .hsvFiltered = empty_img,
+                .extractedColor = empty_img,
                 .skeleton = empty_img,
                 .filtered_skeleton = empty_img,
                 .trajectory = empty_img,
@@ -107,17 +112,34 @@ public:
             std::cerr << "Input frame size (" << frame.size() << ") doesn't match expected frame size (" << m_frame_size << ")" << std::endl;
         }
 
+        auto input_frame = RoiMat(frame);
+
+        auto precropped_frame = preCrop(input_frame);
+
         // Smooth out the frame with some preprocessing
-        auto preprocessed = preprocess(RoiMat(frame));
+        auto preprocessed = preprocess(precropped_frame);
 
-        // Apply hsv filtering to detect colors
-        auto binary_mask = applyHSVThreshold(preprocessed);
+        // Apply filtering to detect colors
+        auto binary_mask = extractColor(preprocessed);
 
-        // Skeletonize the line
-        auto skeleton = skeletonizeCropped(binary_mask);
+        // Crop the ROI
+        auto cropped_binary_mask = cropRoi(binary_mask);
 
-        // Get trajectory from skeleton
-        auto trajectory = skeleton.has_value() ? fitSkeleton(skeleton.value()) : std::vector<Eigen::Vector2i>();
+        std::vector<Eigen::Vector2i> trajectory;
+        if (cropped_binary_mask)
+        {
+            m_roi_tracker.submit(cropped_binary_mask.value().getCrop());
+
+            // Skeletonize the line
+            auto skeleton = skeletonize(cropped_binary_mask.value());
+
+            // Get trajectory from skeleton
+            trajectory = fitSkeleton(skeleton);
+        }
+        else
+        {
+            m_roi_tracker.reset();
+        }
 
         // Project trajectory to real-world coordinates
         auto projected_trajectory = projectTrajectory(std::span(trajectory));
@@ -129,6 +151,18 @@ public:
     [[nodiscard]] inline const DebugData& debugData() const { return m_debug; }
 
 private:
+
+    [[nodiscard]] RoiMat preCrop(const RoiMat& input)
+    {
+        const auto roi_crop = m_roi_tracker.getEstimatedRoi(input.getOriginalSize());
+
+        if (!roi_crop)
+        {
+            return input;
+        }
+
+        return input.crop(roi_crop.value());
+    }
 
     /**
      * @brief Applies Gaussian blur to reduce noise.
@@ -153,37 +187,39 @@ private:
     }
 
     /**
-     * @brief Converts an image to HSV and applies multiple threshold masks.
+     * @brief Creates a binary mask with extracted color from input image.
      * @param input Input image (BGR format).
-     * @return Binary mask combining all detected ranges.
+     * @return Binary mask with extracted color.
      */
-    [[nodiscard]] RoiMat applyHSVThreshold(const RoiMat& input)
+    [[nodiscard]] RoiMat extractColor(const RoiMat& input)
     {
         EASY_FUNCTION();
 
-        cv::Mat hsv, mask;
-        cv::cvtColor(input.getMat(), hsv, cv::COLOR_BGR2HSV);
-        mask = cv::Mat::zeros(input.getMat().size(), CV_8U);
+        cv::Mat mask = m_color_extractor.get().extract(input.getMat());
 
-        for (const auto& [lower, upper] : m_hsv_masks) {
-            cv::Mat temp_mask;
-            cv::inRange(hsv, lower, upper, temp_mask);
-            cv::bitwise_or(mask, temp_mask, mask);
-        }
-
-        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11)));
-
-        // Apply Erosion to remove small artifacts
-        cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11)));
+        // Morphological cleanup
+        const auto kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
+        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+        cv::erode(mask, mask, kernel);
 
         RoiMat output(mask, input);
 
         if constexpr (tkDebug)
         {
-            m_debug.hsvFiltered = output;
+            m_debug.extractedColor = output;
         }
 
         return output;
+    }
+
+    [[nodiscard]] std::optional<RoiMat> cropRoi(const RoiMat& binary_mask)
+    {
+        EASY_FUNCTION();
+
+        const cv::Rect bbox = computeBoundingBox(binary_mask.getMat());
+        if (bbox.width == 0 || bbox.height == 0) return std::nullopt;
+
+        return binary_mask.crop(bbox);
     }
 
     /**
@@ -220,20 +256,6 @@ private:
         }
 
         return output;
-    }
-
-    [[nodiscard]] std::optional<RoiMat> skeletonizeCropped(const RoiMat& binary_mask)
-    {
-        EASY_FUNCTION();
-
-        const cv::Rect bbox = computeBoundingBox(binary_mask.getMat());
-        if (bbox.width == 0 || bbox.height == 0) return std::nullopt;
-
-        // Crop the region of interest (ROI)
-        RoiMat cropped_binary_mask = binary_mask.crop(bbox);
-        RoiMat cropped_skeleton = skeletonize(cropped_binary_mask);
-
-        return cropped_skeleton;
     }
 
     /**

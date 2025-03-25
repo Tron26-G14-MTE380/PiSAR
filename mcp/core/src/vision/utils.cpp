@@ -2,7 +2,7 @@
 
 namespace pisar::mcp {
 
-cv::Rect computeBoundingBox(const cv::Mat& img) {
+[[nodiscard]] cv::Rect computeBoundingBox(const cv::Mat& img) {
     CV_Assert(img.type() == CV_8UC1);
 
     int min_x = 0, max_x = img.cols - 1, min_y = 0, max_y = img.rows - 1;
@@ -23,7 +23,7 @@ cv::Rect computeBoundingBox(const cv::Mat& img) {
     return cv::Rect(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1);
 }
 
-cv::Mat resizeWithPadding(const cv::Mat& input, const cv::Size& target_size)
+[[nodiscard]] cv::Mat resizeWithPadding(const cv::Mat& input, const cv::Size& target_size)
 {
     if (input.empty())
     {
@@ -69,7 +69,7 @@ cv::Mat resizeWithPadding(const cv::Mat& input, const cv::Size& target_size)
     return output;
 }
 
-cv::Mat downscaleCrop(const cv::Mat &input, const cv::Size &target_size)
+[[nodiscard]] cv::Mat downscaleCrop(const cv::Mat &input, const cv::Size &target_size)
 {
     if (input.empty())
     {
@@ -104,11 +104,27 @@ cv::Mat downscaleCrop(const cv::Mat &input, const cv::Size &target_size)
     return cropped_output;
 }
 
-[[nodiscard]] cv::Rect computeCenterCrop(const cv::Size& full_size, const cv::Size& cropped_size) 
+[[nodiscard]] cv::Rect computeCenterCrop(const cv::Size& full_size, const cv::Size& cropped_size)
 {
     const int crop_x = (full_size.width - cropped_size.width) / 2;
     const int crop_y = (full_size.height - cropped_size.height) / 2;
     return cv::Rect(crop_x, crop_y, cropped_size.width, cropped_size.height);
+}
+
+[[nodiscard]] cv::Mat createBinaryMaskOr(
+    const cv::Mat& input,
+    const std::span<const std::pair<cv::Scalar, cv::Scalar>>& mask_thresholds
+)
+{
+    cv::Mat mask = cv::Mat::zeros(input.size(), CV_8U);
+    for (const auto& [lower, upper] : mask_thresholds)
+    {
+        cv::Mat temp_mask;
+        cv::inRange(input, lower, upper, temp_mask);
+        cv::bitwise_or(mask, temp_mask, mask);
+    }
+
+    return mask;
 }
 
 }

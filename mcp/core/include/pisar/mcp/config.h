@@ -14,6 +14,10 @@ static const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> gkRedTapeHsvThresh
     std::make_pair(cv::Scalar(170, 120, 70), cv::Scalar(180, 255, 255))
 };
 
+static const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> gkRedTapeYuvThresholds = {
+    std::make_pair(cv::Scalar(0, 110, 180), cv::Scalar(255, 140, 255))
+};
+
 static const CameraTransform gkCameraTransform = {
     .position = {0, 9.5, 12},
     .tilt = Eigen::AngleAxisd(pisar::mcp::deg_to_rad<double>(-48), Eigen::Vector3d::UnitX())

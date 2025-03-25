@@ -21,7 +21,7 @@ using namespace pisar::mcp;
 constexpr bool kDebug = true;
 constexpr bool kProfile = false;
 constexpr uint64_t kProfileTimeMs = 10000;
-constexpr double kFrameRateLimit = 1.0;
+constexpr double kFrameRateLimit = 10.0;
 constexpr auto kFrameDurationLimit = std::chrono::duration<double>(1.0 / kFrameRateLimit);
 
 int main()
@@ -50,11 +50,16 @@ int main()
         std::optional<cv::Rect> frame_crop = std::nullopt;
     #endif
 
+    frame_crop = computeCenterCrop(gkFullFrameSize, gkCaptureFrameSize);
+
     video_source.start(gkCaptureFrameSize);
 
-    auto line_tracker = LineTracker<kDebug>(
+    //HsvColorExtractor color_extractor(gkRedTapeHsvThresholds)
+    YuvColorExtractor color_extractor(gkRedTapeYuvThresholds);
+
+    auto line_tracker = LineTracker<kDebug, decltype(color_extractor)>(
         gkFrameSize,
-        gkRedTapeHsvThresholds,
+        color_extractor,
         projection.for_image(gkFrameSize, frame_crop),
         filter
     );
@@ -81,7 +86,7 @@ int main()
             std::vector<std::pair<std::string, RoiMat>> debug_image_map = {
                 std::make_pair("1. Original", RoiMat(input_frame)),
                 std::make_pair("2. Preprocessed", debug_data.preprocessed),
-                std::make_pair("3. HSV Filtered", debug_data.hsvFiltered),
+                std::make_pair("3. Color Extracted", debug_data.extractedColor),
                 std::make_pair("4. Skeleton", debug_data.skeleton),
                 std::make_pair("5. Filtered Skeleton", debug_data.filtered_skeleton),
                 std::make_pair("6. Trajectory", debug_data.trajectory),

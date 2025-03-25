@@ -64,6 +64,8 @@ public:
      */
     [[nodiscard]] cv::Size getOriginalSize() const { return m_original_size; }
 
+    [[nodiscard]] cv::Rect getCrop() const { return cv::Rect(m_offset.x, m_offset.y, m_image.cols, m_image.rows); }
+
     /**
      * @brief Crop the image and update the offset.
      * @param rect The cropping rectangle.

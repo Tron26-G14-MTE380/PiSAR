@@ -64,16 +64,38 @@ public:
         return world_homogeneous.head<2>() * zc + m_camera_position.head<2>();
     }
 
+    /**
+     * @brief Project a set of pixel coordinates to world coordinates. Writes in place to @p world_coords
+     *
+     * @param pixel_coords The span of pixel coordinates to project.
+     * @param world_coords The output span of world coordinates.
+     */
     inline void project(const std::span<const Eigen::Vector2i> pixel_coords, const std::span<Eigen::Vector2d> world_coords) const
     {
+        if (pixel_coords.empty())
+        {
+            return;
+        }
+
         for (int i = 0; i < pixel_coords.size(); ++i)
         {
             world_coords[i] = project(pixel_coords[i]);
         }
     }
 
+    /**
+     * @brief Project a set of pixel coordinates to world coordinates. Returns a vector.
+     *
+     * @param pixel_coords The span of pixel coordinates to project.
+     * @return Vector of world coordinates.
+     */
     [[nodiscard]] inline std::vector<Eigen::Vector2d> project(const std::span<const Eigen::Vector2i> pixel_coords) const
     {
+        if (pixel_coords.empty())
+        {
+            return {};
+        }
+
         std::vector<Eigen::Vector2d> world_coords(pixel_coords.size(), Eigen::Vector2d::Zero());
         project(pixel_coords, std::span(world_coords));
         return world_coords;
