@@ -62,30 +62,27 @@ void OperatingModeFollowTrajectory::onEnterImpl()
 
     float angle = toDegrees(std::acos(current_position.dot(target_position)/(current_position.norm() * target_position.norm())));
 
+    Eigen::Vector2f error_vec = target_position - current_position;
+    float angle_error = m_target_heading - current_heading;
+
+    // Normalize angle error to [-180, 180]
+    while (angle_error > 180.0f) angle_error -= 360.0f;
+    while (angle_error < -180.0f) angle_error += 360.0f;
+
+    float distance_error = error_vec.norm();
+    auto current_time = std::chrono::milliseconds(millis());
+    std::chrono::duration<float> elapsed = current_time - m_last_update_time;
+    float dt = elapsed.count();
+
     // Angle testing ELEPHANT
-    // Note that this always evaluates to inf if the current position is 0,0
-    // PISAR_LOG_INFO("Angle: %f, Current: %.20f, Target: %f", angle, current_position.norm(), target_position.norm());
+    // Note that this always evaluates to inf if the current position is 0, 0
+    PISAR_LOG_INFO("Angle: %f", angle);
 
     // Test Data Updating ELEPHANT
     // PISAR_LOG_INFO("First Trajectory Point: %f, %f", target_position.x(), target_position.y());
 
     if(angle > kDotProductTolerance)
     {
-        Eigen::Vector2f error_vec = target_position - current_position;
-        float distance_error = error_vec.norm();
-
-        // PISAR_LOG_INFO("Distance Error: %f", distance_error);
-
-        float angle_error = m_target_heading - current_heading;
-
-        // Normalize angle error to [-180, 180]
-        while (angle_error > 180.0f) angle_error -= 360.0f;
-        while (angle_error < -180.0f) angle_error += 360.0f;
-
-        auto current_time = std::chrono::milliseconds(millis());
-        std::chrono::duration<float> elapsed = current_time - m_last_update_time;
-        float dt = elapsed.count();
-
         // Compute PID terms
         m_integral_angle += angle_error * dt;
         float derivative_angle = (angle_error - m_last_angle_error) / dt;
@@ -105,7 +102,7 @@ void OperatingModeFollowTrajectory::onEnterImpl()
         float left_speed_raw = abs(forward_output - angular_output);
         float right_speed_raw = abs(forward_output + angular_output);
 
-        PISAR_LOG_INFO("Angle Error: %f", angle_error);
+        // PISAR_LOG_INFO("Angle Error: %f", angle_error);
         // PISAR_LOG_INFO("Left Speed Original Raw: %f, Right Speed Original Raw: %f", left_speed_raw, right_speed_raw);
 
         // Find the max speed, scale both down to keep ratio
@@ -123,21 +120,23 @@ void OperatingModeFollowTrajectory::onEnterImpl()
 
         m_facility.get().getDriveController().tankDrive(left_speed, right_speed);
 
-        m_last_angle_error = angle_error;
-        m_last_update_time = current_time;
-        return false;
+    }
+    else
+    {
+        if(m_trajectry_points - 1 != m_target_index)
+        {
+            m_target_index += 1;
+        }
+        else
+        {
+            m_facility.get().getDriveController().hardStop();
+            return true;
+        }
+    }
 
-    }
-    else if(m_trajectry_points - 1 != m_target_index)
-    {
-        m_target_index += 1;
-        return false;
-    }
-    else if(m_trajectry_points - 1 == m_target_index)
-    {
-        m_facility.get().getDriveController().hardStop();
-        return true;
-    }
+    m_last_angle_error = angle_error;
+    m_last_update_time = current_time;
+    return false;
 }
 
 void OperatingModeFollowTrajectory::onExitImpl()

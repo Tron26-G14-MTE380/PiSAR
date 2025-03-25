@@ -138,27 +138,28 @@ void pisarSetup()
 void pisarLoop()
 {
 
-    // if (first_time) 
-    // {
-    //     nowOffset = static_cast<float>(micros()) / 1000000.0f;
-    //     first_time = false;
-    // }
+    if (first_time) 
+    {
+        PISAR_LOG_INFO("STARTING");
+        nowOffset = static_cast<float>(micros()) / 1000000.0f;
+        first_time = false;
+    }
 
-    // // Test data refresh
-    // if (currentSampleIndex < kTestData.size())
-    // { 
-    //     auto now = (static_cast<float>(micros()) / 1000000.0f) - nowOffset;
+    // Test data refresh
+    if (currentSampleIndex < kTestData.size())
+    { 
+        auto now = (static_cast<float>(micros()) / 1000000.0f) - nowOffset;
 
-    //     const auto& data = kTestData[currentSampleIndex];
+        const auto& data = kTestData[currentSampleIndex];
 
-    //     if(now > data.timestamp)
-    //     {
-    //         // Debug ELEPHANT
-    //         // PISAR_LOG_INFO("Timestamp: %f, Now: %f", data.timestamp, now);
-    //         operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, data.trajectory));
-    //         currentSampleIndex++;
-    //     }
-    // }
+        if(now > data.timestamp)
+        {
+            // Debug ELEPHANT
+            // PISAR_LOG_INFO("Timestamp: %f, Now: %f", data.timestamp, now);
+            operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, data.trajectory));
+            currentSampleIndex++;
+        }
+    }
 
     // auto now = std::chrono::milliseconds(millis());
     // if (now - last_reset_time > kTrackerResetTime)
