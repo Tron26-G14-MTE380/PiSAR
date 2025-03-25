@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 #endif
 
+#include <string>
 #include <sstream>
 
 namespace pisar::mcp {
@@ -35,7 +36,8 @@ LibcameraVideoSource::LibcameraVideoSource(std::string_view camera_id, float fra
 
     for (auto& camera : m_camera_manager->cameras())
     {
-        if (camera->id() == camera_id)
+        std::cout << "Camera Found with id: " << camera->id() << std::endl;
+        if (camera_id.compare(camera->id()) == 0)
         {
             m_camera = camera;
             break;
@@ -98,7 +100,7 @@ void LibcameraVideoSource::startImpl(const cv::Size frame_size)
     cv::Size validated_size = {m_config->at(0).size.width, m_config->at(0).size.height};
     if (validated_size != frame_size)
     {
-        throw std::runtime_error("Set size doesn't match validated size")
+        throw std::runtime_error("Set size doesn't match validated size");
     }
 
     m_capture_rect = cv::Rect(0, 0, validated_size.width, validated_size.height);

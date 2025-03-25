@@ -317,7 +317,7 @@ public:
     /**
      * @brief Constructs a LibcameraVideoSource instance.
      */
-    LibcameraVideoSource(std::string_view camera_id, size_t frame_buffer_size = 10);
+    LibcameraVideoSource(std::string_view camera_id, float frame_rate = 90, size_t frame_buffer_size = 10);
 
     /**
      * @brief Destructs the video source and ensures cleanup.

@@ -29,6 +29,9 @@ cv::Mat createHomographyProjectionVisualization(
     // Create a blank image
     cv::Mat visualization = cv::Mat::zeros(image_size.height, image_size.width, CV_8UC3);
 
+    const Eigen::Vector2d robot_position = Eigen::Vector2d::Zero();
+    const Eigen::Vector2d camera_position = projection.cameraPosition().head<2>();
+
     // Step 1: Generate a grid of points for visualization
     std::vector<Eigen::Vector2i> camera_view_grid_image_points;
     for (int i = 0; i < 10; ++i)
@@ -51,6 +54,9 @@ cv::Mat createHomographyProjectionVisualization(
         camera_view_grid_world_points.begin(),
         camera_view_grid_world_points.end()
     );
+
+    all_world_points.push_back(robot_position);
+    all_world_points.push_back(camera_position);
 
     // Find world bounds
     double X_min = std::numeric_limits<double>::max(), X_max = std::numeric_limits<double>::lowest();
@@ -89,10 +95,7 @@ cv::Mat createHomographyProjectionVisualization(
     std::vector<cv::Point2f> image_trajectory(trajectory.size(), {0});
     std::transform(trajectory.begin(), trajectory.end(), image_trajectory.begin(), worldToImageFixed);
 
-    const Eigen::Vector2d camera_position = projection.cameraPosition().head<2>();
     cv::Point2f image_camera_position = worldToImageFixed(camera_position);
-
-    const Eigen::Vector2d robot_position = Eigen::Vector2d::Zero();
     cv::Point2f image_robot_position = worldToImageFixed(robot_position);
 
     // Draw grid points

@@ -104,4 +104,11 @@ cv::Mat downscaleCrop(const cv::Mat &input, const cv::Size &target_size)
     return cropped_output;
 }
 
+[[nodiscard]] cv::Rect computeCenterCrop(const cv::Size& full_size, const cv::Size& cropped_size) 
+{
+    const int crop_x = (full_size.width - cropped_size.width) / 2;
+    const int crop_y = (full_size.height - cropped_size.height) / 2;
+    return cv::Rect(crop_x, crop_y, cropped_size.width, cropped_size.height);
+}
+
 }

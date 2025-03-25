@@ -25,4 +25,12 @@ namespace pisar::mcp {
      */
     cv::Mat downscaleCrop(const cv::Mat &input, const cv::Size &target_size);
 
+    /**
+     * @brief Computes the crop rect of an image from the full size image in the center.
+     * @param full_size The size of the full res image the image from cropped from.
+     * @param cropped_size The size of the cropped region.
+     * @return Rect describing the crop region.
+     */
+    [[nodiscard]] cv::Rect computeCenterCrop(const cv::Size& full_size, const cv::Size& cropped_size);
+
 }

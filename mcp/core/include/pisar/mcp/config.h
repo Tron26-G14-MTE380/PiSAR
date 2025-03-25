@@ -39,6 +39,7 @@ static const CameraCalibrationData gkCameraCalibration = {
     }
 };
 
-static const cv::Size gkCaptureFrameSize = {1280, 960};
-static const cv::Size gkFrameSize = {320, 240};
+static const cv::Size gkFullFrameSize = {3280, 2464};
+static const cv::Size gkCaptureFrameSize = {1280, 720};
+static const cv::Size gkFrameSize = {320, 180};
 }

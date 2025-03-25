@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 
 #include <optional>
+#include <span>
 
 namespace pisar::mcp {
 
