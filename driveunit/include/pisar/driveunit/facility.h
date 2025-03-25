@@ -39,6 +39,7 @@ public:
      */
     inline bool initialize()
     {
+        // Possible future shenanigans ELEPHANT
         return true;
     }
 

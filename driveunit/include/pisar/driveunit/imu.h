@@ -31,8 +31,6 @@ public:
     struct AccelData { Eigen::Vector3<DataValueT> values; };
     struct GyroDataRaw { Eigen::Vector3<DataRawValueT> values; };
     struct GyroData { Eigen::Vector3<DataValueT> values; };
-    struct TestDataAccel { Eigen::Vector3<int32_t> values; };
-    struct TestDataGyro { Eigen::Vector3<int32_t> values; };
 
     struct DataRaw
     {

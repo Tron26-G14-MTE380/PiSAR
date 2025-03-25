@@ -3,14 +3,23 @@
 
 namespace pisar::driveunit {
 
+template <typename T>
+[[nodiscard]] constexpr T toDegrees(T radians)
+{
+    static_assert(std::is_arithmetic_v<T>, "toDegrees<T>: T must be an arithmetic type");
+    return radians * static_cast<T>(180.0) / static_cast<T>(M_PI);
+}
+
 ///////////////////////////////////////////// OperatingModeFollowTrajectory ////////////////////////////////////////////
 
 OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& facility, const std::span<const Eigen::Vector2f> trajectory) : 
     m_facility(facility), 
-    m_trajectory(trajectory.begin(), trajectory.end()), 
-    m_adj_kp(0.0f),
-    m_adj_ki(0.0f),
-    m_adj_kd(0.0f),
+    m_trajectory(trajectory.begin(), trajectory.end()),
+    m_trajectry_points(trajectory.size()), 
+    m_adj_kp_rotation(0.0f),
+    m_adj_ki_rotation(0.0f),
+    m_adj_kd_rotation(0.0f),
+    m_adj_kp_travel(0.0f),
     m_target_index(0),
     m_distance_to_target(0.0f),
     m_target_heading(0.0f),
@@ -25,14 +34,15 @@ void OperatingModeFollowTrajectory::onEnterImpl()
     m_facility.get().getDriveController().stop();
 
     const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
-    m_adj_kp = kPidkp * pid_adj_scale;
-    m_adj_ki = kPidki * pid_adj_scale;
-    m_adj_kd = kPidkd * pid_adj_scale;
+    m_adj_kp_rotation = kPidkpRotation * pid_adj_scale;
+    m_adj_ki_rotation = kPidkiRotation * pid_adj_scale;
+    m_adj_kd_rotation = kPidkdRotation * pid_adj_scale;
+    m_adj_kp_travel = kPidkpTravel * pid_adj_scale;
 
     // Set target
     m_target_index = 0;
     m_distance_to_target = getCurrentTarget().norm();
-    m_target_heading = std::atan2(getCurrentTarget().x(), getCurrentTarget().y()) * 180.0f / M_PI; // might have to adjust due to imu axis directions
+    m_target_heading = toDegrees(std::atan2(getCurrentTarget().y(), getCurrentTarget().x())); // might have to adjust due to imu axis directions
 
     m_integral_angle = 0.0f;
     m_last_angle_error = m_target_heading;
@@ -45,67 +55,99 @@ void OperatingModeFollowTrajectory::onEnterImpl()
 [[nodiscard]] bool OperatingModeFollowTrajectory::updateImpl()
 {
     auto current_pose = m_facility.get().getKinematicTracker().getPose();
+    auto target_position = getCurrentTarget();
+    // conditional loop of passed point logic goes here
     auto current_position = current_pose.position;
     auto current_heading = current_pose.orientation;
 
-    Eigen::Vector2f error_vec = getCurrentTarget() - current_position;
-    float distance_error = error_vec.norm();
-    float angle_error = m_target_heading - current_heading;
+    float angle = toDegrees(std::acos(current_position.dot(target_position)/(current_position.norm() * target_position.norm())));
 
-    // Normalize angle error to [-180, 180]
-    while (angle_error > 180.0f) angle_error -= 360.0f;
-    while (angle_error < -180.0f) angle_error += 360.0f;
-
-    auto current_time = std::chrono::milliseconds(millis());
-    std::chrono::duration<float> elapsed = current_time - m_last_update_time;
-    float dt = elapsed.count();
-
-    if (std::abs(angle_error) > thetaTolerance || std::abs(distance_error) > distTolerance)
+    if(angle > kDotProductTolerance)
     {
-        m_on_target_timestamp = std::nullopt;
-
-        // Compute PID terms
-        m_integral_angle += angle_error * dt;
-        float derivative_angle = (angle_error - m_last_angle_error) / dt;        
-
-        // Sharing Kp for now, this could change to be individual and most likely will
-        // PID outputs
-        float angular_output = (m_adj_kp * angle_error) + (m_adj_kd * derivative_angle) + (m_adj_ki * m_integral_angle);
+        Eigen::Vector2f error_vec = getCurrentTarget() - current_position;
+        float distance_error = error_vec.norm();
     
-        // Forward speed (only proportional for now)
-        float forward_output = m_adj_kp * distance_error;
+        PISAR_LOG_INFO("Distance Error: %f", distance_error);
     
-        // Clamp speeds
-        angular_output = std::clamp(angular_output, -1.0f, 1.0f);
-        forward_output = std::clamp(forward_output, 0.0f, 1.0f); // no reversing
+        float angle_error = m_target_heading - current_heading;
     
-        // Blended drive — arc forward
-        float left_speed = forward_output - angular_output;
-        float right_speed = forward_output + angular_output;
+        // Normalize angle error to [-180, 180]
+        while (angle_error > 180.0f) angle_error -= 360.0f;
+        while (angle_error < -180.0f) angle_error += 360.0f;
     
-        left_speed = std::clamp(left_speed, -1.0f, 1.0f);
-        right_speed = std::clamp(right_speed, -1.0f, 1.0f);
+        auto current_time = std::chrono::milliseconds(millis());
+        std::chrono::duration<float> elapsed = current_time - m_last_update_time;
+        float dt = elapsed.count();
     
-        m_facility.get().getDriveController().tankDrive(left_speed, right_speed);
-
+        if (std::abs(angle_error) > kThetaTolerance || std::abs(distance_error) > kDistTolerance)
+        {
+            m_on_target_timestamp = std::nullopt;
+    
+            // Compute PID terms
+            m_integral_angle += angle_error * dt;
+            float derivative_angle = (angle_error - m_last_angle_error) / dt;        
+    
+            // Sharing Kp for now, this could change to be individual and most likely will
+            // PID outputs
+            float angular_output = (m_adj_kp_rotation * angle_error) + (m_adj_kd_rotation * derivative_angle) + (m_adj_ki_rotation * m_integral_angle);
+        
+            // Forward speed (only proportional for now)
+            float forward_output = m_adj_kp_travel * distance_error;
+        
+            // Clamp speeds
+            angular_output = std::clamp(angular_output, -1.0f, 1.0f);
+            forward_output = std::clamp(forward_output, 0.0f, 1.0f); // no reversing
+        
+            // Arc forward blend
+            float left_speed_raw = forward_output - angular_output;
+            float right_speed_raw = forward_output + angular_output;
+    
+            // Find the max speed
+            float max_speed = std::max(left_speed_raw, right_speed_raw);
+            if (max_speed > 1.0f)
+            {
+                // Scale both down to keep ratio
+                left_speed_raw /= max_speed;
+                right_speed_raw /= max_speed;
+            }
+    
+            // Clamp again after scaling
+            float left_speed = std::clamp(left_speed_raw, 0.0f, 1.0f);
+            float right_speed = std::clamp(right_speed_raw, 0.0f, 1.0f);
+    
+            // PISAR_LOG_INFO("Left Speed: %f, Right Speed: %f", left_speed, right_speed);
+        
+            m_facility.get().getDriveController().tankDrive(left_speed, right_speed);
+    
+        }
+        else
+        {
+            if (!m_on_target_timestamp.has_value())
+            {
+                m_on_target_timestamp = current_time;
+                m_facility.get().getDriveController().hardStop();
+            }
+            else if (current_time - m_on_target_timestamp.value() >= kOnTargetDurationTolerance && m_trajectry_points - 1 != m_target_index)
+            {
+                m_facility.get().getDriveController().hardStop();
+            }
+            else if (current_time - m_on_target_timestamp.value() >= kOnTargetDurationTolerance && m_trajectry_points - 1 == m_target_index)
+            {
+                m_facility.get().getDriveController().hardStop();
+                return true;
+            }
+        }
+    
+        m_last_angle_error = angle_error;
+        m_last_update_time = current_time;
+        return false;
     }
     else
     {
-        if (!m_on_target_timestamp.has_value())
-        {
-            m_on_target_timestamp = current_time;
-            m_facility.get().getDriveController().hardStop();
-        }
-        else if (current_time - m_on_target_timestamp.value() >= kOnTargetDurationTolerance)
-        {
-            m_facility.get().getDriveController().hardStop();
-            return true;
-        }
+        m_target_index += 1;
     }
 
-    m_last_angle_error = angle_error;
-    m_last_update_time = current_time;
-    return false;
+
 }
 
 void OperatingModeFollowTrajectory::onExitImpl()

@@ -8,14 +8,19 @@
 
 using namespace pisar::driveunit;
 
+// IMU Instance
+Imu imu(SPI1, 13, 12, 11, 10, 14, "/imu_calibration_data.bin");
+ImuPlanarKinematicTracker kinematic_tracker(imu, "/kinematic_tracker_calibration_data.bin");
+
+// Motor Driver Instance
 MotorDriver left_motor(7, 6, 0.06f, 0.2f);
 MotorDriver right_motor(8, 9, 0.06f, 0.2f);
-
 DifferentialDriveController drive_controller(left_motor, right_motor, 10, 1.0f, 4.0f);
 
-Imu imu(SPI1, 13, 12, 11, 10, 14, "/calibration_data.bin");
+static constexpr bool kDoCalibration = false;
+static constexpr auto kTrackerResetTime = std::chrono::milliseconds(5000);
 
-RobotFacility facility(drive_controller, imu);
+RobotFacility facility(drive_controller, kinematic_tracker);
 
 /// @brief Factory function for creating the default mode
 inline OperatingModeIdle createDefaultMode()
@@ -26,17 +31,18 @@ inline OperatingModeIdle createDefaultMode()
 using OperatingModeManagerT = OperatingModeManager<OperatingModeIdle, OperatingModeFollowTrajectory, OperatingModeRotate>;
 OperatingModeManagerT operating_mode_manager(createDefaultMode);
 
+// Visualization (verify every time you make changes... Gabe)
 Plotter plotter;
-
-// Data variables for visualization
 float accel_x = 0, accel_y = 0;
 float gyro_z = 0;
 float velocity_x = 0, velocity_y = 0;
 float position_x = 0, position_y = 0;
 float orientation = 0;
 
+// IMU zeroing still not perfect, force after a certain amount of time
+auto last_reset_time = std::chrono::milliseconds(1500);
 
-void setup()
+void pisarSetup()
 {
     initLogging(115200, LogLevel::kInfo, false);
 
@@ -52,40 +58,86 @@ void setup()
         return;
     }
 
-    if(!facility.initialize(configMAX_PRIORITIES-2, configMAX_PRIORITIES-2))
+    if (!imu.initialize())
     {
-        PISAR_LOG_ERROR("Failed to initialize robot facility!");
+        PISAR_LOG_ERROR("Failed to initialize IMU!");
         return;
     }
 
-    auto calib_data = imu.getCalibration();
-    PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", calib_data.accel_offset.x(), calib_data.accel_offset.y(), calib_data.accel_offset.z());
-    PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", calib_data.gyro_offset.x(), calib_data.gyro_offset.y(), calib_data.gyro_offset.z());
+    // if (!imu.calibrate(5000, true))
+    // {
+    //     PISAR_LOG_ERROR("IMU Calibration failed!");
+    //     return;
+    // }
+
+    if (!kinematic_tracker.initialize(5))
+    {
+        PISAR_LOG_ERROR("Failed to initialize kinematic tracker!");
+        return;
+    }
+
+    if (!drive_controller.initialize(6))
+    {
+        PISAR_LOG_ERROR("Failed to initialize drive controller!");
+        return;
+    }
+
+    // if (!kinematic_tracker.calibrate(3, 1000, true))
+    // {
+    //     PISAR_LOG_ERROR("Kinematic tracker calibration failed!");
+    //     return;
+    // }
+
+    if (!facility.initialize())
+    {
+        PISAR_LOG_ERROR("Failed to initialize facility!");
+        return;
+    }
+
+    // We do all of this in respective calibrate functions, maybe move? ELEPHANT
+    // auto calib_data = imu.getCalibration();
+    // auto slope_data = kinematic_tracker.getCalibration();
+    // PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", calib_data.accel_offset.x(), calib_data.accel_offset.y(), calib_data.accel_offset.z());
+    // PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", calib_data.gyro_offset.x(), calib_data.gyro_offset.y(), calib_data.gyro_offset.z());
+    // PISAR_LOG_INFO("Velocity Slope: x=%f, y=%f", slope_data.velocity_slope().x(), slope_data.velocity_slope().y());
+    // PISAR_LOG_INFO("Position Slope: x=%f, y=%f", slope_data.position_slope().x(), slope_data.position_slope().y());
 
     operating_mode_manager.initialize(configMAX_PRIORITIES-3);
 
-    PISAR_LOG_INFO("Initiating rotate test in 3 seconds...");
-    delay(5000);
+    // PISAR_LOG_INFO("Initiating drive test in 3 seconds...");
+    // delay(3000);
     PISAR_LOG_INFO("Starting....");
-    // operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, (0, 0)));
+
+    std::array<Eigen::Vector2f, 1> penis1 = {Eigen::Vector2f(0.04, 0.0)};    
+    // std::array<Eigen::Vector2f, 1> penis2 = {Eigen::Vector2f(0.08, 0.06)};
+    // std::array<Eigen::Vector2f, 1> penis2 = {Eigen::Vector2f(0.08, -0.06)};    
+
+    operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, std::span(penis1)));
 }
 
-void loop()
+void pisarLoop()
 {
-    accel_x = facility.getAcceleration().x();
-    accel_y = facility.getAcceleration().y();
+    // auto now = std::chrono::milliseconds(millis());
+    // if (now - last_reset_time > kTrackerResetTime)
+    // {
+    //     kinematic_tracker.reset();
+    //     last_reset_time = now;
+    // }
 
-    gyro_z = facility.getAngularVelocity();
+    // const auto current_state = kinematic_tracker.getState();
 
-    velocity_x = facility.getVelocity().x();
-    velocity_y = facility.getVelocity().y();
+    // accel_x = current_state.acceleration.x();
+    // accel_y = current_state.acceleration.y();
 
-    position_x = facility.getPosition().x();
-    position_y = facility.getPosition().y();
+    // velocity_x = current_state.velocity.x();
+    // velocity_y = current_state.velocity.y();
 
-    orientation = facility.getOrientation(); // Yaw in degrees
+    // position_x = current_state.pose.position.x();
+    // position_y = current_state.pose.position.y();
 
-    // // Plot the data
-    plotter.Plot();
+    // gyro_z = current_state.angular_velocity;
 
+    // orientation = current_state.pose.orientation;
+
+    // plotter.Plot();
 }
