@@ -11,8 +11,8 @@ using namespace pisar::driveunit;
 
 ////////////////////////////////////////////////////TESTING////////////////////////////////////////////////////////
 
-size_t currentSampleIndex = 0;
-float nowOffset = 0;
+size_t current_sample_index = 0;
+auto now_offset = std::chrono::duration<float>(0.0f);
 bool first_time = true;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ inline OperatingModeIdle createDefaultMode()
     return OperatingModeIdle(facility);
 }
 
-using OperatingModeManagerT = OperatingModeManager<OperatingModeIdle, OperatingModeFollowTrajectory, OperatingModeRotate>;
+using OperatingModeManagerT = OperatingModeManager<OperatingModeIdle, OperatingModeFollowTrajectory, OperatingModeRotate, OperatingModeGoToTarget>;
 OperatingModeManagerT operating_mode_manager(createDefaultMode);
 
 // Visualization (verify every time you make changes... Gabe)
@@ -53,7 +53,7 @@ auto last_reset_time = std::chrono::milliseconds(1500);
 
 void pisarSetup()
 {
-    initLogging(115200, LogLevel::kInfo, true);
+    initLogging(115200, LogLevel::kInfo, false);
 
     // plotter.AddTimeGraph("Acceleration", 500, "Accel X", accel_x, "Accel Y", accel_y);
     // plotter.AddTimeGraph("Velocity", 500, "Vel X", velocity_x, "Vel Y", velocity_y);
@@ -79,13 +79,13 @@ void pisarSetup()
     //     return;
     // }
 
-    if (!kinematic_tracker.initialize(5))
+    if (!kinematic_tracker.initialize(configMAX_PRIORITIES-2))
     {
         PISAR_LOG_ERROR("Failed to initialize kinematic tracker!");
         return;
     }
 
-    if (!drive_controller.initialize(6))
+    if (!drive_controller.initialize(configMAX_PRIORITIES-2))
     {
         PISAR_LOG_ERROR("Failed to initialize drive controller!");
         return;
@@ -113,8 +113,8 @@ void pisarSetup()
 
     operating_mode_manager.initialize(configMAX_PRIORITIES-3);
 
-    // PISAR_LOG_INFO("Initiating drive test in 3 seconds...");
-    // delay(3000);
+    PISAR_LOG_INFO("Initiating drive test in 3 seconds...");
+    delay(5000);
     PISAR_LOG_INFO("Starting....");
 
 
@@ -129,37 +129,48 @@ void pisarSetup()
     //     }
     // }
 
-    std::array<Eigen::Vector2f, 1> penis1 = {Eigen::Vector2f(0.04, 0.0)};    
+    //std::array<Eigen::Vector2f, 1> penis1 = {Eigen::Vector2f(0.04, 0.0)};    
     // std::array<Eigen::Vector2f, 1> penis2 = {Eigen::Vector2f(0.08, 0.06)};
     // std::array<Eigen::Vector2f, 1> penis2 = {Eigen::Vector2f(0.08, -0.06)};
-    operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, penis1));
+    //operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, penis1));
+
+    now_offset = std::chrono::microseconds(micros());
 }
 
 void pisarLoop()
 {
+    // Test Follow Trajectory
+    // if (current_sample_index < kTestDataHalf.size())
+    // { 
+    //     std::chrono::duration<float> now = std::chrono::microseconds(micros()) - now_offset;
 
-    if (first_time) 
-    {
-        PISAR_LOG_INFO("STARTING");
-        nowOffset = static_cast<float>(micros()) / 1000000.0f;
-        first_time = false;
-    }
+    //     const auto& data = kTestDataHalf[current_sample_index];
 
-    // Test data refresh
-    if (currentSampleIndex < kTestData.size())
+    //     if(now > data.timestamp * 5)
+    //     {
+    //         // Debug ELEPHANT
+    //         // PISAR_LOG_INFO("Index: %zu, Timestamp: %f, Now: %f", current_sample_index, data.timestamp.count(), now.count());
+    //         operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, data.trajectory));
+    //         current_sample_index++;
+    //     }
+    // }
+
+    if (current_sample_index < kTestDataFake.size())
     { 
-        auto now = (static_cast<float>(micros()) / 1000000.0f) - nowOffset;
+        std::chrono::duration<float> now = std::chrono::microseconds(micros()) - now_offset;
 
-        const auto& data = kTestData[currentSampleIndex];
+        const auto& data = kTestDataFake[current_sample_index];
 
-        if(now > data.timestamp)
+        if(now > data.timestamp/10.0f)
         {
             // Debug ELEPHANT
-            // PISAR_LOG_INFO("Timestamp: %f, Now: %f", data.timestamp, now);
-            operating_mode_manager.switchMode(OperatingModeFollowTrajectory(facility, data.trajectory));
-            currentSampleIndex++;
+            // PISAR_LOG_INFO("Index: %zu, Timestamp: %f, Now: %f", current_sample_index, data.timestamp.count(), now.count());
+            operating_mode_manager.switchMode(OperatingModeGoToTarget(facility, data.trajectory[0]));
+            current_sample_index++;
         }
     }
+
+    // Test Go To Trajectory
 
     // auto now = std::chrono::milliseconds(millis());
     // if (now - last_reset_time > kTrackerResetTime)

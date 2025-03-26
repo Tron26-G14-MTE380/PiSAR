@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pisar/driveunit/facility.h"
+#include "pisar/driveunit/pid.h"
 
 #include <variant>
 #include <span>
@@ -76,12 +77,8 @@ public:
 class OperatingModeFollowTrajectory : public OperatingMode<OperatingModeFollowTrajectory>
 {
 private:
-    std::reference_wrapper<RobotFacility> m_facility;
-    std::vector<Eigen::Vector2f> m_trajectory;
-
     static constexpr float kThetaTolerance = 5.0f;
     static constexpr float kDistTolerance = 0.0000001f;
-    static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(1);
     static constexpr float kDotProductTolerance = 120.0f;
 
     static constexpr float kPidkpRotation = 0.000005f;
@@ -89,22 +86,18 @@ private:
     static constexpr float kPidkdRotation = 0.0001f;
 
     static constexpr float kPidkpTravel = 0.01f;
+    static constexpr float kPidkiTravel = 0.0f;
+    static constexpr float kPidkdTravel = 0.0f;
 
-    float m_adj_kp_rotation;
-    float m_adj_ki_rotation;
-    float m_adj_kd_rotation;
+    std::reference_wrapper<RobotFacility> m_facility;
+    std::vector<Eigen::Vector2f> m_trajectory;
 
-    float m_adj_kp_travel;
+    PidController m_pid_rotation;
+    PidController m_pid_travel;
 
     int m_target_index;
-    float m_distance_to_target;
-    float m_target_heading;
-    int m_trajectry_points;
 
-    float m_integral_angle;
-    float m_last_angle_error;
     std::chrono::milliseconds m_last_update_time;
-    std::optional<std::chrono::milliseconds> m_on_target_timestamp;
 
     [[nodiscard]] inline const Eigen::Vector2f& getCurrentTarget() const
     {
@@ -119,36 +112,40 @@ public:
     void onEnterImpl();
     [[nodiscard]] bool updateImpl();
     void onExitImpl();
+
+    [[nodiscard]] inline std::chrono::duration<float> updateDeltaTime() 
+    {
+        const auto current_time = std::chrono::milliseconds(millis());
+        std::chrono::duration<float> elapsed = current_time - m_last_update_time;
+        m_last_update_time = current_time;
+        return elapsed;
+    }
 };
 
 class OperatingModeGoToTarget : public OperatingMode<OperatingModeGoToTarget>
 {
 private:
-    std::reference_wrapper<RobotFacility> m_facility;
-    Eigen::Vector2f m_target;
 
-    static constexpr float kThetaTolerance = 5.0f;
-    static constexpr float kDistTolerance = 0.0000001f;
-    static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(1);
-    static constexpr float kDotProductTolerance = 120.0f;
+    static constexpr float kThetaTolerance = 3.0f;
+    static constexpr float kDistTolerance = 0.0005f;
+    static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(10);
 
     static constexpr float kPidkpRotation = 0.000005f;
     static constexpr float kPidkiRotation = 0.0f;
     static constexpr float kPidkdRotation = 0.0001f;
 
     static constexpr float kPidkpTravel = 0.01f;
+    static constexpr float kPidkiTravel = 0.0f;
+    static constexpr float kPidkdTravel = 0.0f;
 
-    float m_adj_kp_rotation;
-    float m_adj_ki_rotation;
-    float m_adj_kd_rotation;
+    std::reference_wrapper<RobotFacility> m_facility;
+    Eigen::Vector2f m_target;
 
-    float m_adj_kp_travel;
+    PidController m_pid_rotation;
+    PidController m_pid_travel;
 
     float m_distance_to_target;
-    float m_target_heading;
 
-    float m_integral_angle;
-    float m_last_angle_error;
     std::chrono::milliseconds m_last_update_time;
     std::optional<std::chrono::milliseconds> m_on_target_timestamp;
 
@@ -160,6 +157,14 @@ public:
     void onEnterImpl();
     [[nodiscard]] bool updateImpl();
     void onExitImpl();
+
+    [[nodiscard]] inline std::chrono::duration<float> updateDeltaTime() 
+    {
+        const auto current_time = std::chrono::milliseconds(millis());
+        std::chrono::duration<float> elapsed = current_time - m_last_update_time;
+        m_last_update_time = current_time;
+        return elapsed;
+    }
 };
 
 class OperatingModeRotate: public OperatingMode<OperatingModeRotate>
@@ -189,6 +194,14 @@ public:
     void onEnterImpl();
     [[nodiscard]] bool updateImpl();
     void onExitImpl();
+
+    [[nodiscard]] inline std::chrono::duration<float> updateDeltaTime() 
+    {
+        const auto current_time = std::chrono::milliseconds(millis());
+        std::chrono::duration<float> elapsed = current_time - m_last_update_time;
+        m_last_update_time = current_time;
+        return elapsed;
+    }    
 };
 
 }

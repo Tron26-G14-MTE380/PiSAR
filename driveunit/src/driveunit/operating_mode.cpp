@@ -15,133 +15,147 @@ template <typename T>
 OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& facility, const std::span<const Eigen::Vector2f> trajectory) :
     m_facility(facility),
     m_trajectory(trajectory.begin(), trajectory.end()),
-    m_trajectry_points(trajectory.size()),
-    m_adj_kp_rotation(0.0f),
-    m_adj_ki_rotation(0.0f),
-    m_adj_kd_rotation(0.0f),
-    m_adj_kp_travel(0.0f),
+    m_pid_rotation(kPidkpRotation, kPidkiRotation, kPidkdRotation, -1.0f, 1.0f),
+    m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 1.0f),
     m_target_index(0),
-    m_distance_to_target(0.0f),
-    m_target_heading(0.0f),
-    m_integral_angle(0.0f),
-    m_last_angle_error(0.0f),
-    m_last_update_time{0},
-    m_on_target_timestamp(std::nullopt)
+    m_last_update_time{0}
     {}
 
 void OperatingModeFollowTrajectory::onEnterImpl()
 {
-    m_facility.get().getDriveController().stop();
-
     const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
-    m_adj_kp_rotation = kPidkpRotation * pid_adj_scale;
-    m_adj_ki_rotation = kPidkiRotation * pid_adj_scale;
-    m_adj_kd_rotation = kPidkdRotation * pid_adj_scale;
-    m_adj_kp_travel = kPidkpTravel * pid_adj_scale;
+    m_pid_rotation.setGains(kPidkpRotation * pid_adj_scale, kPidkiRotation * pid_adj_scale, kPidkdRotation * pid_adj_scale);
+    m_pid_travel.setGains(kPidkpTravel * pid_adj_scale, kPidkiTravel * pid_adj_scale, kPidkdTravel * pid_adj_scale);
 
     // Set target
     m_target_index = 0;
-    m_distance_to_target = getCurrentTarget().norm();
-    m_target_heading = toDegrees(std::atan2(getCurrentTarget().y(), getCurrentTarget().x())); // might have to adjust due to imu axis directions
 
-    m_integral_angle = 0.0f;
-    m_last_angle_error = m_target_heading;
-    m_on_target_timestamp = std::nullopt;
     // ELEPHANT do a lot of bs with ash about distance travelled after image vs actual travel attempt
     m_facility.get().getKinematicTracker().reset(false);
+}
 
+static float angleFromTrajectory(const Eigen::Vector2f& trajectory_vector, const Eigen::Vector2f target_vector)
+{
+    const float target_vector_norm = target_vector.norm();
+    const float trajectory_vector_norm = trajectory_vector.norm();
+
+    const bool target_at_ref = target_vector_norm < 1e-6;
+    const bool trajectory_empty = trajectory_vector_norm < 1e-6;
+
+    if (trajectory_empty)
+    {
+        PISAR_LOG_ERROR("Trajectory vector is 0, wtf");
+        return 0;
+    }
+
+    // Robot is on trajectory start
+    if (target_at_ref)
+    {
+        return 0;
+    }
+
+    return toDegrees(std::acos(target_vector.dot(trajectory_vector)/(target_vector_norm * trajectory_vector_norm)));
 }
 
 [[nodiscard]] bool OperatingModeFollowTrajectory::updateImpl()
 {
+    if (m_trajectory.size() == 1)
+    {
+        PISAR_LOG_INFO("Trajectory size is 1, use OperatingModeGoToTarget, stopping");
+        m_facility.get().getDriveController().hardStop();
+        return true;
+    }
+
     auto current_pose = m_facility.get().getKinematicTracker().getPose();
-    auto target_position = getCurrentTarget();
-    // conditional loop of passed point logic goes here
-    auto current_position = current_pose.position;
-    auto current_heading = current_pose.orientation;
 
-    float angle = toDegrees(std::acos(current_position.dot(target_position)/(current_position.norm() * target_position.norm())));
+    const auto current_position = current_pose.position;
+    const auto current_heading = current_pose.orientation;
 
-    Eigen::Vector2f error_vec = target_position - current_position;
-    float angle_error = m_target_heading - current_heading;
+    //PISAR_LOG_INFO("Current position: (%f, %f)", current_position.x(), current_position.y());
+
+    // Check if we passed the current target iteratively
+    while (true)
+    {
+        Eigen::Vector2f trajectory_vector;
+        if (m_target_index == m_trajectory.size() - 1)
+        {
+            trajectory_vector = m_trajectory[m_target_index] - m_trajectory[m_target_index-1];
+        }
+        else
+        {
+            trajectory_vector = m_trajectory[m_target_index+1] - m_trajectory[m_target_index];
+        }
+
+        const auto delta_pos = current_position - m_trajectory[m_target_index];
+
+        // PISAR_LOG_INFO("Trajectory vector: (%f, %f)", trajectory_vector.x(), trajectory_vector.y());
+        // PISAR_LOG_INFO("Delta pos: (%f, %f)", delta_pos.x(), delta_pos.y());
+
+        const float angle_from_trajectory = angleFromTrajectory(trajectory_vector, delta_pos);
+
+        //PISAR_LOG_INFO("angle_from_trajectory: %f", angle_from_trajectory);
+
+        if (angle_from_trajectory < kDotProductTolerance)
+        {
+            if(m_target_index == m_trajectory.size() - 1)
+            {
+                PISAR_LOG_INFO("Reached end of trajectory");
+                m_facility.get().getDriveController().hardStop();
+                return true;
+            }
+
+            m_target_index ++;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    const auto target_position = getCurrentTarget();
+
+    const Eigen::Vector2f error_vec = target_position - current_position;
+    const float distance_error = error_vec.norm();
+
+    const float target_heading = toDegrees(std::atan2(error_vec.y(), error_vec.x()));
+    float angle_error = target_heading - current_heading;
 
     // Normalize angle error to [-180, 180]
     while (angle_error > 180.0f) angle_error -= 360.0f;
     while (angle_error < -180.0f) angle_error += 360.0f;
 
-    float distance_error = error_vec.norm();
-    auto current_time = std::chrono::milliseconds(millis());
-    std::chrono::duration<float> elapsed = current_time - m_last_update_time;
-    float dt = elapsed.count();
-
-    // Angle testing ELEPHANT
-    // Note that this always evaluates to inf if the current position is 0, 0
-    PISAR_LOG_INFO("Angle: %f", angle);
-
     // Test Data Updating ELEPHANT
-    // PISAR_LOG_INFO("First Trajectory Point: %f, %f", target_position.x(), target_position.y());
+    // PISAR_LOG_INFO("Trajectory Point: %f, %f", target_position.x(), target_position.y());
 
-    if(angle > kDotProductTolerance)
-    {
-        // Compute PID terms
-        m_integral_angle += angle_error * dt;
-        float derivative_angle = (angle_error - m_last_angle_error) / dt;
+    // PID update
+    const auto delta_time = updateDeltaTime();
+    const float angular_output = m_pid_rotation.update(angle_error, delta_time);
+    const float forward_output = m_pid_travel.update(distance_error, delta_time);
 
-        // Sharing Kp for now, this could change to be individual and most likely will
-        // PID outputs
-        float angular_output = (m_adj_kp_rotation * angle_error) + (m_adj_kd_rotation * derivative_angle) + (m_adj_ki_rotation * m_integral_angle);
+    // Arc forward blend
+    const float left_speed_raw = abs(forward_output - angular_output);
+    const float right_speed_raw = abs(forward_output + angular_output);
 
-        // Forward speed (only proportional for now)
-        float forward_output = m_adj_kp_travel * distance_error;
+    // PISAR_LOG_INFO("Angle Error: %f", angle_error);
+    // PISAR_LOG_INFO("Left Speed Original Raw: %f, Right Speed Original Raw: %f", left_speed_raw, right_speed_raw);
 
-        // Clamp speeds
-        angular_output = std::clamp(angular_output, -1.0f, 1.0f);
-        forward_output = std::clamp(forward_output, 0.0f, 1.0f); // no reversing, technically angle check solves this
+    // Find the max speed, scale both down to keep ratio
+    // Clamp again after scaling
+    const float max_speed = std::max(left_speed_raw, right_speed_raw);
 
-        // Arc forward blend
-        float left_speed_raw = abs(forward_output - angular_output);
-        float right_speed_raw = abs(forward_output + angular_output);
+    float left_speed = std::clamp(left_speed_raw / max_speed, 0.0f, 1.0f);
+    float right_speed = std::clamp(right_speed_raw / max_speed, 0.0f, 1.0f);
 
-        // PISAR_LOG_INFO("Angle Error: %f", angle_error);
-        // PISAR_LOG_INFO("Left Speed Original Raw: %f, Right Speed Original Raw: %f", left_speed_raw, right_speed_raw);
+    //PISAR_LOG_INFO("Left Speed: %f, Right Speed: %f", left_speed, right_speed);
 
-        // Find the max speed, scale both down to keep ratio
-        float max_speed = std::max(left_speed_raw, right_speed_raw);
-        left_speed_raw /= max_speed;
-        right_speed_raw /= max_speed;
+    // DRIVEEEEE!!! :D
+    m_facility.get().getDriveController().tankDrive(left_speed, right_speed);
 
-        PISAR_LOG_INFO("Left Speed Raw: %f, Right Speed Raw: %f", left_speed_raw, right_speed_raw);
-
-        // Clamp again after scaling
-        float left_speed = std::clamp(left_speed_raw, 0.0f, 1.0f);
-        float right_speed = std::clamp(right_speed_raw, 0.0f, 1.0f);
-
-        // PISAR_LOG_INFO("Left Speed: %f, Right Speed: %f", left_speed, right_speed);
-
-        m_facility.get().getDriveController().tankDrive(left_speed, right_speed);
-
-    }
-    else
-    {
-        if(m_trajectry_points - 1 != m_target_index)
-        {
-            m_target_index += 1;
-        }
-        else
-        {
-            m_facility.get().getDriveController().hardStop();
-            return true;
-        }
-    }
-
-    m_last_angle_error = angle_error;
-    m_last_update_time = current_time;
     return false;
 }
 
 void OperatingModeFollowTrajectory::onExitImpl()
 {
-    m_facility.get().getDriveController().hardStop();
 }
 
 ///////////////////////////////////////////// OperatingModeGoToTarget ////////////////////////////////////////////
@@ -149,35 +163,12 @@ void OperatingModeFollowTrajectory::onExitImpl()
 OperatingModeGoToTarget::OperatingModeGoToTarget(RobotFacility& facility, const Eigen::Vector2f target) :
     m_facility(facility),
     m_target(target),
-    m_adj_kp_rotation(0.0f),
-    m_adj_ki_rotation(0.0f),
-    m_adj_kd_rotation(0.0f),
-    m_adj_kp_travel(0.0f),
-    m_distance_to_target(0.0f),
-    m_target_heading(0.0f),
-    m_integral_angle(0.0f),
-    m_last_angle_error(0.0f),
-    m_last_update_time{0},
-    m_on_target_timestamp(std::nullopt)
-    {}
-
-void OperatingModeGoToTarget::onEnterImpl()
+    m_pid_rotation(kPidkpRotation, kPidkiRotation, kPidkdRotation, -1.0f, 1.0f),
+    m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 1.0f),
 {
-    m_facility.get().getDriveController().stop();
-
     const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
-    m_adj_kp_rotation = kPidkpRotation * pid_adj_scale;
-    m_adj_ki_rotation = kPidkiRotation * pid_adj_scale;
-    m_adj_kd_rotation = kPidkdRotation * pid_adj_scale;
-    m_adj_kp_travel = kPidkpTravel * pid_adj_scale;
+    m_pid_travel.setGains(kPidkpTravel * pid_adj_scale, kPidkiTravel * pid_adj_scale, kPidkdTravel * pid_adj_scale);
 
-    // Set target
-    m_distance_to_target = m_target.norm();
-    m_target_heading = toDegrees(std::atan2(m_target.y(), m_target.x())); // might have to adjust due to imu axis directions
-
-    m_integral_angle = 0.0f;
-    m_last_angle_error = m_target_heading;
-    m_on_target_timestamp = std::nullopt;
     // ELEPHANT do a lot of bs with ash about distance travelled after image vs actual travel attempt
     m_facility.get().getKinematicTracker().reset(false);
 
@@ -189,13 +180,6 @@ void OperatingModeGoToTarget::onEnterImpl()
     auto current_position = current_pose.position;
     auto current_heading = current_pose.orientation;
 
-    // Note that this always evaluates to inf if the current position is 0,0
-    float angle = toDegrees(std::acos(current_position.dot(m_target)/(current_position.norm() * m_target.norm())));
-
-    // Angle testing ELEPHANT
-
-    // PISAR_LOG_INFO("Angle: %f, Current: %.20f, Target: %f", angle, current_position.norm(), target_position.norm());
-
     // Test Data Updating ELEPHANT
     // PISAR_LOG_INFO("First Trajectory Point: %f, %f", target_position.x(), target_position.y());
 
@@ -204,50 +188,42 @@ void OperatingModeGoToTarget::onEnterImpl()
 
     // PISAR_LOG_INFO("Distance Error: %f", distance_error);
 
-    float angle_error = m_target_heading - current_heading;
+    // ELEPHANT this is lowkey butchered with IMU coonfig rn
+    float target_angle = toDegrees(std::atan2(error_vec.y(), error_vec.x()));
+    float angle_error = target_angle - current_heading;
+
+    // Angle testing ELEPHANT
+
+    // PISAR_LOG_INFO("Angle: %f", angle_error);
 
     // Normalize angle error to [-180, 180]
     while (angle_error > 180.0f) angle_error -= 360.0f;
     while (angle_error < -180.0f) angle_error += 360.0f;
 
     auto current_time = std::chrono::milliseconds(millis());
+
     std::chrono::duration<float> elapsed = current_time - m_last_update_time;
     float dt = elapsed.count();
+
+    // PISAR_LOG_INFO("Time Delta: %f", dt);
 
     if (std::abs(angle_error) > kThetaTolerance || std::abs(distance_error) > kDistTolerance)
     {
         m_on_target_timestamp = std::nullopt;
 
         // Compute PID terms
-        m_integral_angle += angle_error * dt;
-        float derivative_angle = (angle_error - m_last_angle_error) / dt;
-
-        // Sharing Kp for now, this could change to be individual and most likely will
-        // PID outputs
-        float angular_output = (m_adj_kp_rotation * angle_error) + (m_adj_kd_rotation * derivative_angle) + (m_adj_ki_rotation * m_integral_angle);
-
-        // Forward speed (only proportional for now)
-        float forward_output = m_adj_kp_travel * distance_error;
-
-        // Clamp speeds
-        angular_output = std::clamp(angular_output, -1.0f, 1.0f);
-        forward_output = std::clamp(forward_output, 0.0f, 1.0f); // no reversing, technically angle check solves this
+        const auto delta_time = updateDeltaTime();
+        const float angular_output = m_pid_rotation.update(angle_error, delta_time);
+        const float forward_output = m_pid_travel.update(distance_error, delta_time);
 
         // Arc forward blend
-        float left_speed_raw = abs(forward_output - angular_output);
-        float right_speed_raw = abs(forward_output + angular_output);
+        const float left_speed_raw = abs(forward_output - angular_output);
+        const float right_speed_raw = abs(forward_output + angular_output);
 
-        // PISAR_LOG_INFO("Angle Error: %f", angle_error);
-        // PISAR_LOG_INFO("Left Speed Original Raw: %f, Right Speed Original Raw: %f", left_speed_raw, right_speed_raw);
+        const float max_speed = std::max(left_speed_raw, right_speed_raw);
 
-        // Find the max speed, scale both down to keep ratio
-        float max_speed = std::max(left_speed_raw, right_speed_raw);
-        left_speed_raw /= max_speed;
-        right_speed_raw /= max_speed;
-
-        //PISAR_LOG_INFO("Left Speed Raw: %f, Right Speed Raw: %f", left_speed_raw, right_speed_raw);
-
-        // PISAR_LOG_INFO("Left Speed: %f, Right Speed: %f", left_speed, right_speed);
+        float left_speed = std::clamp(left_speed_raw / max_speed, 0.0f, 1.0f);
+        float right_speed = std::clamp(right_speed_raw / max_speed, 0.0f, 1.0f);
 
         m_facility.get().getDriveController().tankDrive(left_speed_raw, right_speed_raw);
     }
@@ -265,8 +241,6 @@ void OperatingModeGoToTarget::onEnterImpl()
         }
     }
 
-    m_last_angle_error = angle_error;
-    m_last_update_time = current_time;
     return false;
 }
 
