@@ -66,6 +66,12 @@ static const auto gkRpiCamV2Mode6CaptureConfig = CameraCaptureConfig(
 
 static const auto gkCamCaptureConfig = gkRpiCamV2Mode4CaptureConfig;
 
+// Bullseye/Target detection
+static const std::pair<cv::Scalar, cv::Scalar> gkBullseyeWhiteHsvMask =
+    std::make_pair(cv::Scalar(0, 0, 220), cv::Scalar(180, 40, 255));
+
+static const std::pair<cv::Scalar, cv::Scalar> gkBullseyeWhiteYuvMask =
+    std::make_pair(cv::Scalar(200, 0, 0), cv::Scalar(255, 255, 255));
 
 // Interfacing settings
 static const size_t gkMaxTrajectoryPoints = 10;

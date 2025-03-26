@@ -65,6 +65,8 @@ int main()
         VideoFileCameraSource video_source(gkCamCaptureConfig, "../../sample_images/track_video.mp4");
     #endif
 
+    const auto sized_projection = projection.forCapture(video_source.captureConfig());
+
     //HsvColorExtractor color_extractor(gkRedTapeHsvThresholds)
     YuvColorExtractor color_extractor(gkRedTapeYuvThresholds);
     using ColorExtractorT = decltype(color_extractor);
@@ -72,7 +74,7 @@ int main()
     auto line_tracker = LineTracker<CapturedFrame::TimestampT, ColorExtractorT, kDebug>(
         gkCamCaptureConfig.downscaledSize(),
         color_extractor,
-        projection.forCapture(video_source.captureConfig()),
+        sized_projection,
         filter
     );
 

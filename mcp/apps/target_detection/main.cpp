@@ -1,7 +1,7 @@
 #include "pisar/mcp/config.h"
 #include "pisar/mcp/vision/camera_source.h"
-#include "pisar/mcp/vision/line_tracker.h"
-#include "pisar/mcp/driveunit/controller.h"
+#include "pisar/mcp/vision/target_tracker.h"
+#include "pisar/mcp/vision/target_detector.h"
 
 #include <easy/profiler.h>
 
@@ -27,40 +27,32 @@ int main()
         EASY_PROFILER_ENABLE;
     }
 
-    HomographyProjection projection = HomographyProjection(
+    const HomographyProjection projection = HomographyProjection(
         gkCameraTransform,
         gkCameraAxisMapping,
         gkCameraCalibration
     );
 
-    TrajectoryFilter<double, CapturedFrame::TimestampT> filter;
-
-
     #if __linux__
         LibcameraCameraSource video_source(gkCamCaptureConfig, "/base/axi/pcie@120000/rp1/i2c@80000/imx219@10");
     #else
         //CvCameraSource video_source(gkCamCaptureConfig, 0);
-        //RepeatedImageFileCameraSource video_source(gkCamCaptureConfig, "../../sample_images/red_tape2.jpg");
-        VideoFileCameraSource video_source(gkCamCaptureConfig, "../../sample_images/track_video.mp4");
+        RepeatedImageFileCameraSource video_source(gkCamCaptureConfig, "../../sample_images/lego_on_bullseye.jpg");
+        //VideoFileCameraSource video_source(gkCamCaptureConfig, "../../sample_images/track_video.mp4");
     #endif
 
     const auto sized_projection = projection.forCapture(video_source.captureConfig());
 
-    video_source.start();
-
-    //HsvColorExtractor color_extractor(gkRedTapeHsvThresholds)
-    YuvColorExtractor color_extractor(gkRedTapeYuvThresholds);
+    //HsvColorExtractor color_extractor(gkBullseyeWhiteHsvMask)
+    const YuvColorExtractor color_extractor(std::span(&gkBullseyeWhiteYuvMask, 1));
     using ColorExtractorT = decltype(color_extractor);
 
-    auto line_tracker = LineTracker<CapturedFrame::TimestampT, ColorExtractorT, kDebug>(
-        gkCamCaptureConfig.downscaledSize(),
+    auto target_tracker = TargetTracker<CapturedFrame::TimestampT, ColorExtractorT, kDebug>(
         color_extractor,
         sized_projection
-        filter
     );
 
-    std::cout << gkCameraCalibration.get_transformation(gkCamCaptureConfig) << std::endl;
-
+    video_source.start();
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
 
     std::optional<CapturedFrame> captured_frame;
@@ -68,31 +60,32 @@ int main()
     {
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
 
-        const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(captured_frame.value().frame, captured_frame.value().timestamp);
+        const std::optional<Eigen::Vector2d> target_pos = target_tracker.track(captured_frame.value().frame, captured_frame.value().timestamp);
+
+        if (target_pos)
+        {
+            std::cout << "World point at " << target_pos.value() << std::endl;
+        }
+        else
+        {
+            std::cout << "No target detected!" << std::endl;
+        }
 
         const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - loop_start).count(); // Convert to milliseconds
         const double fps = 1000000.0 / elapsed;
-        std::cout << "extractTrajectory FPS: " << fps << std::endl;
+        std::cout << "targetTrack FPS: " << fps << std::endl;
 
         if constexpr (kDebug)
         {
-            auto debug_data = line_tracker.debugData();
-            std::vector<std::pair<std::string, RoiMat>> debug_image_map = {
-                std::make_pair("1. Original", RoiMat(captured_frame.value().frame)),
-                std::make_pair("2. Preprocessed", debug_data.preprocessed),
-                std::make_pair("3. Color Extracted", debug_data.extractedColor),
-                std::make_pair("4. Skeleton", debug_data.skeleton),
-                std::make_pair("5. Filtered Skeleton", debug_data.filtered_skeleton),
-                std::make_pair("6. Trajectory", debug_data.trajectory),
-                std::make_pair("7. Simplified Trajectory", debug_data.simplified_trajectory),
-                std::make_pair("8. Ordered Trajectory", debug_data.ordered_trajectory),
-                std::make_pair("9. Projected Trajectory", debug_data.projected_trajectory),
-                std::make_pair("10. Filtered Trajectory", debug_data.filtered_trajectory),
-                std::make_pair("11. Simplified Trajectory", debug_data.simplified_filtered_trajectory)
+            auto debug_data = target_tracker.debugData();
+            std::vector<std::pair<std::string, cv::Mat>> debug_image_map = {
+                std::make_pair("1. Original", captured_frame.value().frame),
+                std::make_pair("2. Color Extracted", debug_data.color_extracted),
+                std::make_pair("3. Target Point", debug_data.target_point),
+                std::make_pair("4. Projected Point", debug_data.projected_point)
             };
 
-
-            displayDebug(createDebugCanvas(debug_image_map, 320));
+            displayDebug(createDebugCanvas(debug_image_map, 410));
         }
 
         if constexpr (kProfile)

@@ -98,15 +98,7 @@ static inline cv::Mat transformImageToCameraConfig(const cv::Mat& input, const C
 {
     // Crop input to match aspect ratio of binned resolution
     // Resize to binned resolution.
-
-    const double binned_aspect = static_cast<double>(capture_config.binnedSize().width) / capture_config.binnedSize().height;
-    const double input_aspect = static_cast<double>(input.cols) / input.rows;
-
-    cv::Mat binned_image = input;
-    if (std::abs(binned_aspect - input_aspect) > 1e-3)
-    {
-        binned_image = resizeCropMaintainRatio(input, capture_config.binnedSize());
-    }
+    cv::Mat binned_image = resizeCropMaintainRatio(input, capture_config.binnedSize());
 
     // Crop the configured capture region (e.g., center or offset)
     cv::Mat captured_image = binned_image(capture_config.captureCrop());
