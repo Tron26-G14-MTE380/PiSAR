@@ -36,4 +36,8 @@ cv::Mat createDebugCanvas(
 
 void displayDebug(const cv::Mat debug_canvas);
 
+bool windowClosed(const std::string_view window_name);
+bool windowClosedOrEsc(const std::string_view window_name, const int key);
+void terminateOnWindowCloseOrEsc(const std::string_view window_name, const int key);
+
 }

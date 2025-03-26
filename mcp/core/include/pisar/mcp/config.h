@@ -20,7 +20,7 @@ static const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> gkRedTapeYuvThresh
 
 static const CameraTransform gkCameraTransform = {
     .position = {0, 9.5, 12},
-    .tilt = Eigen::AngleAxisd(pisar::mcp::deg_to_rad<double>(-48), Eigen::Vector3d::UnitX())
+    .tilt = Eigen::AngleAxisd(pisar::mcp::degToRad<double>(-48), Eigen::Vector3d::UnitX())
 };
 
 static const auto gkCameraAxisMapping = Eigen::Matrix3d{
@@ -46,4 +46,7 @@ static const CameraCalibrationData gkCameraCalibration = {
 static const cv::Size gkFullFrameSize = {3280, 2464};
 static const cv::Size gkCaptureFrameSize = {1280, 720};
 static const cv::Size gkFrameSize = {320, 180};
+
+// Interfacing settings
+static const size_t gkMaxTrajectoryPoints = 10;
 }

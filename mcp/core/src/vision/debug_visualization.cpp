@@ -274,15 +274,36 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, RoiMat>>& deb
 
 void displayDebug(const cv::Mat debug_canvas)
 {
-    // Show the composite debug display
-    cv::imshow("Debug Data", debug_canvas);
-    const int key = cv::waitKey(1);  // Small delay to allow window to refresh
+    constexpr std::string_view debug_window_name = "Debug Data";
 
+    // Show the composite debug display
+    cv::imshow(debug_window_name.data(), debug_canvas);
+    const int key = cv::waitKey(1);  // Small delay to allow window to refresh
+    terminateOnWindowCloseOrEsc(debug_window_name, key);
+}
+
+bool windowClosed(const std::string_view window_name)
+{
 #ifdef _WIN32
-    if (key == 27 || cv::getWindowProperty("Debug Data", cv::WND_PROP_VISIBLE) <= 0)  // ESC key or window closed
+    return cv::getWindowProperty(window_name.data(), cv::WND_PROP_VISIBLE) <= 0;  // ESC key or window closed
 #else
-    if (key == 27 || cv::getWindowProperty("Debug Data", cv::WND_PROP_AUTOSIZE) < 0)  // ESC key or window closed
+    return cv::getWindowProperty(window_name.data(), cv::WND_PROP_AUTOSIZE) < 0;  // ESC key or window closed
 #endif
+}
+
+bool windowClosedOrEsc(const std::string_view window_name, const int key)
+{
+    if (key == 27 || windowClosed(window_name))  // ESC key or window closed
+    {
+        return true;
+    }
+
+    return false;
+}
+
+void terminateOnWindowCloseOrEsc(const std::string_view window_name, const int key)
+{
+    if (windowClosedOrEsc(window_name, key))
     {
         std::cout << "Debug window closed. Exiting program." << std::endl;
         cv::destroyAllWindows();

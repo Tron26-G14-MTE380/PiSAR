@@ -10,11 +10,23 @@
 		},
 		{
 			"name": "mcp-line-tracking-demo",
-			"path": "../mcp/samples/line_tracking"
+			"path": "../mcp/apps/line_tracking"
 		},
 		{
-			"name": "mcp-interface-codec-demo",
-			"path": "../mcp/samples/interface_codec"
+			"name": "mcp-homography-validation-test",
+			"path": "../mcp/apps/homography_validation"
+		},
+		{
+			"name": "mcp-line-following-demo",
+			"path": "../mcp/apps/line_following"
+		},
+		{
+			"name": "mcp-interface-codec-test",
+			"path": "../mcp/apps/interface_codec"
+		},
+		{
+			"name": "mcp-driveunit-interfacing-demo",
+			"path": "../mcp/apps/driveunit_interfacing"
 		},
 		{
 			"name": "driveunit",
@@ -144,9 +156,5 @@
 		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
 		"editor.tabSize": 4,
 		"editor.detectIndentation": true
-	},
-	"tasks": {
-		"version": "2.0.0",
-		"tasks": []
 	}
 }

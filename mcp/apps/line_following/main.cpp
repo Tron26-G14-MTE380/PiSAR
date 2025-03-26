@@ -1,13 +1,7 @@
-
 #include "pisar/mcp/config.h"
 #include "pisar/mcp/vision/video_source.h"
 #include "pisar/mcp/vision/line_tracker.h"
-#include "pisar/mcp/vision/homography.h"
-#include "pisar/mcp/vision/roi_mat.h"
-#include "pisar/mcp/vision/debug_visualization.h"
-#include "pisar/mcp/vision/trajectory_filter.h"
-
-#include <easy/profiler.h>
+#include "pisar/mcp/driveunit/controller.h"
 
 #include <numbers>
 #include <iostream>
@@ -16,21 +10,45 @@
 #include <span>
 #include <chrono>
 
+
 using namespace pisar::mcp;
 
 constexpr bool kDebug = true;
-constexpr bool kProfile = false;
-constexpr uint64_t kProfileTimeMs = 10000;
 constexpr double kFrameRateLimit = 10.0;
 constexpr auto kFrameDurationLimit = std::chrono::duration<double>(1.0 / kFrameRateLimit);
 
-int main()
+std::vector<Eigen::Vector2f> convertVector(const std::vector<Eigen::Vector2d>& input)
 {
-    if constexpr(kProfile)
+    std::vector<Eigen::Vector2f> output;
+    output.reserve(input.size()); // Reserve memory to avoid reallocation
+
+    std::transform(input.begin(), input.end(), std::back_inserter(output),
+                   [](const Eigen::Vector2d& v) { return v.cast<float>(); });
+
+    return output;
+}
+
+void runRobot(DriveunitController& driveunit_controller, std::vector<Eigen::Vector2d> trajectory)
+{
+    if (trajectory.empty())
     {
-        EASY_PROFILER_ENABLE;
+        return;
     }
 
+    if (trajectory.size() > gkMaxTrajectoryPoints)
+    {
+        trajectory.resize(gkMaxTrajectoryPoints);
+    }
+
+    const auto du_response = driveunit_controller.sendTrajectoryCommand(std::chrono::duration<float>(0), convertVector(trajectory));
+    if (!du_response.has_value())
+    {
+        std::cerr << "Error sending trajectory: " << du_response.error().message() << std::endl;
+    }
+}
+
+int main()
+{
     HomographyProjection projection = HomographyProjection(
         gkCameraTransform,
         gkCameraAxisMapping,
@@ -39,20 +57,15 @@ int main()
 
     TrajectoryFilter<double, CapturedFrame::TimestampT> filter;
 
-
     #if __linux__
         LibcameraVideoSource video_source("/base/axi/pcie@120000/rp1/i2c@80000/imx219@10");
-        std::optional<cv::Rect> frame_crop = computeCenterCrop(gkFullFrameSize, gkCaptureFrameSize);
     #else
         //CvCameraVideoSource video_source(0);
         //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
         VideoFileSource video_source("../../sample_images/track_video.mp4");
-        std::optional<cv::Rect> frame_crop = std::nullopt;
     #endif
 
-    frame_crop = computeCenterCrop(gkFullFrameSize, gkCaptureFrameSize);
-
-    video_source.start(gkCaptureFrameSize);
+    std::optional<cv::Rect> frame_crop = computeCenterCrop(gkFullFrameSize, gkCaptureFrameSize);
 
     //HsvColorExtractor color_extractor(gkRedTapeHsvThresholds)
     YuvColorExtractor color_extractor(gkRedTapeYuvThresholds);
@@ -64,6 +77,12 @@ int main()
         projection.for_image(gkFrameSize, frame_crop),
         filter
     );
+
+    DriveunitTransport driveunit_transport;
+    DriveunitController driveunit_controller(driveunit_transport);
+
+    driveunit_transport.open();
+    video_source.start(gkCaptureFrameSize);
 
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
 
@@ -101,17 +120,7 @@ int main()
             displayDebug(createDebugCanvas(debug_image_map, 320));
         }
 
-        if constexpr (kProfile)
-        {
-            const auto end = std::chrono::high_resolution_clock::now(); // end time
-            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(); // Convert to milliseconds
-
-            if (elapsed > kProfileTimeMs)
-            {
-                profiler::dumpBlocksToFile("profile.prof");
-                break;
-            }
-        }
+        runRobot(driveunit_controller, world_trajectory);
 
         auto loop_end = std::chrono::high_resolution_clock::now();
         auto loop_duration = std::chrono::duration_cast<std::chrono::duration<double>>(loop_end - loop_start);
@@ -123,5 +132,4 @@ int main()
     }
 
     video_source.stop();
-
 }

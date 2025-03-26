@@ -24,15 +24,15 @@ const auto kWorldPoints = std::to_array<Eigen::Vector2d>({
     {-9,30}, {-4,25}, {0,25}, {0,20}, {0,15}, {4,30}, {6,25}, {11,25}
 });
 
-const cv::Size kTestFrameSize = {3280, 2464};
+const cv::Size kTestFrameSize = gkFullFrameSize;
 const float kProjectionTolerance = 0.5f;
 
 const std::string_view kWindowName = "Projection Comparison";
 
 // Adjustable parameters (starting values)
-double camera_tilt_deg = -45;
-double camera_height_cm = 12;
-double camera_offset_cm = 9.4;
+double camera_tilt_deg = radToDeg<double>(gkCameraTransform.tilt.angle());
+double camera_height_cm = gkCameraTransform.position.z();
+double camera_offset_cm = gkCameraTransform.position.y();
 
 void visualizeProjectionComparison(
     const std::span<const Eigen::Vector2d>& expected_world_points,
@@ -98,7 +98,7 @@ void updateHomography()
     std::cout << "Projecting with tilt = " << camera_tilt_deg << " deg, height = " << camera_height_cm << " cm, offset = " << camera_offset_cm << " cm" << std::endl;
 
     // Adjust tilt angle
-    double camera_tilt_rad = pisar::mcp::deg_to_rad<double>(camera_tilt_deg);
+    double camera_tilt_rad = pisar::mcp::degToRad<double>(camera_tilt_deg);
 
     // Create updated camera transform
     CameraTransform updated_camera_transform {
@@ -144,7 +144,7 @@ int main()
     cv::createTrackbar("Tilt (deg)", kWindowName.data(), nullptr, 70, updateTiltAngle);
     cv::setTrackbarMin("Tilt (deg)", kWindowName.data(), 30);
     cv::setTrackbarMax("Tilt (deg)", kWindowName.data(), 70);
-    cv::setTrackbarPos("Tilt (deg)", kWindowName.data(), 45);
+    cv::setTrackbarPos("Tilt (deg)", kWindowName.data(), -camera_tilt_deg);
 
     cv::createTrackbar("Height (mm)", kWindowName.data(), nullptr, 130, updateCameraHeight);
     cv::setTrackbarMin("Height (mm)", kWindowName.data(), 110);
@@ -160,7 +160,14 @@ int main()
     updateHomography();
 
     // Keep updating until user closes the window
-    while (cv::waitKey(10) != 27); // Press 'Esc' to exit
+    while(1)
+    {
+        const int key = cv::waitKey(10);  // Small delay to allow window to refresh
+        if (windowClosedOrEsc(kWindowName, key))
+        {
+            break;
+        }
+    }
 
     return 0;
 }
