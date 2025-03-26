@@ -61,23 +61,20 @@ public:
         auto& target_detector = m_context.get().getTargetDetector();
         auto& driveunit_controller = m_context.get().getDriveunitController();
 
-        std::optional<cv::Mat> frame = video_source.getFrame();
-        if (!frame.has_value())
+        std::optional<CapturedFrame> captured_frame = video_source.getFrame();
+        if (!captured_frame.has_value())
         {
             return std::nullopt;
         }
 
-        const auto now = Clock::now();
-        const std::chrono::duration<float> frame_timestamp = now.time_since_epoch();
-
         // See if target is found
-        if (target_detector.scanFrame(frame.value()))
+        if (target_detector.scanFrame(captured_frame.value().frame))
         {
             return EventTargetFound{};
         }
 
         // Extract trajectory data.
-        const auto trajectory = line_tracker.extractTrajectory(*frame, frame_timestamp);
+        const auto trajectory = line_tracker.extractTrajectory(captured_frame.value().frame, captured_frame.value().timestamp);
 
         if (trajectory.empty())
         {
@@ -117,7 +114,7 @@ public:
     void enterImpl()
     {
         auto& video_source = m_context.get().getVideoSource();
-        auto& target_tracker = m_context.get().getLineTracker();
+        auto& target_tracker = m_context.get().getTargetTracker();
 
         if (!video_source.isRunning())
         {
