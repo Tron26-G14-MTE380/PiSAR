@@ -1,4 +1,4 @@
-#include "pisar/mcp/vision/video_source.h"
+#include "pisar/mcp/vision/camera_source.h"
 
 #ifdef __linux__
 #include <libcamera/stream.h>
@@ -15,12 +15,11 @@ namespace pisar::mcp {
 #ifdef __linux__
 
 /**
- * @brief Constructs a LibcameraVideoSource instance.
+ * @brief Constructs a LibcameraCameraSource instance.
  */
-LibcameraVideoSource::LibcameraVideoSource(std::string_view camera_id, float frame_rate, size_t frame_buffer_size)
+LibcameraCameraSource::LibcameraCameraSource(std::string_view camera_id, size_t frame_buffer_size)
     : m_capture_rect(0, 0, 0, 0),
       m_camera_manager(std::make_unique<libcamera::CameraManager>()),
-      m_frame_rate(frame_rate),
       m_frame_buffer_size(frame_buffer_size)
 {
     if (m_camera_manager->start())
@@ -60,7 +59,7 @@ LibcameraVideoSource::LibcameraVideoSource(std::string_view camera_id, float fra
 /**
  * @brief Destructs the video source and ensures cleanup.
  */
-LibcameraVideoSource::~LibcameraVideoSource()
+LibcameraCameraSource::~LibcameraCameraSource()
 {
     stopImpl();
     if (m_camera)
@@ -70,11 +69,7 @@ LibcameraVideoSource::~LibcameraVideoSource()
     m_camera_manager->stop();
 }
 
-/**
- * @brief Starts the video source with a specified resolution.
- * @param frame_size Frame size.
- */
-void LibcameraVideoSource::startImpl(const cv::Size frame_size)
+void LibcameraCameraSource::startImpl()
 {
     if (m_running.exchange(true))
     {
@@ -88,8 +83,8 @@ void LibcameraVideoSource::startImpl(const cv::Size frame_size)
     }
 
     auto& stream_config = m_config->at(0);
-    stream_config.size.width = frame_size.width;
-    stream_config.size.height = frame_size.height;
+    stream_config.size.width = m_capture_config.binnedSize().width;
+    stream_config.size.height = m_capture_config.binnedSize().height;
     stream_config.pixelFormat = libcamera::formats::YUV420;
 
     if (m_config->validate() == libcamera::CameraConfiguration::Invalid)
@@ -98,7 +93,7 @@ void LibcameraVideoSource::startImpl(const cv::Size frame_size)
     }
 
     cv::Size validated_size = {m_config->at(0).size.width, m_config->at(0).size.height};
-    if (validated_size != frame_size)
+    if (validated_size != m_capture_config.binnedSize())
     {
         throw std::runtime_error("Set size doesn't match validated size");
     }
@@ -135,9 +130,9 @@ void LibcameraVideoSource::startImpl(const cv::Size frame_size)
     }
 
     // Connect the requestCompleted signal to handle finished frames
-    m_camera->requestCompleted.connect(this, &LibcameraVideoSource::requestComplete);
+    m_camera->requestCompleted.connect(this, &LibcameraCameraSource::requestComplete);
 
-    const int64_t frame_period_us = 1'000'000 / m_frame_rate;
+    const int64_t frame_period_us = static_cast<int64_t>(1'000'000.0 / m_capture_config.framerate());
 
     libcamera::ControlList cam_controls;
     cam_controls.set(libcamera::controls::FrameDurationLimits, libcamera::Span<const std::int64_t, 2>({frame_period_us, frame_period_us}));
@@ -162,7 +157,7 @@ void LibcameraVideoSource::startImpl(const cv::Size frame_size)
  * @brief Handles completed requests asynchronously.
  * @param request The completed request.
  */
-void LibcameraVideoSource::requestComplete(libcamera::Request* request)
+void LibcameraCameraSource::requestComplete(libcamera::Request* request)
 {
     if (request->status() != libcamera::Request::RequestComplete)
     {
@@ -187,7 +182,7 @@ void LibcameraVideoSource::requestComplete(libcamera::Request* request)
  * @brief Processes a captured frame and converts it to OpenCV format.
  * @param buffer The frame buffer containing image data.
  */
-void LibcameraVideoSource::processFrame(libcamera::FrameBuffer* buffer)
+void LibcameraCameraSource::processFrame(libcamera::FrameBuffer* buffer)
 {
     const libcamera::FrameMetadata& metadata = buffer->metadata();
     if (metadata.status != libcamera::FrameMetadata::FrameSuccess)
@@ -288,7 +283,7 @@ void LibcameraVideoSource::processFrame(libcamera::FrameBuffer* buffer)
  * @brief Retrieves the most recent frame.
  * @return The latest frame as cv::Mat if available, otherwise std::nullopt.
  */
-[[nodiscard]] std::optional<CapturedFrame> LibcameraVideoSource::getFrameImpl()
+[[nodiscard]] std::optional<CapturedFrame> LibcameraCameraSource::getFrameImpl()
 {
     return m_frame_queue.pop();
 }
@@ -296,14 +291,14 @@ void LibcameraVideoSource::processFrame(libcamera::FrameBuffer* buffer)
 /**
  * @brief Stops the video source.
  */
-void LibcameraVideoSource::stopImpl()
+void LibcameraCameraSource::stopImpl()
 {
     if (!m_running.exchange(false))
     {
         return; // Already stopped
     }
 
-    m_camera->requestCompleted.disconnect(this, &LibcameraVideoSource::requestComplete);
+    m_camera->requestCompleted.disconnect(this, &LibcameraCameraSource::requestComplete);
     m_camera->stop();
     m_frame_buffer_allocator->free(m_config->at(0).stream());
     m_frame_buffer_allocator.reset();

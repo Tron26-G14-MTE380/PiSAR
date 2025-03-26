@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pisar/mcp/vision/utils.h"
+
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>
 
@@ -11,6 +13,50 @@ namespace pisar::mcp {
 struct CameraTransform {
     Eigen::Vector3d position;
     Eigen::AngleAxisd tilt;
+};
+
+class CameraCaptureConfig {
+private:
+    cv::Size m_full_size;                         ///< Camera sensor full-resolution
+    cv::Size m_binned_size;                       ///< Post-binning resolution (downscale).
+    std::optional<cv::Point> m_capture_offset;    ///< Top-left point of the capture crop. std::nullopt if using perfect center crop.
+    cv::Size m_capture_size;                      ///< Cropped binned image resolution.
+    cv::Size m_downscaled_size;                   ///< post digital downscaling frame size.
+
+    unsigned int m_framerate;
+
+public:
+
+    CameraCaptureConfig(
+        const cv::Size& full_size, unsigned int binned_mode, std::optional<cv::Point> capture_offset,
+        cv::Size capture_size, unsigned int downscale_factor, unsigned int framerate
+    ) : m_full_size(full_size),
+        m_binned_size(full_size.width / binned_mode, full_size.height / binned_mode),
+        m_capture_offset(capture_offset),
+        m_capture_size(capture_size),
+        m_downscaled_size(m_capture_size.width / downscale_factor, m_capture_size.height / downscale_factor),
+        m_framerate(framerate)
+    {
+        // TODO: Validation
+    }
+
+    [[nodiscard]] inline const cv::Size& fullSize() const { return m_full_size; }
+    [[nodiscard]] inline const cv::Size& binnedSize() const { return m_binned_size; }
+    [[nodiscard]] inline const cv::Size& captureOffset() const { return m_capture_offset.value_or(cv::Point(0, 0)); }
+    [[nodiscard]] inline const cv::Size& captureSize() const { return m_capture_size; }
+    [[nodiscard]] inline const cv::Size& downscaledSize() const { return m_downscaled_size; }
+    [[nodiscard]] inline unsigned int framerate() const { return m_framerate; }
+
+    /// @brief Return the crop region of the image captured from the binned output.
+    [[nodiscard]] inline cv::Rect captureCrop() const
+    {
+        if (m_capture_offset)
+        {
+            return cv::Rect(m_capture_offset.value().x, m_capture_offset.value().y, m_capture_size.width, m_capture_size.height);
+        }
+
+        return computeCenterCrop(m_binned_size, m_capture_size);
+    }
 };
 
 struct CameraDistortionData
@@ -33,35 +79,45 @@ struct CameraCalibrationData
      * which is then downscaled to a smaller output resolution, this adjusts focal length and
      * principal point accordingly.
      *
-     * @param output_image_size_px The final resolution after scaling (e.g., 320x240).
-     * @param crop_in_calibrated_image The crop region in full-res calibration image coordinates (e.g., {x, y, w, h}).
+     * @param capture camera capture configuration.
      * @return A intrinsic transformation adjusted for the new crop and scale.
      */
     [[nodiscard]]
-    inline Eigen::Matrix3d get_transformation(const cv::Size& output_image_size_px,
-        const std::optional<cv::Rect> crop_in_calibrated_image = std::nullopt) const
+    inline Eigen::Matrix3d get_transformation(const CameraCaptureConfig& capture) const
     {
-        // By default, assume full-frame calibration
-        cv::Rect crop_rect(0, 0, calibration_img_size_px.x(), calibration_img_size_px.y());
+        // Ensure calibration is at full resolution
+        assert(capture.fullSize().width == calibration_img_size_px.x() &&
+        capture.fullSize().height == calibration_img_size_px.y() &&
+        "CameraCalibrationData must be calibrated at full sensor resolution");
 
-        if (crop_in_calibrated_image.has_value())
-        {
-            crop_rect = crop_in_calibrated_image.value();
-        }
+        // Get the crop in the binned image (this is in binned coordinates)
+        const cv::Rect binned_crop = capture.captureCrop();
 
-        // Compute scale from cropped region to output
-        const Eigen::Vector2d scale = Eigen::Vector2d(output_image_size_px.width, output_image_size_px.height).cwiseQuotient(
-            Eigen::Vector2d(crop_rect.width, crop_rect.height)
-        );
+        // Scale crop rect to calibration (full-res) coordinates
+        const double scale_x = static_cast<double>(capture.fullSize().width) / capture.binnedSize().width;
+        const double scale_y = static_cast<double>(capture.fullSize().height) / capture.binnedSize().height;
 
-        // Adjust focal length by scaling
+        const cv::Rect crop_in_calibrated = {
+            static_cast<int>(std::round(binned_crop.x * scale_x)),
+            static_cast<int>(std::round(binned_crop.y * scale_y)),
+            static_cast<int>(std::round(binned_crop.width * scale_x)),
+            static_cast<int>(std::round(binned_crop.height * scale_y))
+        };
+
+        // Compute scale from crop to downscaled output
+        const Eigen::Vector2d scale = Eigen::Vector2d(
+            capture.downscaledSize().width,
+            capture.downscaledSize().height
+        ).cwiseQuotient(Eigen::Vector2d(crop_in_calibrated.width, crop_in_calibrated.height));
+
+        // Adjust focal length
         const Eigen::Vector2d scaled_focal_length = focal_length_px.cwiseProduct(scale);
 
-        // Adjust principal point by offsetting crop and scaling
+        // Adjust principal point
         const Eigen::Vector2d adjusted_principal_point =
-        (principle_axis_offset_px - Eigen::Vector2d(crop_rect.x, crop_rect.y)).cwiseProduct(scale);
+        (principle_axis_offset_px - Eigen::Vector2d(crop_in_calibrated.x, crop_in_calibrated.y)).cwiseProduct(scale);
 
-        return Eigen::Matrix3d {
+        return Eigen::Matrix3d{
             {scaled_focal_length.x(), skew, adjusted_principal_point.x()},
             {0, scaled_focal_length.y(), adjusted_principal_point.y()},
             {0, 0, 1}
@@ -70,27 +126,26 @@ struct CameraCalibrationData
 
 
     [[nodiscard]]
-    inline Eigen::Matrix3d get_inverse_transformation(const cv::Size& output_image_size_px,
-        const std::optional<cv::Rect> crop_in_calibrated_image = std::nullopt) const
+    inline Eigen::Matrix3d get_inverse_transformation(const CameraCaptureConfig& capture) const
     {
-        return get_transformation(output_image_size_px, crop_in_calibrated_image).inverse();
+        return get_transformation(capture).inverse();
     }
 
     /**
      * @brief Undistorts a distorted pixel coordinate using this camera's distortion model.
      * @param distorted_px The distorted pixel coordinate (u, v).
-     * @param image_size_px The image resolution the point comes from.
+     * @param capture camera capture configuration.
      * @param iterations Number of refinement iterations (default: 5).
      * @return Undistorted pixel coordinate (u', v') in the same image space.
      */
     [[nodiscard]]
     inline Eigen::Vector2i undistortPixel(
         const Eigen::Vector2i& distorted_px,
-        const cv::Size& image_size_px,
+        const CameraCaptureConfig& capture,
         int iterations = 5
     ) const
     {
-        Eigen::Matrix3d intrinsic_transformation = get_transformation(image_size_px);
+        Eigen::Matrix3d intrinsic_transformation = get_transformation(capture);
         return undistortPixel(distorted_px, intrinsic_transformation, iterations);
     }
 
@@ -98,18 +153,18 @@ struct CameraCalibrationData
      * @brief Undistorts a span of distorted pixel coordinates using this camera's distortion model.
      *
      * @param distorted_pixels Span of distorted pixel coordinates.
-     * @param image_size_px The resolution of the image the points come from.
+     * @param capture camera capture configuration.
      * @param iterations Number of refinement iterations (default: 5).
      * @return A vector of undistorted pixel coordinates (u', v').
      */
     [[nodiscard]]
     inline std::vector<Eigen::Vector2i> undistortPixel(
         const std::span<const Eigen::Vector2i> distorted_pixels,
-        const cv::Size& image_size_px,
+        const CameraCaptureConfig& capture,
         int iterations = 5
     ) const
     {
-        Eigen::Matrix3d intrinsic_transformation = get_transformation(image_size_px);
+        Eigen::Matrix3d intrinsic_transformation = get_transformation(capture);
 
         std::vector<Eigen::Vector2i> result;
         result.reserve(distorted_pixels.size());

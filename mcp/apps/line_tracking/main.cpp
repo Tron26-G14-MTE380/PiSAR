@@ -1,5 +1,5 @@
 #include "pisar/mcp/config.h"
-#include "pisar/mcp/vision/video_source.h"
+#include "pisar/mcp/vision/camera_source.h"
 #include "pisar/mcp/vision/line_tracker.h"
 #include "pisar/mcp/driveunit/controller.h"
 
@@ -37,29 +37,27 @@ int main()
 
 
     #if __linux__
-        LibcameraVideoSource video_source("/base/axi/pcie@120000/rp1/i2c@80000/imx219@10");
-        std::optional<cv::Rect> frame_crop = computeCenterCrop(gkFullFrameSize, gkCaptureFrameSize);
+        LibcameraCameraSource video_source(gkCamCaptureConfig, "/base/axi/pcie@120000/rp1/i2c@80000/imx219@10");
     #else
-        //CvCameraVideoSource video_source(0);
-        //RepeatedImageFileSource video_source("../../sample_images/red_tape2.jpg");
-        VideoFileSource video_source("../../sample_images/track_video.mp4");
-        std::optional<cv::Rect> frame_crop = std::nullopt;
+        //CvCameraSource video_source(gkCamCaptureConfig, 0);
+        //RepeatedImageFileCameraSource video_source(gkCamCaptureConfig, "../../sample_images/red_tape2.jpg");
+        VideoFileCameraSource video_source(gkCamCaptureConfig, "../../sample_images/track_video.mp4");
     #endif
 
-    frame_crop = computeCenterCrop(gkFullFrameSize, gkCaptureFrameSize);
-
-    video_source.start(gkCaptureFrameSize);
+    video_source.start();
 
     //HsvColorExtractor color_extractor(gkRedTapeHsvThresholds)
     YuvColorExtractor color_extractor(gkRedTapeYuvThresholds);
     using ColorExtractorT = decltype(color_extractor);
 
     auto line_tracker = LineTracker<CapturedFrame::TimestampT, ColorExtractorT, kDebug>(
-        gkFrameSize,
+        gkCamCaptureConfig.downscaledSize(),
         color_extractor,
-        projection.for_image(gkFrameSize, frame_crop),
+        projection.forCapture(video_source.captureConfig()),
         filter
     );
+
+    std::cout << gkCameraCalibration.get_transformation(gkCamCaptureConfig) << std::endl;
 
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
 
@@ -68,9 +66,7 @@ int main()
     {
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
 
-        // TODO: account for any cropping that happens here
-        cv::Mat input_frame = downscaleCrop(captured_frame.value().frame, gkFrameSize);
-        const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(input_frame, captured_frame.value().timestamp);
+        const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(captured_frame.value().frame, captured_frame.value().timestamp);
 
         const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - loop_start).count(); // Convert to milliseconds
         const double fps = 1000000.0 / elapsed;
@@ -80,7 +76,7 @@ int main()
         {
             auto debug_data = line_tracker.debugData();
             std::vector<std::pair<std::string, RoiMat>> debug_image_map = {
-                std::make_pair("1. Original", RoiMat(input_frame)),
+                std::make_pair("1. Original", RoiMat(captured_frame.value().frame)),
                 std::make_pair("2. Preprocessed", debug_data.preprocessed),
                 std::make_pair("3. Color Extracted", debug_data.extractedColor),
                 std::make_pair("4. Skeleton", debug_data.skeleton),

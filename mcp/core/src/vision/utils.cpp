@@ -69,7 +69,7 @@ namespace pisar::mcp {
     return output;
 }
 
-[[nodiscard]] cv::Mat downscaleCrop(const cv::Mat &input, const cv::Size &target_size)
+[[nodiscard]] cv::Mat resizeCropMaintainRatio(const cv::Mat &input, const cv::Size &target_size)
 {
     if (input.empty())
     {
@@ -83,7 +83,7 @@ namespace pisar::mcp {
     double scale_x = static_cast<double>(target_size.width) / original_width;
     double scale_y = static_cast<double>(target_size.height) / original_height;
 
-    // ✅ Choose the **larger** scaling factor to **fill the entire target_size**
+    // Choose the **larger** scaling factor to **fill the entire target_size**
     double scale_factor = std::max(scale_x, scale_y);
 
     // Compute the new scaled dimensions
@@ -94,7 +94,7 @@ namespace pisar::mcp {
     cv::Mat scaled_image;
     cv::resize(input, scaled_image, new_size, 0, 0, cv::INTER_AREA);
 
-    // ✅ Crop the center region to match the exact target size
+    // Crop the center region to match the exact target size
     int crop_x = (new_size.width - target_size.width) / 2;
     int crop_y = (new_size.height - target_size.height) / 2;
 

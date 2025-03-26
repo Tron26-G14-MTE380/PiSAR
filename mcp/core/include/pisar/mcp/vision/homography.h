@@ -26,9 +26,8 @@ public:
         const Eigen::Vector3d cam_position,
         const Eigen::Matrix3d& inverse_world_to_camera_transformation,
         const CameraCalibrationData& cam_calib,
-        const cv::Size& image_size_px,
-        const std::optional<cv::Rect> crop_in_calibrated_image = std::nullopt
-    ) : HomographySizedProjection(cam_position, inverse_world_to_camera_transformation, cam_calib.get_transformation(image_size_px, crop_in_calibrated_image))
+        const CameraCaptureConfig& capture
+    ) : HomographySizedProjection(cam_position, inverse_world_to_camera_transformation, cam_calib.get_transformation(capture))
     {
     }
 
@@ -48,9 +47,8 @@ public:
         const CameraTransform cam_transform,
         const Eigen::Matrix3d& axis_mapping,
         const CameraCalibrationData& cam_calib,
-        const cv::Size& image_size_px,
-        const std::optional<cv::Rect> crop_in_calibrated_image = std::nullopt
-    ) : HomographySizedProjection(cam_transform, axis_mapping, cam_calib.get_transformation(image_size_px, crop_in_calibrated_image))
+        const CameraCaptureConfig& capture
+    ) : HomographySizedProjection(cam_transform, axis_mapping, cam_calib.get_transformation(capture))
     {
     }
 
@@ -128,16 +126,13 @@ public:
     }
 
     [[nodiscard]]
-    inline HomographySizedProjection for_image(
-        const cv::Size& image_size_px,
-        const std::optional<cv::Rect> crop_in_calibrated_image = std::nullopt) const
+    inline HomographySizedProjection forCapture(const CameraCaptureConfig& capture) const
     {
         return HomographySizedProjection(
             m_camera_position,
             m_inverse_world_to_camera_transformation,
             m_cam_calibration,
-            image_size_px,
-            crop_in_calibrated_image
+            capture
         );
     }
 

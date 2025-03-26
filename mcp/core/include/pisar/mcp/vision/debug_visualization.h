@@ -19,7 +19,7 @@ cv::Mat createTrajectoryVisualization(
 cv::Mat createHomographyProjectionVisualization(
     cv::Size image_size,
     const HomographySizedProjection& projection,
-    const std::vector<Eigen::Vector2d>& trajectory
+    const std::span<const Eigen::Vector2d>& trajectory
 );
 
 std::vector<std::pair<std::string, cv::Mat>> createDebugImageMap();

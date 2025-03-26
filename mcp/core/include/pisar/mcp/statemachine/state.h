@@ -47,7 +47,7 @@ public:
 
         if (!video_source.isRunning())
         {
-            video_source.start(gkCaptureFrameSize);
+            video_source.start();
         }
 
         line_tracker.reset();
@@ -118,7 +118,7 @@ public:
 
         if (!video_source.isRunning())
         {
-            video_source.start(gkCaptureFrameSize);
+            video_source.start();
         }
 
         target_tracker.reset();
@@ -315,7 +315,7 @@ public:
 
         if (!video_source.isRunning())
         {
-            video_source.start(gkCaptureFrameSize);
+            video_source.start();
         }
 
         line_tracker.reset();

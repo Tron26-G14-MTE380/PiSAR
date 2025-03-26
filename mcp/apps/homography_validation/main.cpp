@@ -108,7 +108,7 @@ void updateHomography()
 
     // Recompute homography
     HomographyProjection projection(updated_camera_transform, gkCameraAxisMapping, gkCameraCalibration);
-    HomographySizedProjection sized_projection = projection.for_image(kTestFrameSize);
+    HomographySizedProjection sized_projection = projection.forCapture(gkCamCaptureConfig);
 
     // Project all image points
     auto projected_world_points = sized_projection.project(std::span(kImagePoints));

@@ -40,7 +40,7 @@ target_sources(pisar_core
     src/vision/debug_visualization.cpp
     src/vision/path_extraction.cpp
     src/vision/utils.cpp
-    src/vision/video_source.cpp
+    src/vision/camera_source.cpp
 )
 
 target_link_libraries(pisar_core

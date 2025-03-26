@@ -29,6 +29,7 @@ static const auto gkCameraAxisMapping = Eigen::Matrix3d{
     {0, 1, 0}
 };
 
+// RPI Camera v2 calibration done at full-res
 static const CameraCalibrationData gkCameraCalibration = {
     .calibration_img_size_px = {3280, 2464},
     .focal_length_px = {2630.73, 2621.95},
@@ -43,9 +44,28 @@ static const CameraCalibrationData gkCameraCalibration = {
     }
 };
 
-static const cv::Size gkFullFrameSize = {3280, 2464};
-static const cv::Size gkCaptureFrameSize = {1280, 720};
-static const cv::Size gkFrameSize = {320, 180};
+// RPI Camera v2 capture config for mode 4
+static const auto gkRpiCamV2Mode4CaptureConfig = CameraCaptureConfig(
+    cv::Size(3280, 2464),       // Camera Full resolution
+    2,                          // binning mode
+    std::nullopt,               // Capture crop offset
+    cv::Size(1640, 1232),       // Capture crop size
+    4,                          // Downscale size
+    40                          // Framerate
+);
+
+// RPI Camera v2 capture config for mode 6
+static const auto gkRpiCamV2Mode6CaptureConfig = CameraCaptureConfig(
+    cv::Size(3280, 2464),       // Camera Full resolution
+    2,                          // binning mode
+    std::nullopt,               // Capture crop offset
+    cv::Size(1280, 720),        // Capture crop size
+    4,                          // Downscale size
+    90                          // Framerate
+);
+
+static const auto gkCamCaptureConfig = gkRpiCamV2Mode4CaptureConfig;
+
 
 // Interfacing settings
 static const size_t gkMaxTrajectoryPoints = 10;

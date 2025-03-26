@@ -45,7 +45,7 @@ cv::Mat createTrajectoryVisualization(
 cv::Mat createHomographyProjectionVisualization(
     cv::Size image_size,
     const HomographySizedProjection& projection,
-    const std::vector<Eigen::Vector2d>& trajectory
+    const std::span<const Eigen::Vector2d>& trajectory
 )
 {
     if (trajectory.empty())
@@ -75,7 +75,7 @@ cv::Mat createHomographyProjectionVisualization(
     std::vector<Eigen::Vector2d> camera_view_grid_world_points = projection.project(std::span(camera_view_grid_image_points));
 
     // Combine trajectory and projected grid points for world bounds computation
-    std::vector<Eigen::Vector2d> all_world_points = trajectory;
+    auto all_world_points = std::vector<Eigen::Vector2d>(trajectory.begin(), trajectory.end());
     all_world_points.insert(
         all_world_points.end(),
         camera_view_grid_world_points.begin(),
