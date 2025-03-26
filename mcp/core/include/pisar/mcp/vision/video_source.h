@@ -30,11 +30,14 @@ namespace pisar::mcp {
  */
 template <typename TDerived>
 class VideoSource {
+private:
+    bool m_is_running;
+
 public:
     /**
      * @brief Constructs a VideoSource with a specified resolution.
      */
-    inline VideoSource() noexcept {}
+    inline VideoSource() noexcept : m_is_running(false) {}
 
     ~VideoSource() {
         stop();
@@ -44,7 +47,11 @@ public:
      * @brief Starts the video source.
      * @param frame_size Frame size.
      */
-    inline void start(const cv::Size frame_size) { static_cast<TDerived*>(this)->startImpl(frame_size); }
+    inline void start(const cv::Size frame_size)
+    {
+        static_cast<TDerived*>(this)->startImpl(frame_size);
+        m_is_running = true;
+    }
 
     /**
      * @brief Captures a frame from the video source.
@@ -56,10 +63,17 @@ public:
     /**
      * @brief Stops the video source.
      */
-    inline void stop() { static_cast<TDerived*>(this)->stopImpl(); }
+    inline void stop()
+    {
+        static_cast<TDerived*>(this)->stopImpl();
+        m_is_running = false;
+    }
 
     /// @brief Get the camera capture rect indicating cropping from full-res.
     [[nodiscard]] inline cv::Rect getCaptureRect() const { return static_cast<TDerived*>(this)->getCaptureRectImpl(); }
+
+    /// @brief Get whether the video source is running.
+    [[nodiscard]] inline bool isRunning() const { return m_is_running; }
 };
 
 /**

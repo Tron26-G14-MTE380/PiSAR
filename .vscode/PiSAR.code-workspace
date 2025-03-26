@@ -141,7 +141,9 @@
 			"csignal": "cpp",
 			"strstream": "cpp"
 		},
-		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json"
+		"C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+		"editor.tabSize": 4,
+		"editor.detectIndentation": true
 	},
 	"tasks": {
 		"version": "2.0.0",

@@ -148,6 +148,14 @@ public:
         return filterTrajectory(std::span(projected_trajectory), timestamp);
     }
 
+    /// @brief Resets the line tracker state.
+    [[nodiscard]] inline void reset() const
+    {
+        m_roi_tracker.reset();
+        m_trajectory_filter.reset();
+    };
+
+    /// @brief Retrieve debug data from last frame submitted.
     [[nodiscard]] inline const DebugData& debugData() const { return m_debug; }
 
 private:

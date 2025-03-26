@@ -10,3 +10,6 @@
 [submodule "mcp/thirdparty/easy_profile/easy_profile"]
 	path = thirdparty/easy_profiler/easy_profiler
 	url = https://github.com/yse/easy_profiler.git
+[submodule "thirdparty/sml/sml"]
+	path = thirdparty/sml/sml
+	url = https://github.com/boost-ext/sml.git

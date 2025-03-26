@@ -198,10 +198,7 @@ public:
 #else
 
 /**
- * @brief UART serial communication wrapper for Raspberry Pi using WiringPi.
- *
- * Provides buffered reading with optional timeouts, non-blocking writes, and
- * efficient handling of UART data via file descriptors.
+ * @brief Fake Serial UART class for compiling on windows.
  */
 class SerialUart
 {
