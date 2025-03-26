@@ -31,7 +31,7 @@ namespace pisar::mcp {
 /**
  * @brief Extracts a fitted trajectory from a skeletonized path.
  */
-template<bool tkDebug, class TColorExtractor>
+template<class TTimestamp, class TColorExtractor, bool tkDebug>
 class LineTracker {
 public:
     struct DebugData {
@@ -56,7 +56,7 @@ private:
     RoiTracker m_roi_tracker;
     std::reference_wrapper<const TColorExtractor> m_color_extractor;
     HomographySizedProjection m_homography_sized_projection;
-    std::reference_wrapper<TrajectoryFilter<double>> m_trajectory_filter;
+    std::reference_wrapper<TrajectoryFilter<double, TTimestamp>> m_trajectory_filter;
 
     DebugDataT m_debug;
 
@@ -73,7 +73,7 @@ public:
         const cv::Size& frame_size,
         const TColorExtractor& color_extractor,
         const HomographySizedProjection& homography_projection,
-        TrajectoryFilter<double>& trajectory_filter
+        TrajectoryFilter<double, TTimestamp>& trajectory_filter
     )
         : m_frame_size(frame_size),
           m_color_extractor(color_extractor),
@@ -86,7 +86,7 @@ public:
      * @param frame The input frame (BGR format).
      * @return Ordered list of key points representing the fitted trajectory.
      */
-    [[nodiscard]] std::vector<Eigen::Vector2d> extractTrajectory(const cv::Mat& frame, std::chrono::duration<float> timestamp)
+    [[nodiscard]] std::vector<Eigen::Vector2d> extractTrajectory(const cv::Mat& frame, TTimestamp timestamp)
     {
         EASY_FUNCTION();
 
@@ -149,10 +149,10 @@ public:
     }
 
     /// @brief Resets the line tracker state.
-    [[nodiscard]] inline void reset() const
+    [[nodiscard]] inline void reset()
     {
         m_roi_tracker.reset();
-        m_trajectory_filter.reset();
+        m_trajectory_filter.get().reset();
     };
 
     /// @brief Retrieve debug data from last frame submitted.
@@ -394,7 +394,7 @@ private:
         return projected_trajectory;
     }
 
-    [[nodiscard]] std::vector<Eigen::Vector2d> filterTrajectory(const std::span<const Eigen::Vector2d> trajectory, std::chrono::duration<float> timestamp)
+    [[nodiscard]] std::vector<Eigen::Vector2d> filterTrajectory(const std::span<const Eigen::Vector2d> trajectory, TTimestamp timestamp)
     {
         const auto filtered_trajectory = m_trajectory_filter.get().filter(trajectory, timestamp);
         const auto simplified_filtered_trajectory = simplifyPath<double>(filtered_trajectory, 0.5f);

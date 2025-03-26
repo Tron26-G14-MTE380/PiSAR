@@ -11,20 +11,31 @@
 
 namespace pisar::mcp {
 
-template<typename T>
+/**
+ * @brief Smoothes and filters a time-series trajectory.
+ *
+ * @tparam T The type of output trajectory data value.
+ * @tparam TTimestamp The timestamp type, must be of type std::chrono::time_point.
+ */
+template<typename T, class TTimestamp>
 class TrajectoryFilter
 {
+public:
+    using TimestampT = TTimestamp;
+    using ClockT = TTimestamp::clock;
+    using DurationT = TimestampT::duration;
+
 private:
-    std::chrono::duration<float> m_reset_timeout;
+    DurationT m_reset_timeout;
     float m_max_jump_distance;
     int m_min_persistence_frames;
     int m_fixed_sample_size;
 
     std::vector<ExtendedKalmanFilter<2>> m_kalman_filters; ///< One Kalman filter per trajectory point
-    std::deque<std::pair<std::chrono::duration<float>, std::vector<Eigen::Vector2d>>> m_past_trajectories; ///< Stores past trajectories
+    std::deque<std::pair<TimestampT, std::vector<Eigen::Vector2d>>> m_past_trajectories; ///< Stores past trajectories
     std::vector<Eigen::Vector2d> m_smoothed_trajectory; ///< Stores the last valid trajectory
     std::vector<Eigen::Vector2<T>> m_output_trajectory; ///< Smoothed trajectory casted to output type
-    std::optional<std::chrono::duration<float>> m_last_valid_trajectory_time;
+    std::optional<TimestampT> m_last_valid_trajectory_time;
 
 public:
 
@@ -36,7 +47,7 @@ public:
      * @param fixed_sample_size Number of points used for arc-length parameterization.
      */
     explicit TrajectoryFilter(
-        std::chrono::duration<float> reset_timeout = std::chrono::milliseconds(500),
+        DurationT reset_timeout = std::chrono::milliseconds(500),
         float max_jump_distance = 30.0f,
         int min_persistence_frames = 3,
         int fixed_sample_size = 20)
@@ -54,7 +65,7 @@ public:
      * @param trajectory Extracted raw trajectory.
      * @return Smoothed and filtered trajectory.
      */
-    [[nodiscard]] std::vector<Eigen::Vector2<T>> filter(const std::span<const Eigen::Vector2<T>>& trajectory, std::chrono::duration<float> timestamp)
+    [[nodiscard]] std::vector<Eigen::Vector2<T>> filter(const std::span<const Eigen::Vector2<T>>& trajectory, TimestampT timestamp)
     {
         if (trajectory.size() < 2)
         {
@@ -88,7 +99,7 @@ public:
         // **Apply Arc-Length Parameterization**
         std::vector<Eigen::Vector2d> resampled = arcLengthResample(trajectory_casted);
 
-        const std::chrono::duration<float> delta_t = timestamp - m_past_trajectories.back().first;
+        const DurationT delta_t = timestamp - m_past_trajectories.back().first;
 
         // Apply smoothing
         std::vector<Eigen::Vector2d> smoothed = applyFiltering(resampled, delta_t);
@@ -202,7 +213,7 @@ private:
     /**
      * @brief Applies Kalman filtering.
      */
-    [[nodiscard]] std::vector<Eigen::Vector2d> applyFiltering(const std::vector<Eigen::Vector2d>& trajectory, std::chrono::duration<float> delta_t)
+    [[nodiscard]] std::vector<Eigen::Vector2d> applyFiltering(const std::vector<Eigen::Vector2d>& trajectory, DurationT delta_t)
     {
         const bool empty_trajectory = trajectory.size() < 2;
 

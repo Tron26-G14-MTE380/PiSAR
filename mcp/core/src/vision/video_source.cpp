@@ -196,6 +196,8 @@ void LibcameraVideoSource::processFrame(libcamera::FrameBuffer* buffer)
         return;
     }
 
+    const auto timestamp = CapturedFrame::ClockT::now();
+
     // Create OpenCV Mats for each plane
     std::array<cv::Mat, 3> planes;
 
@@ -279,14 +281,14 @@ void LibcameraVideoSource::processFrame(libcamera::FrameBuffer* buffer)
     }
 
     // Push to frame queue
-    m_frame_queue.push(std::move(bgr_image));
+    m_frame_queue.push(CapturedFrame { .frame = std::move(bgr_image), .timestamp = timestamp });
 }
 
 /**
  * @brief Retrieves the most recent frame.
  * @return The latest frame as cv::Mat if available, otherwise std::nullopt.
  */
-[[nodiscard]] std::optional<cv::Mat> LibcameraVideoSource::getFrameImpl()
+[[nodiscard]] std::optional<CapturedFrame> LibcameraVideoSource::getFrameImpl()
 {
     return m_frame_queue.pop();
 }

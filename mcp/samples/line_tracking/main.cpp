@@ -37,7 +37,7 @@ int main()
         gkCameraCalibration
     );
 
-    TrajectoryFilter<double> filter;
+    TrajectoryFilter<double, CapturedFrame::TimestampT> filter;
 
 
     #if __linux__
@@ -56,8 +56,9 @@ int main()
 
     //HsvColorExtractor color_extractor(gkRedTapeHsvThresholds)
     YuvColorExtractor color_extractor(gkRedTapeYuvThresholds);
+    using ColorExtractorT = decltype(color_extractor);
 
-    auto line_tracker = LineTracker<kDebug, decltype(color_extractor)>(
+    auto line_tracker = LineTracker<CapturedFrame::TimestampT, ColorExtractorT, kDebug>(
         gkFrameSize,
         color_extractor,
         projection.for_image(gkFrameSize, frame_crop),
@@ -66,19 +67,18 @@ int main()
 
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
 
-    std::optional<cv::Mat> captured_frame;
+    std::optional<CapturedFrame> captured_frame;
     while ((captured_frame = video_source.getFrame()).has_value())
     {
         const auto loop_start = std::chrono::high_resolution_clock::now(); // Start time
-        const std::chrono::duration<float> frame_capture_time = loop_start - start;
 
         // TODO: account for any cropping that happens here
-        cv::Mat input_frame = downscaleCrop(captured_frame.value(), gkFrameSize);
-        const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(input_frame, frame_capture_time);
+        cv::Mat input_frame = downscaleCrop(captured_frame.value().frame, gkFrameSize);
+        const std::vector<Eigen::Vector2d> world_trajectory = line_tracker.extractTrajectory(input_frame, captured_frame.value().timestamp);
 
         const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - loop_start).count(); // Convert to milliseconds
         const double fps = 1000000.0 / elapsed;
-        std::cout << "FPS: " << fps << std::endl;
+        std::cout << "extractTrajectory FPS: " << fps << std::endl;
 
         if constexpr (kDebug)
         {

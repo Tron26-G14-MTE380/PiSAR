@@ -24,6 +24,15 @@
 
 namespace pisar::mcp {
 
+struct CapturedFrame {
+    using ClockT = std::chrono::steady_clock;
+    using DurationT = std::chrono::duration<double>;
+    using TimestampT = std::chrono::time_point<ClockT, DurationT>;
+
+    cv::Mat frame;
+    TimestampT timestamp;
+};
+
 /**
  * @brief CRTP base class for video sources.
  * @tparam TDerived The derived class implementing the interface.
@@ -58,7 +67,10 @@ public:
      * @retval cv::Mat The captured frame is successful.
      * @retval std::nullopt if no frame captured.
      */
-    [[nodiscard]] inline std::optional<cv::Mat> getFrame() { return static_cast<TDerived*>(this)->getFrameImpl(); }
+    [[nodiscard]] inline std::optional<CapturedFrame> getFrame()
+    {
+        return static_cast<TDerived*>(this)->getFrameImpl();
+    }
 
     /**
      * @brief Stops the video source.
@@ -124,12 +136,12 @@ public:
      * @retval cv::Mat The captured frame is successful.
      * @retval std::nullopt if no frame captured.
      */
-    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
+    [[nodiscard]] inline std::optional<CapturedFrame> getFrameImpl()
     {
         if (m_img.empty()) {
             throw std::runtime_error("Image not loaded. Call start() first.");
         }
-        return m_img.clone();
+        return CapturedFrame { .frame = m_img.clone(), .timestamp = CapturedFrame::ClockT::now() };
     }
 
     /**
@@ -186,7 +198,7 @@ public:
      * @retval std::nullopt if no frame captured.
      * @throws std::runtime_error on error.
      */
-    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
+    [[nodiscard]] inline std::optional<CapturedFrame> getFrameImpl()
     {
         if (!m_cap.isOpened())
         {
@@ -199,7 +211,7 @@ public:
             return std::nullopt;
         }
 
-        return frame;
+        return CapturedFrame { .frame = frame, .timestamp = CapturedFrame::ClockT::now() };
     }
 
     /**
@@ -215,96 +227,6 @@ public:
 
     /// @brief Get the camera capture rect indicating cropping from full-res.
     [[nodiscard]] inline cv::Rect getCaptureRect() const { return cv::Rect(0, 0, m_original_size.width, m_original_size.height); }
-};
-
-/**
- * @brief Video source using a camera feed (via GStreamer).
- */
-class GStreamerCameraVideoSource : public VideoSource<GStreamerCameraVideoSource> {
-private:
-    int m_camera_id;            ///< Camera ID (ignored for libcamera, but kept for compatibility).
-    cv::Rect m_capture_rect;    ///< The rect of the original frame.
-    cv::VideoCapture m_cap;     ///< OpenCV VideoCapture object using GStreamer.
-
-public:
-    /**
-     * @brief Constructs a GStreamerCameraVideoSource.
-     * @param camera_id Camera index.
-     */
-    inline explicit GStreamerCameraVideoSource(int camera_id)
-        : VideoSource(), m_camera_id(camera_id), m_capture_rect(0, 0, 0, 0), m_cap() {}
-
-    /**
-     * @brief Starts the video capture.
-     * @param frame_size Image frame size.
-     * @throws std::runtime_error if the camera fails to open.
-     */
-    inline void startImpl(const cv::Size frame_size)
-    {
-        if (m_cap.isOpened()) {
-            throw std::runtime_error("Camera already started.");
-        }
-
-        // GStreamer pipeline for libcamera
-        std::string p_line1 = "libcamerasrc camera-name=/base/axi/pcie@120000/rp1/i2c@88000/imx219@10 contrast=1.2 ";  // Enable auto-exposure, gain, and denoising
-
-        std::string p_line2 = "! video/x-raw, width=640, height=480, framerate=60/1, format=NV12 ";  // Use NV12 for better quality
-
-        std::string p_line3 = "! videoconvert ! video/x-raw, format=BGR ";  // Convert to standard format
-        std::string p_line4 = "! appsink";
-
-        std::string pipeline = p_line1 + p_line2 + p_line3 + p_line4;
-        std::cout << "Pipeline: " << pipeline << std::endl;
-
-        m_cap.open(pipeline, cv::CAP_GSTREAMER);
-        if (!m_cap.isOpened()) {
-            throw std::runtime_error("Failed to open camera via GStreamer.");
-        }
-
-        m_capture_rect = {0, 0, m_cap.get(cv::CAP_PROP_FRAME_WIDTH), m_cap.get(cv::CAP_PROP_FRAME_HEIGHT)};
-    }
-
-    bool isBlackImage(const cv::Mat& img)
-    {
-        cv::Mat gray;
-        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY); // Convert to grayscale
-        return cv::countNonZero(gray) == 0;
-    }
-
-    /**
-     * @brief Captures a frame from the video source.
-     * @return std::optional<cv::Mat> containing the frame if successful, otherwise std::nullopt.
-     */
-    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
-    {
-        if (!m_cap.isOpened()) {
-            throw std::runtime_error("Camera is not started.");
-        }
-
-        cv::Mat frame;
-        while (frame.empty() || isBlackImage(frame))
-        {
-            if (!m_cap.read(frame))
-            {
-                return std::nullopt;
-            }
-        }
-
-        return frame;
-    }
-
-    /**
-     * @brief Stops the video capture and releases the camera.
-     */
-    inline void stopImpl()
-    {
-        if (m_cap.isOpened()) {
-            m_cap.release();
-        }
-    }
-
-    /// @brief Get the camera capture rect indicating cropping from full-res.
-    [[nodiscard]] inline cv::Rect getCaptureRect() const { return m_capture_rect; }
 };
 
 #ifdef __linux__
@@ -324,7 +246,7 @@ private:
     std::unique_ptr<libcamera::CameraConfiguration> m_config;
     std::unique_ptr<libcamera::FrameBufferAllocator> m_frame_buffer_allocator;
     std::vector<std::unique_ptr<libcamera::Request>> m_requests;
-    ConcurrentQueue<cv::Mat> m_frame_queue;
+    ConcurrentQueue<CapturedFrame> m_frame_queue;
     std::atomic<bool> m_running{false};
 
 public:
@@ -348,7 +270,7 @@ public:
      * @brief Captures a frame from the video source.
      * @return The captured frame if successful, otherwise std::nullopt.
      */
-    [[nodiscard]] std::optional<cv::Mat> getFrameImpl();
+    [[nodiscard]] std::optional<CapturedFrame> getFrameImpl();
 
     /**
      * @brief Stops the video source.
@@ -419,7 +341,7 @@ public:
      * @retval std::nullopt if no frame captured.
      * @throws std::runtime_error on error.
      */
-    [[nodiscard]] inline std::optional<cv::Mat> getFrameImpl()
+    [[nodiscard]] inline std::optional<CapturedFrame> getFrameImpl()
     {
         if (!m_cap.isOpened())
         {
@@ -445,7 +367,7 @@ public:
 
         frame = resizeWithPadding(frame, m_size);
 
-        return frame;
+        return CapturedFrame { .frame = frame, .timestamp = CapturedFrame::ClockT::now() };
     }
 
     /**
