@@ -69,7 +69,10 @@ public:
      * @param trajectory The list of waypoints (Eigen::Vector2f).
      * @return true if the command was acknowledged, false otherwise.
      */
-    inline rd::expected<bool, std::error_code> sendTrajectoryCommand(std::chrono::duration<float> reference_time, const std::span<const Eigen::Vector2f>& trajectory)
+    inline rd::expected<bool, std::error_code> sendTrajectoryCommand(
+        driveunit_interface::CommandFollowTrajectory::ReferenceTimeT reference_time,
+        const std::span<const Eigen::Vector2f>& trajectory
+    )
     {
         driveunit_interface::CommandFollowTrajectory command{reference_time, std::vector<Eigen::Vector2f>(trajectory.begin(), trajectory.end())};
         auto response = sendRequest<driveunit_interface::CommandFollowTrajectory, driveunit_interface::CommandResponse>(command);

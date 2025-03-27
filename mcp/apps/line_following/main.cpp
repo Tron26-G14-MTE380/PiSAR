@@ -40,7 +40,7 @@ void runRobot(DriveunitController& driveunit_controller, std::vector<Eigen::Vect
         trajectory.resize(gkMaxTrajectoryPoints);
     }
 
-    const auto reference_time = CapturedFrame::ClockT::now() - frame_time;
+    const auto reference_time = std::chrono::duration_cast<pisar::driveunit_interface::CommandFollowTrajectory::ReferenceTimeT>(CapturedFrame::ClockT::now() - frame_time);
     const auto du_response = driveunit_controller.sendTrajectoryCommand(reference_time, convertVector(trajectory));
     if (!du_response.has_value())
     {
@@ -97,7 +97,7 @@ int main()
         const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - loop_start).count(); // Convert to milliseconds
         const double fps = 1000000.0 / elapsed;
         std::cout << "extractTrajectory FPS: " << fps << std::endl;
-        
+
         runRobot(driveunit_controller, world_trajectory, captured_frame.value().timestamp);
 
         if constexpr (kDebug)
