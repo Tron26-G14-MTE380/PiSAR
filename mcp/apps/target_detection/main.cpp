@@ -73,7 +73,8 @@ int main()
 
     auto target_tracker = TargetTracker<CapturedFrame::TimestampT, ColorExtractorT, kDebug>(
         color_extractor,
-        sized_projection
+        sized_projection,
+        gkTargetGrabDistanceOffset
     );
 
     DriveunitTransport driveunit_transport;

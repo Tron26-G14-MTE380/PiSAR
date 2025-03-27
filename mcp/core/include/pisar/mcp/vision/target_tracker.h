@@ -24,15 +24,20 @@ public:
         cv::Mat projected_point;
     };
 
+    using TimestampT = TTimestamp;
+
 private:
     using DebugDataT = typename std::conditional_t<tkDebug, DebugData, std::monostate>;
 
-    static constexpr float kMinContourArea = 2000.0f;
-    static constexpr float kMinRadius = 20.0f;
-    static constexpr float kMaxRadius = 200.0f;
+    static constexpr double kMinContourArea = 2000.0;
+    static constexpr double kMinRadius = 20.0;
+    static constexpr double kMaxRadius = 200.0;
 
     std::reference_wrapper<const TColorExtractor> m_color_extractor;
     std::reference_wrapper<const HomographySizedProjection> m_projection;
+
+    /// @brief Offset distance applied to target (tuned based on gripper position.)
+    double m_distance_offset;
 
     DebugDataT m_debug;
 
@@ -41,11 +46,16 @@ public:
     /**
      * @brief Construct a new Target Tracker object
      *
-     * @param color_extractor
-     * @param projection
+     * @param color_extractor Color extractor used to extract ring color.
+     * @param projection Homography projection used to project pixel coordinates to real world coordinates.
+     * @param distance_offset Offset distance applied to target (tuned based on gripper position.)
      */
-    TargetTracker(const TColorExtractor& color_extractor, const HomographySizedProjection& projection) :
-        m_color_extractor(color_extractor), m_projection(projection) {}
+    TargetTracker(
+        const TColorExtractor& color_extractor,
+        const HomographySizedProjection& projection,
+        double distance_offset
+    ) :
+        m_color_extractor(color_extractor), m_projection(projection), m_distance_offset(distance_offset) {}
 
     /**
      * @brief Scans the input @p frame and returns the position of the target.
@@ -107,15 +117,18 @@ public:
 
         const Eigen::Vector2i pixel(static_cast<int>(center.x), static_cast<int>(center.y));
         const auto world = m_projection.get().project(pixel);
+        const auto offset_world = Eigen::Vector2d(world.x(), std::max(world.y() - m_distance_offset, 0.0));
 
         if (tkDebug)
         {
             m_debug.target_point = frame.clone();
             cv::circle(m_debug.target_point, center, 5, cv::Scalar(0, 255, 0), 2);
-            m_debug.projected_point = createHomographyProjectionVisualization(frame.size(), m_projection, std::span(&world, 1));
+
+            std::array<Eigen::Vector2d, 2> world_points = {world, offset_world};
+            m_debug.projected_point = createHomographyProjectionVisualization(frame.size(), m_projection, std::span(world_points));
         }
 
-        return world;
+        return offset_world;
     }
 
     /**
