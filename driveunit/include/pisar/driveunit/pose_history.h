@@ -144,12 +144,12 @@ public:
      * @param time The target timestamp.
      * @return The pose of the closest record in time.
      */
-    [[nodiscard]] constexpr std::optional<Eigen::Vector2f> poseAtNearest(TTimeStampRep time) const noexcept
+    [[nodiscard]] constexpr std::optional<KinematicPose> poseAtNearest(TTimeStampRep time) const noexcept
     {
         const auto record = recordAtNearest(time);
         if (record)
         {
-            return record.value.value;
+            return record.value().value;
         }
         else
         {
@@ -167,7 +167,7 @@ public:
         const auto record = recordAtNearest(time);
         if (record)
         {
-            return record.value.value.position;
+            return record.value().value.position;
         }
         else
         {
@@ -185,7 +185,7 @@ public:
         const auto record = recordAtNearest(time);
         if (record)
         {
-            return record.value.value.orientation;
+            return record.value().value.orientation;
         }
         else
         {

@@ -244,6 +244,12 @@ public:
         return m_last_update_time;
     }
 
+    [[nodiscard]]  inline std::optional<KinematicPose> poseAtNearest(TimestampT time) const noexcept
+    {
+        Lock<Mutex> lock(m_mutex);
+        return m_pose_history.poseAtNearest(time);
+    }
+
 private:
     [[nodiscard]] CalibrationData calibrateImpl(const size_t num_batches, const size_t slope_sample_batch_size);
 

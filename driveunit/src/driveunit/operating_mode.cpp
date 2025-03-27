@@ -15,8 +15,8 @@ template <typename T>
 OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& facility, const std::span<const Eigen::Vector2f> trajectory, const std::chrono::duration<float> reference_time) :
     m_facility(facility),
     m_trajectory(trajectory.begin(), trajectory.end()),
-    m_reference_time(reference_time),
-    m_pid_rotation(kPidkpRotation, kPidkiRotation, kPidkdRotation, -1e6f, 1e6f),
+    m_reference_time(std::chrono::milliseconds(millis() - 25)),
+    m_pid_rotation(kPidkpRotation, kPidkiRotation, kPidkdRotation, 0.0f, 1.0f),
     m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 1e6f),
     m_target_index(0),
     m_last_update_time{0}
@@ -25,6 +25,7 @@ OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& faci
 void OperatingModeFollowTrajectory::onEnterImpl()
 {
     //PISAR_LOG_INFO("Going to (%f, %f)", m_trajectory[0].x(), m_trajectory[0].y());
+    const auto ref_pose = m_facility.get().getKinematicTracker().poseAtNearest(m_reference_time);
 
     const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
     m_pid_rotation.setGains(kPidkpRotation * pid_adj_scale, kPidkiRotation * pid_adj_scale, kPidkdRotation * pid_adj_scale);
@@ -35,6 +36,10 @@ void OperatingModeFollowTrajectory::onEnterImpl()
 
     // ELEPHANT do a lot of bs with ash about distance travelled after image vs actual travel attempt
     m_facility.get().getKinematicTracker().reset(false);
+    if (ref_pose)
+    {
+        m_facility.get().getKinematicTracker().setPoseReference(ref_pose.value());
+    }
 }
 
 static float angleFromTrajectory(const Eigen::Vector2f& trajectory_vector, const Eigen::Vector2f target_vector)
@@ -62,12 +67,12 @@ static float angleFromTrajectory(const Eigen::Vector2f& trajectory_vector, const
 
 [[nodiscard]] bool OperatingModeFollowTrajectory::updateImpl()
 {
-    if (m_trajectory.size() == 1)
-    {
-        PISAR_LOG_INFO("Trajectory size is 1, use OperatingModeGoToTarget, stopping");
-        m_facility.get().getDriveController().hardStop();
-        return true;
-    }
+    // if (m_trajectory.size() == 1)
+    // {
+    //     PISAR_LOG_INFO("Trajectory size is 1, use OperatingModeGoToTarget, stopping");
+    //     m_facility.get().getDriveController().hardStop();
+    //     return true;
+    // }
 
     auto current_pose = m_facility.get().getKinematicTracker().getPose();
 
@@ -135,41 +140,26 @@ static float angleFromTrajectory(const Eigen::Vector2f& trajectory_vector, const
 
     // PID update
     const auto delta_time = updateDeltaTime();
-    float angular_output = m_pid_rotation.update(angle_error, delta_time);
-    float forward_output = m_pid_travel.update(distance_error, delta_time);
+    float forward_output = 1.0f; //std::clamp(distance_error * 0.5f, 0.1f, 1.0f); // creep at low distance
 
-    PISAR_LOG_INFO("Heading: %f --> %f, (%f, %f)", current_heading, target_heading, forward_output, angular_output);
-
-    if (std::abs(angle_error) > kAngleLockThreshold)
-    {
-        forward_output = 0.0f; // only rotate in place
-        angular_output = std::clamp(angular_output, -0.3f, 0.3f); // rotation cap
-    }
-    else
-    {
-        const float max_angular_ratio = 1.0f; // how much you're willing to rotate vs move
-        const float angular_limit = forward_output * max_angular_ratio;
-        angular_output = std::clamp(angular_output, -angular_limit, angular_limit);
-    }
-
-    // Arc forward blend
-    const float left_speed_raw = forward_output - angular_output;
-    const float right_speed_raw = forward_output + angular_output;
-
-    // PISAR_LOG_INFO("Angle Error: %f", angle_error);
-    // PISAR_LOG_INFO("Left Speed Original Raw: %f, Right Speed Original Raw: %f", left_speed_raw, right_speed_raw);
+    const float turn_ratio = m_pid_rotation.update(std::abs(angle_error), delta_time);
 
     // Find the max speed, scale both down to keep ratio
     // Clamp again after scaling
     float left_speed = 0.0f, right_speed = 0.0f;
-    const float max_abs_speed = std::max(std::abs(left_speed_raw), std::abs(right_speed_raw));
-    if (max_abs_speed > 1e-6f)
-    {
-        left_speed = std::clamp(left_speed_raw / max_abs_speed, 0.0f, 1.0f);
-        right_speed = std::clamp(right_speed_raw / max_abs_speed, 0.0f, 1.0f);
+    if (angle_error > 0.0f) {
+        // Turn left = slow down left wheel
+        left_speed = forward_output * (1.0f - turn_ratio);
+        right_speed = forward_output;
+    } else {
+        // Turn right = slow down right wheel
+        left_speed = forward_output;
+        right_speed = forward_output * (1.0f - turn_ratio);
     }
+    PISAR_LOG_INFO("(%f, %f) -> (%f, %f)", forward_output, turn_ratio, left_speed, right_speed);
 
-    //PISAR_LOG_INFO("Left Speed: %f, Right Speed: %f", left_speed, right_speed);
+    left_speed = std::clamp(left_speed, 0.0f, 1.0f);
+    right_speed = std::clamp(right_speed, 0.0f, 1.0f);
 
     // DRIVEEEEE!!! :D
     m_facility.get().getDriveController().tankDrive(left_speed, right_speed);

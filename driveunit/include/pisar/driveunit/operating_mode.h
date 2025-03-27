@@ -99,9 +99,9 @@ private:
     static constexpr float kDotProductTolerance = 120.0f;
     static constexpr float kAngleLockThreshold = 35.0f;
 
-    static constexpr float kPidkpRotation = 0.0001f;
+    static constexpr float kPidkpRotation = 0.0015f;
     static constexpr float kPidkiRotation = 0.0f;
-    static constexpr float kPidkdRotation = 0.0f;//0001f;
+    static constexpr float kPidkdRotation = 0.0004f;
 
     static constexpr float kPidkpTravel = 0.01f;
     static constexpr float kPidkiTravel = 0.0f;
@@ -109,7 +109,7 @@ private:
 
     std::reference_wrapper<RobotFacility> m_facility;
     std::vector<Eigen::Vector2f> m_trajectory;
-    std::chrono::duration<float> m_reference_time;
+    std::chrono::microseconds m_reference_time;
 
     PidController m_pid_rotation;
     PidController m_pid_travel;
