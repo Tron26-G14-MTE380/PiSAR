@@ -177,7 +177,7 @@ OperatingModeGoToTarget::OperatingModeGoToTarget(RobotFacility& facility, const 
     m_facility(facility),
     m_target(target),
     m_pid_rotation(kPidkpRotation, kPidkiRotation, kPidkdRotation, -1.0f, 1.0f),
-    m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 1.0f),
+    m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 1.0f)
 {
     const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
     m_pid_travel.setGains(kPidkpTravel * pid_adj_scale, kPidkiTravel * pid_adj_scale, kPidkdTravel * pid_adj_scale);
@@ -185,6 +185,11 @@ OperatingModeGoToTarget::OperatingModeGoToTarget(RobotFacility& facility, const 
     // ELEPHANT do a lot of bs with ash about distance travelled after image vs actual travel attempt
     m_facility.get().getKinematicTracker().reset(false);
 
+}
+
+void OperatingModeGoToTarget::onEnterImpl()
+{
+    m_facility.get().getDriveController().hardStop();
 }
 
 [[nodiscard]] bool OperatingModeGoToTarget::updateImpl()

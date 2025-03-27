@@ -47,7 +47,7 @@ struct CommandFollowTrajectory
     using serialize = zpp::bits::members<2>;
     using ReferenceTimeT = std::chrono::microseconds;
 
-    ReferenceTimeT reference_time;
+    uint32_t reference_time;
     std::vector<Eigen::Vector2f> trajectory;
 };
 

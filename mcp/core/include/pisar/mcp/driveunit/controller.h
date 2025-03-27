@@ -74,7 +74,7 @@ public:
         const std::span<const Eigen::Vector2f>& trajectory
     )
     {
-        driveunit_interface::CommandFollowTrajectory command{reference_time, std::vector<Eigen::Vector2f>(trajectory.begin(), trajectory.end())};
+        driveunit_interface::CommandFollowTrajectory command{reference_time.count(), std::vector<Eigen::Vector2f>(trajectory.begin(), trajectory.end())};
         auto response = sendRequest<driveunit_interface::CommandFollowTrajectory, driveunit_interface::CommandResponse>(command);
         return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pisar/mcp/driveunit/sync.h"
+#include "pisar/driveunit/sync.h"
 #include "pisar/utilities/type_info.h"
 
 #include "Arduino.h"

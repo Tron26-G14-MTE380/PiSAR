@@ -43,7 +43,7 @@ public:
                             {
                                 PISAR_LOG_DEBUG("Got command 'Follow Trajectory'");
                                 m_operating_mode_manager.template switchMode(OperatingModeFollowTrajectory(
-                                   m_robot_facility, std::span(command.trajectory), command.reference_time
+                                   m_robot_facility, std::span(command.trajectory), std::chrono::microseconds(command.reference_time)
                                 ));
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },

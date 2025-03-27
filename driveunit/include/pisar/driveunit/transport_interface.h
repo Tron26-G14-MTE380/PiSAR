@@ -3,10 +3,10 @@
 #include "pisar/driveunit_interface/codec.h"
 #include "pisar/driveunit_interface/interface.h"
 
-#include "pisar/mcp/driveunit/async_serial_uart.h"
+#include "pisar/driveunit/async_serial_uart.h"
 
-#include "pisar/mcp/driveunit/rtos/stream_buffer.h"
-#include "pisar/mcp/driveunit/logging.h"
+#include "pisar/driveunit/rtos/stream_buffer.h"
+#include "pisar/driveunit/logging.h"
 
 #include "pisar/utilities/fixed_vector.h"
 
