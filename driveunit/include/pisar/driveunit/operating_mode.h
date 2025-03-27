@@ -113,7 +113,7 @@ private:
 
     PidController m_pid_rotation;
     PidController m_pid_travel;
-    
+
 
     int m_target_index;
 
@@ -128,13 +128,13 @@ public:
     OperatingModeFollowTrajectory(
         RobotFacility& facility,
         const std::span<const Eigen::Vector2f> trajectory,
-        const std::chrono::duration<float> reference_time
+        const std::chrono::microseconds reference_time
     );
     void onEnterImpl();
     [[nodiscard]] bool updateImpl();
     void onExitImpl();
 
-    [[nodiscard]] inline std::chrono::duration<float> updateDeltaTime() 
+    [[nodiscard]] inline std::chrono::duration<float> updateDeltaTime()
     {
         const auto current_time = std::chrono::milliseconds(millis());
         std::chrono::duration<float> elapsed = current_time - m_last_update_time;
@@ -179,7 +179,7 @@ public:
     [[nodiscard]] bool updateImpl();
     void onExitImpl();
 
-    [[nodiscard]] inline std::chrono::duration<float> updateDeltaTime() 
+    [[nodiscard]] inline std::chrono::duration<float> updateDeltaTime()
     {
         const auto current_time = std::chrono::milliseconds(millis());
         std::chrono::duration<float> elapsed = current_time - m_last_update_time;
@@ -213,13 +213,13 @@ public:
     [[nodiscard]] bool updateImpl();
     void onExitImpl();
 
-    [[nodiscard]] inline std::chrono::duration<float> updateDeltaTime() 
+    [[nodiscard]] inline std::chrono::duration<float> updateDeltaTime()
     {
         const auto current_time = std::chrono::milliseconds(millis());
         std::chrono::duration<float> elapsed = current_time - m_last_update_time;
         m_last_update_time = current_time;
         return elapsed;
-    }    
+    }
 };
 
 class OperatingModeSetGripper : public OperatingMode<OperatingModeSetGripper>

@@ -12,10 +12,10 @@ template <typename T>
 
 ///////////////////////////////////////////// OperatingModeFollowTrajectory ////////////////////////////////////////////
 
-OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& facility, const std::span<const Eigen::Vector2f> trajectory, const std::chrono::duration<float> reference_time) :
+OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& facility, const std::span<const Eigen::Vector2f> trajectory, const std::chrono::microseconds reference_time) :
     m_facility(facility),
     m_trajectory(trajectory.begin(), trajectory.end()),
-    m_reference_time(std::chrono::milliseconds(millis() - 25)),
+    m_reference_time(std::chrono::microseconds(micros()) - reference_time),
     m_pid_rotation(kPidkpRotation, kPidkiRotation, kPidkdRotation, 0.0f, 1.0f),
     m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 1e6f),
     m_target_index(0),
