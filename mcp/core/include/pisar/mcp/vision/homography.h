@@ -1,0 +1,141 @@
+#pragma once
+
+#include <span>
+#include <Eigen/Dense>
+#include "pisar/mcp/vision/camera.h"
+
+namespace pisar::mcp {
+
+class HomographySizedProjection {
+private:
+    Eigen::Vector3d m_camera_position;
+    Eigen::Matrix3d m_inverse_world_to_image_transformation;
+
+public:
+    inline HomographySizedProjection(
+        const Eigen::Vector3d cam_position,
+        const Eigen::Matrix3d& inverse_world_to_camera_transformation,
+        const Eigen::Matrix3d& camera_instrinsic_matrix
+    ) :
+        m_camera_position(cam_position),
+        m_inverse_world_to_image_transformation(inverse_world_to_camera_transformation * camera_instrinsic_matrix.inverse())
+    {
+    }
+
+    inline HomographySizedProjection(
+        const Eigen::Vector3d cam_position,
+        const Eigen::Matrix3d& inverse_world_to_camera_transformation,
+        const CameraCalibrationData& cam_calib,
+        const CameraCaptureConfig& capture
+    ) : HomographySizedProjection(cam_position, inverse_world_to_camera_transformation, cam_calib.get_transformation(capture))
+    {
+    }
+
+    inline HomographySizedProjection(
+        const CameraTransform& cam_transform,
+        const Eigen::Matrix3d& axis_mapping,
+        const Eigen::Matrix3d& camera_instrinsic_matrix
+    ) :
+        m_camera_position(cam_transform.position),
+        m_inverse_world_to_image_transformation((
+            camera_instrinsic_matrix * axis_mapping * cam_transform.tilt.toRotationMatrix()
+        ).inverse())
+    {
+    }
+
+    inline HomographySizedProjection(
+        const CameraTransform cam_transform,
+        const Eigen::Matrix3d& axis_mapping,
+        const CameraCalibrationData& cam_calib,
+        const CameraCaptureConfig& capture
+    ) : HomographySizedProjection(cam_transform, axis_mapping, cam_calib.get_transformation(capture))
+    {
+    }
+
+    [[nodiscard]]
+    inline Eigen::Vector2d project(const Eigen::Vector2i& pixel_coord) const
+    {
+        const Eigen::Vector3i pixel_homogeneous = pixel_coord.homogeneous();
+        const Eigen::Vector3d world_homogeneous = m_inverse_world_to_image_transformation * pixel_homogeneous.cast<double>();
+
+        const double zc = m_camera_position.z() / world_homogeneous.z();
+        return world_homogeneous.head<2>() * zc + m_camera_position.head<2>();
+    }
+
+    /**
+     * @brief Project a set of pixel coordinates to world coordinates. Writes in place to @p world_coords
+     *
+     * @param pixel_coords The span of pixel coordinates to project.
+     * @param world_coords The output span of world coordinates.
+     */
+    inline void project(const std::span<const Eigen::Vector2i> pixel_coords, const std::span<Eigen::Vector2d> world_coords) const
+    {
+        if (pixel_coords.empty())
+        {
+            return;
+        }
+
+        for (int i = 0; i < pixel_coords.size(); ++i)
+        {
+            world_coords[i] = project(pixel_coords[i]);
+        }
+    }
+
+    /**
+     * @brief Project a set of pixel coordinates to world coordinates. Returns a vector.
+     *
+     * @param pixel_coords The span of pixel coordinates to project.
+     * @return Vector of world coordinates.
+     */
+    [[nodiscard]] inline std::vector<Eigen::Vector2d> project(const std::span<const Eigen::Vector2i> pixel_coords) const
+    {
+        if (pixel_coords.empty())
+        {
+            return {};
+        }
+
+        std::vector<Eigen::Vector2d> world_coords(pixel_coords.size(), Eigen::Vector2d::Zero());
+        project(pixel_coords, std::span(world_coords));
+        return world_coords;
+    }
+
+    [[nodiscard]] inline Eigen::Vector3d cameraPosition() const
+    {
+        return m_camera_position;
+    }
+};
+
+class HomographyProjection {
+private:
+    Eigen::Vector3d m_camera_position;
+    Eigen::Matrix3d m_inverse_world_to_camera_transformation;
+    CameraCalibrationData m_cam_calibration;
+
+public:
+    inline HomographyProjection(
+        const CameraTransform& cam_transform,
+        const Eigen::Matrix3d& axis_mapping,
+        const CameraCalibrationData cam_calib
+    ) :
+        m_camera_position(cam_transform.position),
+        m_inverse_world_to_camera_transformation((
+            axis_mapping * cam_transform.tilt.toRotationMatrix()
+        ).inverse()),
+        m_cam_calibration(cam_calib)
+    {
+    }
+
+    [[nodiscard]]
+    inline HomographySizedProjection forCapture(const CameraCaptureConfig& capture) const
+    {
+        return HomographySizedProjection(
+            m_camera_position,
+            m_inverse_world_to_camera_transformation,
+            m_cam_calibration,
+            capture
+        );
+    }
+
+};
+
+}

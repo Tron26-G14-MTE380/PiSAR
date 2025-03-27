@@ -33,8 +33,9 @@ ExternalProject_Add(
         -DWITH_GSTREAMER=ON
         -DWITH_V4L=ON
         -DWITH_LIBV4L=ON
-        -DWITH_OPENGL=ON
+        -DWITH_OPENGL=OFF
         -DBUILD_opencv_videoio=ON
         -DWITH_OPENEXR=OFF
+        -DWITH_FFMPEG=ON
     INSTALL_COMMAND cmake --install .
 )

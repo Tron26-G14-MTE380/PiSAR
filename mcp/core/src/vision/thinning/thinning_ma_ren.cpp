@@ -6,7 +6,7 @@
  * and Valery Kanstantinavich Kanapelka for the theory behind the algorithm.
  */
 
-#include "pisar/vision/thinning.h"
+#include "pisar/mcp/vision/thinning.h"
 
 #include <opencv2/opencv.hpp>
 #include <easy/profiler.h>

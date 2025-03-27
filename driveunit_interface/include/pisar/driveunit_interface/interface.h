@@ -102,8 +102,9 @@ struct CommandIdle
 struct CommandFollowTrajectory
 {
     using serialize = zpp::bits::members<2>;
+    using ReferenceTimeT = std::chrono::microseconds;
 
-    std::chrono::duration<float> reference_time;
+    ReferenceTimeT reference_time;
     std::vector<Eigen::Vector2f> trajectory;
 };
 

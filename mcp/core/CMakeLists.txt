@@ -11,8 +11,11 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../driveunit_interface driveunit_i
 
 # Detect if building on Raspberry Pi
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_NAME MATCHES "Linux")
-    message(STATUS "Building for Raspberry Pi: Enabling wiringPi")
+    message(STATUS "Building for Raspberry Pi: Enabling wiringPi and libcamera")
     find_library(WIRINGPI_LIB wiringPi)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(Libcamera REQUIRED libcamera)
+    pkg_check_modules(Pisp REQUIRED libpisp)
     set(PISAR_CORE_BUILD_RASPBERRY_PI TRUE)
 else()
     message(STATUS "Not on Raspberry Pi: Skipping wiringPi and libcamera")
@@ -36,8 +39,8 @@ target_sources(pisar_core
     src/vision/thinning/thinning_ma_ren.cpp
     src/vision/debug_visualization.cpp
     src/vision/path_extraction.cpp
-    src/vision/path_simplification.cpp
     src/vision/utils.cpp
+    src/vision/camera_source.cpp
 )
 
 target_link_libraries(pisar_core
@@ -51,7 +54,9 @@ target_link_libraries(pisar_core
 
 # Link wiringPi only if on Raspberry Pi
 if(PISAR_CORE_BUILD_RASPBERRY_PI)
-    target_link_libraries(pisar_core PUBLIC ${WIRINGPI_LIB})
+    target_include_directories(pisar_core PUBLIC ${Libcamera_INCLUDE_DIRS} ${Pisp_INCLUDE_DIRS})
+    target_link_libraries(pisar_core PUBLIC ${WIRINGPI_LIB} ${Libcamera_LIBRARIES} ${Pisp_LIBRARIES})
+    target_compile_options(pisar_core PUBLIC ${Libcamera_CFLAGS_OTHER} ${Pisp_CFLAGS_OTHER})
 endif()
 
 set_target_properties(pisar_core PROPERTIES

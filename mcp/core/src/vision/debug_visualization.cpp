@@ -1,15 +1,63 @@
-#include "pisar/vision/debug_visualization.h"
+#include "pisar/mcp/vision/debug_visualization.h"
 
 namespace pisar::mcp {
 
-cv::Mat createHomographyProjectionVisualization(
-    cv::Size2i image_size,
-    const HomographySizedProjection& projection,
-    const std::vector<Eigen::Vector2d>& trajectory
+
+cv::Mat createTrajectoryVisualization(
+    const cv::Size& image_size,
+    const std::vector<Eigen::Vector2i>& points,
+    const cv::Scalar& color,
+    const std::optional<cv::Scalar>& first_point_color,
+    const std::optional<cv::Scalar>& last_point_color
 )
 {
+    if (points.empty())
+    {
+        return {};
+    }
+
+    cv::Mat output = cv::Mat::zeros(image_size.height, image_size.width, CV_8UC3);
+
+    const cv::Scalar first_color = first_point_color.value_or(cv::Scalar(0, 255, 0));
+    const cv::Scalar last_color = last_point_color.value_or(cv::Scalar(0, 0, 255));
+
+    // Connect points with lines
+    for (size_t i = 1; i < points.size(); ++i)
+    {
+        const auto prev_pt = cv::Point(points[i - 1].x(), points[i - 1].y());
+        const auto current_pt = cv::Point(points[i].x(), points[i].y());
+        cv::line(output, prev_pt, current_pt, color, 1);
+    }
+
+    // Draw points
+    for (int i = 0; i < points.size(); ++i)
+    {
+        const auto& pt = points[i];
+        const auto c = i == 0 ? first_color : (i == points.size() - 1 ? last_color : color);
+        const int point_size = (i == 0 || i == points.size() - 1) ? 2 : 1;
+
+        cv::circle(output, cv::Point(pt.x(), pt.y()), point_size, c, cv::FILLED);
+    }
+
+    return output;
+}
+
+cv::Mat createHomographyProjectionVisualization(
+    cv::Size image_size,
+    const HomographySizedProjection& projection,
+    const std::span<const Eigen::Vector2d>& trajectory
+)
+{
+    if (trajectory.empty())
+    {
+        return {};
+    }
+
     // Create a blank image
     cv::Mat visualization = cv::Mat::zeros(image_size.height, image_size.width, CV_8UC3);
+
+    const Eigen::Vector2d robot_position = Eigen::Vector2d::Zero();
+    const Eigen::Vector2d camera_position = projection.cameraPosition().head<2>();
 
     // Step 1: Generate a grid of points for visualization
     std::vector<Eigen::Vector2i> camera_view_grid_image_points;
@@ -27,12 +75,15 @@ cv::Mat createHomographyProjectionVisualization(
     std::vector<Eigen::Vector2d> camera_view_grid_world_points = projection.project(std::span(camera_view_grid_image_points));
 
     // Combine trajectory and projected grid points for world bounds computation
-    std::vector<Eigen::Vector2d> all_world_points = trajectory;
+    auto all_world_points = std::vector<Eigen::Vector2d>(trajectory.begin(), trajectory.end());
     all_world_points.insert(
         all_world_points.end(),
         camera_view_grid_world_points.begin(),
         camera_view_grid_world_points.end()
     );
+
+    all_world_points.push_back(robot_position);
+    all_world_points.push_back(camera_position);
 
     // Find world bounds
     double X_min = std::numeric_limits<double>::max(), X_max = std::numeric_limits<double>::lowest();
@@ -71,10 +122,7 @@ cv::Mat createHomographyProjectionVisualization(
     std::vector<cv::Point2f> image_trajectory(trajectory.size(), {0});
     std::transform(trajectory.begin(), trajectory.end(), image_trajectory.begin(), worldToImageFixed);
 
-    const Eigen::Vector2d camera_position = projection.cameraPosition().head<2>();
     cv::Point2f image_camera_position = worldToImageFixed(camera_position);
-
-    const Eigen::Vector2d robot_position = Eigen::Vector2d::Zero();
     cv::Point2f image_robot_position = worldToImageFixed(robot_position);
 
     // Draw grid points
@@ -104,11 +152,11 @@ cv::Mat createHomographyProjectionVisualization(
 
 cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& debug_images, int max_size, int grid_padding)
 {
-    if (debug_images.empty()) 
+    if (debug_images.empty())
     {
         return cv::Mat::ones(100, 100, CV_8UC3) * 255; // Return a blank white canvas if empty
     }
-    
+
     std::vector<std::pair<std::string, cv::Mat>> processed_images;
     for (const auto& [name, img] : debug_images)
     {
@@ -183,7 +231,7 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& de
         }
 
         // Add text labels
-        cv::putText(grid_canvas, processed_images[i].first, 
+        cv::putText(grid_canvas, processed_images[i].first,
                     {start_point.x + 10, start_point.y + 20},
                     cv::FONT_HERSHEY_SIMPLEX, 0.5, {0, 255, 0}, 1, cv::LINE_AA);
     }
@@ -191,18 +239,71 @@ cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, cv::Mat>>& de
     return grid_canvas;
 }
 
+cv::Mat createDebugCanvas(const std::vector<std::pair<std::string, RoiMat>>& debug_images, int max_size, int grid_padding)
+{
+    if (debug_images.empty())
+    {
+        return cv::Mat::ones(100, 100, CV_8UC3) * 255; // Return a blank white canvas if empty
+    }
+
+    std::vector<std::pair<std::string, cv::Mat>> processed_images;
+    for (const auto& [name, roi_mat] : debug_images)
+    {
+        cv::Mat restored = roi_mat.restoreToOriginalSize();
+
+        if (!restored.empty())
+        {
+            // Convert grayscale to BGR to allow color overlays
+            if (restored.channels() == 1)
+            {
+                cv::cvtColor(restored, restored, cv::COLOR_GRAY2BGR);
+            }
+
+            if (roi_mat.getOffset() != cv::Point(0, 0) || roi_mat.getOriginalSize() != roi_mat.getMat().size())
+            {
+                // Draw a red border around the cropped area
+                cv::rectangle(restored, cv::Rect(roi_mat.getOffset(), roi_mat.getMat().size()), {0, 0, 255}, 5);
+            }
+        }
+
+        processed_images.emplace_back(name, restored);
+    }
+
+    return createDebugCanvas(processed_images, max_size, grid_padding);
+}
 
 void displayDebug(const cv::Mat debug_canvas)
 {
-    // Show the composite debug display
-    cv::imshow("Debug Data", debug_canvas);
-    const int key = cv::waitKey(1);  // Small delay to allow window to refresh
+    constexpr std::string_view debug_window_name = "Debug Data";
 
+    // Show the composite debug display
+    cv::imshow(debug_window_name.data(), debug_canvas);
+    const int key = cv::waitKey(1);  // Small delay to allow window to refresh
+    terminateOnWindowCloseOrEsc(debug_window_name, key);
+}
+
+bool windowClosed(const std::string_view window_name)
+{
 #ifdef _WIN32
-    if (key == 27 || cv::getWindowProperty("Debug Data", cv::WND_PROP_VISIBLE) <= 0)  // ESC key or window closed
+    return cv::getWindowProperty(window_name.data(), cv::WND_PROP_VISIBLE) <= 0;  // ESC key or window closed
 #else
-    if (key == 27 || cv::getWindowProperty("Debug Data", cv::WND_PROP_AUTOSIZE) < 0)  // ESC key or window closed
+    return cv::getWindowProperty(window_name.data(), cv::WND_PROP_AUTOSIZE) < 0;  // ESC key or window closed
 #endif
+}
+
+bool windowClosedOrEsc(const std::string_view window_name, const int key)
+{
+    if (key == 27 || windowClosed(window_name))  // ESC key or window closed
+    {
+        return true;
+    }
+
+    return false;
+}
+
+void terminateOnWindowCloseOrEsc(const std::string_view window_name, const int key)
+{
+    if (windowClosedOrEsc(window_name, key))
     {
         std::cout << "Debug window closed. Exiting program." << std::endl;
         cv::destroyAllWindows();
