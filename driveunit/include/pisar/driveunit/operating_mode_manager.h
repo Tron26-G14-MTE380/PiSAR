@@ -24,7 +24,9 @@ private:
 
     std::function<TDefaultMode()> m_default_mode_factory;               ///< Factory function for default mode
     std::optional<ModeT> m_next_mode;
-    Mutex m_mode_mutex;
+    mutable Mutex m_mode_mutex;
+    mutable Mutex m_current_mode_mutex;
+
     ModeT m_current_mode;                                               ///< Active mode.
     TaskHandle_t m_task_handle;                                         ///< FreeRTOS task handle for mode execution.
 
@@ -53,6 +55,12 @@ public:
         }
 
         return true;
+    }
+
+    [[nodiscard]] inline bool busy()
+    {
+        Lock<Mutex> lock(m_current_mode_mutex);
+        return std::holds_alternative<TDefaultMode>(m_current_mode);
     }
 
     /**
@@ -152,6 +160,8 @@ private:
     template<typename TMode, typename... TArgs>
     void switchModeImpl(TArgs&&... args)
     {
+        Lock<Mutex> lock(m_current_mode_mutex);
+
         exitMode();
         m_current_mode.template emplace<TMode>(std::forward<TArgs>(args)...);
         enterMode();
@@ -167,6 +177,8 @@ private:
      */
     void switchModeImpl(ModeT&& next_mode)
     {
+        Lock<Mutex> lock(m_current_mode_mutex);
+
         exitMode();
         m_current_mode = next_mode;
         enterMode();

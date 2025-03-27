@@ -46,11 +46,20 @@ public:
 
     /**
      * @brief Sends a heartbeat request.
-     * @return std::optional<HeartbeatResponse> The heartbeat response if successful, otherwise std::nullopt.
+     * @return The heartbeat response if successful, otherwise std::nullopt.
      */
-    inline rd::expected<driveunit_interface::HeartbeatResponse, std::error_code> sendHeartbeat()
+    inline rd::expected<driveunit_interface::HeartbeatResponse, std::error_code> sendHeartbeatRequest()
     {
         return sendRequest<driveunit_interface::HeartbeatRequest, driveunit_interface::HeartbeatResponse>(driveunit_interface::HeartbeatRequest{});
+    }
+
+    /**
+     * @brief Sends a command status request. Returns whether the driveunit is still busy with last command.
+     * @return The command status response if successful, otherwise error code.
+     */
+    inline rd::expected<driveunit_interface::CommandStatusResponse, std::error_code> sendCommandStatusRequest()
+    {
+        return sendRequest<driveunit_interface::CommandStatusRequest, driveunit_interface::CommandStatusResponse>(driveunit_interface::CommandStatusRequest{});
     }
 
     /**
@@ -60,6 +69,16 @@ public:
     inline rd::expected<bool, std::error_code> sendIdleCommand()
     {
         auto response = sendRequest<driveunit_interface::CommandIdle, driveunit_interface::CommandResponse>(driveunit_interface::CommandIdle{});
+        return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
+    }
+
+    /**
+     * @brief Sends a command to hard stop.
+     * @return true if the command was acknowledged, false otherwise.
+     */
+    inline rd::expected<bool, std::error_code> sendHardStopCommand()
+    {
+        auto response = sendRequest<driveunit_interface::CommandHardStop, driveunit_interface::CommandResponse>(driveunit_interface::CommandHardStop{});
         return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 
@@ -76,6 +95,23 @@ public:
     {
         driveunit_interface::CommandFollowTrajectory command{reference_time.count(), std::vector<Eigen::Vector2f>(trajectory.begin(), trajectory.end())};
         auto response = sendRequest<driveunit_interface::CommandFollowTrajectory, driveunit_interface::CommandResponse>(command);
+        return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
+    }
+
+    /**
+     * @brief Tell the driveunit to travel to target position.
+     *
+     * @param reference_time The reference time when position data was taken.
+     * @param target_position The target position.
+     * @return true if the command was acknowledged, false otherwise.
+     */
+    inline rd::expected<bool, std::error_code> sendGoToTargetCommand(
+        driveunit_interface::CommandGoToTarget::ReferenceTimeT reference_time,
+        const Eigen::Vector2f& target_position
+    )
+    {
+        driveunit_interface::CommandGoToTarget command{reference_time.count(), target_position};
+        auto response = sendRequest<driveunit_interface::CommandGoToTarget, driveunit_interface::CommandResponse>(command);
         return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 

@@ -39,11 +39,27 @@ public:
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },
 
+                            [this](const driveunit_interface::CommandHardStop& command) -> driveunit_interface::Response
+                            {
+                                PISAR_LOG_DEBUG("Got command 'Hardstop'");
+                                m_operating_mode_manager.template switchMode(OperatingModeHardStop(m_robot_facility));
+                                return driveunit_interface::DefaultResponse {.ack = true};
+                            },
+
                             [this](const driveunit_interface::CommandFollowTrajectory& command) -> driveunit_interface::Response
                             {
                                 PISAR_LOG_DEBUG("Got command 'Follow Trajectory'");
                                 m_operating_mode_manager.template switchMode(OperatingModeFollowTrajectory(
                                    m_robot_facility, std::span(command.trajectory), std::chrono::microseconds(command.reference_time)
+                                ));
+                                return driveunit_interface::DefaultResponse {.ack = true};
+                            },
+
+                            [this](const driveunit_interface::CommandGoToTargetcommand) -> driveunit_interface::Response
+                            {
+                                PISAR_LOG_DEBUG("Got command 'Go to target'");
+                                m_operating_mode_manager.template switchMode(OperatingModeGoToTarget(
+                                   m_robot_facility, std::span(command.target_position), std::chrono::microseconds(command.reference_time)
                                 ));
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },
@@ -57,6 +73,13 @@ public:
                         }, command
                     );
                 },
+
+                [this](const driveunit_interface::CommandStatusRequest& command) -> driveunit_interface::Response
+                {
+                    PISAR_LOG_DEBUG("Got Request 'Command status'");
+                    return driveunit_interface::CommandStatusResponse { m_operating_mode_manager.busy() };
+                }
+
                 [this](const driveunit_interface::HeartbeatRequest& command) -> driveunit_interface::Response
                 {
                     PISAR_LOG_DEBUG("Got Request 'Heartbeat'");

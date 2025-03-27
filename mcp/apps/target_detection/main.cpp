@@ -2,6 +2,7 @@
 #include "pisar/mcp/vision/camera_source.h"
 #include "pisar/mcp/vision/target_tracker.h"
 #include "pisar/mcp/vision/target_detector.h"
+#include "pisar/mcp/driveunit/controller.h"
 
 #include <easy/profiler.h>
 
@@ -16,9 +17,32 @@ using namespace pisar::mcp;
 
 constexpr bool kDebug = true;
 constexpr bool kProfile = false;
+constexpr bool kRunRobot = true;
 constexpr uint64_t kProfileTimeMs = 10000;
 constexpr double kFrameRateLimit = 10.0;
 constexpr auto kFrameDurationLimit = std::chrono::duration<double>(1.0 / kFrameRateLimit);
+
+
+void runRobot(DriveunitController& driveunit_controller, std::optional<Eigen::Vector2d> target_position, CapturedFrame::TimestampT frame_time)
+{
+    if (!target_position.has_value() || target_position.value().norm() < 0.002)
+    {
+        const auto du_response = driveunit_controller.sendHardStopCommand();
+        if (!du_response.has_value())
+        {
+            std::cerr << "Error sending trajectory: " << du_response.error().message() << std::endl;
+        }
+
+        return;
+    }
+
+    const auto reference_time = std::chrono::duration_cast<pisar::driveunit_interface::CommandFollowTrajectory::ReferenceTimeT>(CapturedFrame::ClockT::now() - frame_time);
+    const auto du_response = driveunit_controller.sendGoToTargetCommand(reference_time, target_position.value().cast<float>());
+    if (!du_response.has_value())
+    {
+        std::cerr << "Error sending trajectory: " << du_response.error().message() << std::endl;
+    }
+}
 
 int main()
 {
@@ -52,6 +76,14 @@ int main()
         sized_projection
     );
 
+    DriveunitTransport driveunit_transport;
+    DriveunitController driveunit_controller(driveunit_transport);
+
+    if constexpr (kRunRobot)
+    {
+        driveunit_transport.open();
+    }
+
     video_source.start();
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
 
@@ -74,6 +106,11 @@ int main()
         const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - loop_start).count(); // Convert to milliseconds
         const double fps = 1000000.0 / elapsed;
         std::cout << "targetTrack FPS: " << fps << std::endl;
+
+        if constexpr (kRunRobot)
+        {
+            runRobot(driveunit_controller, target_pos, captured_frame.value().timestamp);
+        }
 
         if constexpr (kDebug)
         {
@@ -110,5 +147,4 @@ int main()
     }
 
     video_source.stop();
-
 }
