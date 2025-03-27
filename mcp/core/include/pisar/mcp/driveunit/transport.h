@@ -105,7 +105,7 @@ public:
     template<typename TRequest, typename TResponse>
     [[nodiscard]]
     std::enable_if_t<!std::is_same_v<TRequest, driveunit_interface::Request>, rd::expected<TResponse, std::error_code>>
-    sendRequest(const TRequest& request, unsigned int retries);
+    sendRequest(const TRequest& request, const unsigned int retries);
 
     /**
      * @brief Sends a raw request with retry logic.
@@ -115,7 +115,7 @@ public:
      */
     [[nodiscard]]
     rd::expected<driveunit_interface::Response, std::error_code>
-    sendRequest(const driveunit_interface::Request& request, unsigned int retries);
+    sendRequest(const driveunit_interface::Request& request, const unsigned int retries);
 
 private:
 
@@ -172,11 +172,12 @@ DriveunitTransport::sendRequest(const TRequest& request)
 template<typename TRequest, typename TResponse>
 [[nodiscard]]
 std::enable_if_t<!std::is_same_v<TRequest, driveunit_interface::Request>, rd::expected<TResponse, std::error_code>>
-DriveunitTransport::sendRequest(const TRequest& request, unsigned int retries)
+DriveunitTransport::sendRequest(const TRequest& request, const unsigned int retries)
 {
     rd::expected<TResponse, std::error_code> last_error = rd::unexpected(make_error_code(Error::kNone));
 
-    while (retries-- >= 0)
+    int64_t retries_left = retries;
+    while (retries_left-- >= 0)
     {
         auto result = sendRequest<TRequest, TResponse>(request);
         if (result.has_value())
@@ -189,11 +190,12 @@ DriveunitTransport::sendRequest(const TRequest& request, unsigned int retries)
 }
 
 inline rd::expected<driveunit_interface::Response, std::error_code>
-DriveunitTransport::sendRequest(const driveunit_interface::Request& request, unsigned int retries)
+DriveunitTransport::sendRequest(const driveunit_interface::Request& request, const unsigned int retries)
 {
     rd::expected<driveunit_interface::Response, std::error_code> last_error = rd::unexpected(make_error_code(Error::kNone));
 
-    while (retries-- >= 0)
+    int64_t retries_left = retries;
+    while (retries_left-- >= 0)
     {
         auto result = sendRequest(request);
         if (result.has_value())

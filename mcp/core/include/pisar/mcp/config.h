@@ -24,7 +24,7 @@ static const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> gkRedTapeYuvThresh
 
 static const CameraTransform gkCameraTransform = {
     .position = {0, 10.0 / 100.0, 15.8 / 100.0},
-    .tilt = Eigen::AngleAxisd(pisar::mcp::degToRad<double>(-70), Eigen::Vector3d::UnitX())
+    .tilt = Eigen::AngleAxisd(pisar::degToRad<double>(-70), Eigen::Vector3d::UnitX())
 };
 
 static const auto gkCameraAxisMapping = Eigen::Matrix3d{

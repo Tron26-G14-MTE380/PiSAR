@@ -21,6 +21,10 @@
 			"path": "../mcp/apps/line_following"
 		},
 		{
+			"name": "mcp-target-tracking-demo",
+			"path": "../mcp/apps/target_detection"
+		},
+		{
 			"name": "mcp-interface-codec-test",
 			"path": "../mcp/apps/interface_codec"
 		},

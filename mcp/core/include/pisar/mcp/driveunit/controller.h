@@ -53,7 +53,7 @@ public:
      */
     inline rd::expected<driveunit_interface::HeartbeatResponse, std::error_code> sendHeartbeatRequest(const unsigned int retries = 0)
     {
-        return sendRequest<driveunit_interface::HeartbeatRequest, driveunit_interface::HeartbeatResponse>(driveunit_interface::HeartbeatRequest{});
+        return sendRequest<driveunit_interface::HeartbeatRequest, driveunit_interface::HeartbeatResponse>(driveunit_interface::HeartbeatRequest{}, retries);
     }
 
     /**
@@ -63,7 +63,7 @@ public:
      */
     inline rd::expected<driveunit_interface::CommandStatusResponse, std::error_code> sendCommandStatusRequest(const unsigned int retries = 0)
     {
-        return sendRequest<driveunit_interface::CommandStatusRequest, driveunit_interface::CommandStatusResponse>(driveunit_interface::CommandStatusRequest{});
+        return sendRequest<driveunit_interface::CommandStatusRequest, driveunit_interface::CommandStatusResponse>(driveunit_interface::CommandStatusRequest{}, retries);
     }
 
     /**
@@ -73,7 +73,7 @@ public:
      */
     inline rd::expected<bool, std::error_code> sendIdleCommand(const unsigned int retries = 0)
     {
-        auto response = sendRequest<driveunit_interface::CommandIdle, driveunit_interface::CommandResponse>(driveunit_interface::CommandIdle{});
+        auto response = sendRequest<driveunit_interface::CommandIdle, driveunit_interface::CommandResponse>(driveunit_interface::CommandIdle{}, retries);
         return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 
@@ -84,7 +84,7 @@ public:
      */
     inline rd::expected<bool, std::error_code> sendHardStopCommand(const unsigned int retries = 0)
     {
-        auto response = sendRequest<driveunit_interface::CommandHardStop, driveunit_interface::CommandResponse>(driveunit_interface::CommandHardStop{});
+        auto response = sendRequest<driveunit_interface::CommandHardStop, driveunit_interface::CommandResponse>(driveunit_interface::CommandHardStop{}, retries);
         return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 
@@ -102,7 +102,7 @@ public:
     )
     {
         driveunit_interface::CommandFollowTrajectory command{reference_time.count(), std::vector<Eigen::Vector2f>(trajectory.begin(), trajectory.end())};
-        auto response = sendRequest<driveunit_interface::CommandFollowTrajectory, driveunit_interface::CommandResponse>(command);
+        auto response = sendRequest<driveunit_interface::CommandFollowTrajectory, driveunit_interface::CommandResponse>(command, retries);
         return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 
@@ -121,7 +121,7 @@ public:
     )
     {
         driveunit_interface::CommandGoToTarget command{reference_time.count(), target_position};
-        auto response = sendRequest<driveunit_interface::CommandGoToTarget, driveunit_interface::CommandResponse>(command);
+        auto response = sendRequest<driveunit_interface::CommandGoToTarget, driveunit_interface::CommandResponse>(command, retries);
         return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 
@@ -134,7 +134,7 @@ public:
     inline rd::expected<bool, std::error_code> sendRotateCommand(float degrees, const unsigned int retries = 0)
     {
         driveunit_interface::CommandRotate command{degrees};
-        auto response = sendRequest<driveunit_interface::CommandRotate, driveunit_interface::CommandResponse>(command);
+        auto response = sendRequest<driveunit_interface::CommandRotate, driveunit_interface::CommandResponse>(command, retries);
         return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 
@@ -147,7 +147,7 @@ public:
     inline rd::expected<bool, std::error_code> sendGripperCommand(bool open, const unsigned int retries = 0)
     {
         driveunit_interface::CommandSetGripper command{open};
-        auto response = sendRequest<driveunit_interface::CommandSetGripper, driveunit_interface::CommandResponse>(command);
+        auto response = sendRequest<driveunit_interface::CommandSetGripper, driveunit_interface::CommandResponse>(command, retries);
         return response.transform([](driveunit_interface::CommandResponse response) { return response.ack; });
     }
 };
