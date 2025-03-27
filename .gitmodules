@@ -13,3 +13,6 @@
 [submodule "thirdparty/sml/sml"]
 	path = thirdparty/sml/sml
 	url = https://github.com/boost-ext/sml.git
+[submodule "thirdparty/arduino_plotter/arduino_plotter"]
+	path = thirdparty/arduino_plotter/arduino_plotter
+	url = https://github.com/devinaconley/arduino-plotter.git
