@@ -12,13 +12,16 @@
 
 using namespace pisar::driveunit;
 
-MotorDriver left_motor(7, 6, 0.2f);
-MotorDriver right_motor(8, 9, 0.2f);
+Imu imu(SPI1, 13, 12, 11, 10, 14, "/imu_calibration_data.bin");
+ImuPlanarKinematicTracker kinematic_tracker(imu, "/kinematic_tracker_calibration_data.bin");
 
-DifferentialDriveController drive_controller(left_motor, right_motor, 10);
-Imu imu(SPI1, 3);
-RobotFacility facility(drive_controller, imu);
+MotorDriver left_motor(7, 6, 0.06f, 0.2f);
+MotorDriver right_motor(8, 9, 0.06f, 0.2f);
+DifferentialDriveController drive_controller(left_motor, right_motor, 10, 1.0f, 4.0f);
 
+GripperController gripper_controller(15);
+
+RobotFacility facility(drive_controller, kinematic_tracker, gripper_controller);
 
 /// @brief Factory function for creating the default mode
 inline OperatingModeIdle createDefaultMode()
@@ -26,40 +29,84 @@ inline OperatingModeIdle createDefaultMode()
     return OperatingModeIdle(facility);
 }
 
-using OperatingModeManagerT = OperatingModeManager<OperatingModeIdle, OperatingModeFollowTrajectory, OperatingModeRotate>;
+using OperatingModeManagerT = OperatingModeManager<OperatingModeIdle, OperatingModeHardStop, OperatingModeFollowTrajectory, OperatingModeGoToTarget, OperatingModeRotate>;
 OperatingModeManagerT operating_mode_manager(createDefaultMode);
 
 MessageHandler message_handler(facility, operating_mode_manager);
 TransportInterface<decltype(message_handler)> transport_interface(AsyncSerial2, message_handler);
 
-void setup()
+void pisarSetup()
 {
     initLogging(115200, LogLevel::kDebug, false);
 
     AsyncSerial2.setTX(4);
     AsyncSerial2.setRX(5);
 
-    pinMode(25, OUTPUT);
-    digitalWrite(25, LOW);
+    if (!LittleFS.begin())
+    {
+        PISAR_LOG_ERROR("Failed to initialize LittleFS!");
+        return;
+    }
+    PISAR_LOG_INFO("Little FS Initialized");
 
-    // initDebugMonitor();
+    if (!imu.initialize())
+    {
+        PISAR_LOG_ERROR("Failed to initialize IMU!");
+        return;
+    }
+    PISAR_LOG_INFO("Imu Initialized");
 
-    facility.initialize(configMAX_PRIORITIES-3);
-    PISAR_LOG_INFO("Robot facility initialized");
+    // auto calib_data = imu.getCalibration();
+    // PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", calib_data.accel_offset.x(), calib_data.accel_offset.y(), calib_data.accel_offset.z());
+    // PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", calib_data.gyro_offset.x(), calib_data.gyro_offset.y(), calib_data.gyro_offset.z());
 
-    operating_mode_manager.initialize(configMAX_PRIORITIES-2);
+    if (!kinematic_tracker.initialize(configMAX_PRIORITIES-2))
+    {
+        PISAR_LOG_ERROR("Failed to initialize kinematic tracker!");
+        return;
+    }
+    PISAR_LOG_INFO("Kinematic tracker initialized");
+
+    if (!drive_controller.initialize(configMAX_PRIORITIES-2))
+    {
+        PISAR_LOG_ERROR("Failed to initialize drive controller!");
+        return;
+    }
+    PISAR_LOG_INFO("Drive controller initialized");
+
+    if (!gripper_controller.initialize())
+    {
+        PISAR_LOG_ERROR("Failed to initialize gripper controller!");
+        return;
+    }    
+    PISAR_LOG_INFO("Gripper Controller initialized");
+    
+    if (!facility.initialize())
+    {
+        PISAR_LOG_ERROR("Failed to initialize facility!");
+        return;
+    }
+    PISAR_LOG_INFO("Facility initialized");
+
+ 
+    if (!operating_mode_manager.initialize(configMAX_PRIORITIES-3))
+    {
+        PISAR_LOG_ERROR("Failed to initialize operating mode manager!");
+        return;
+    }
     PISAR_LOG_INFO("Operating mode manager initialized");
 
-    transport_interface.initialize(configMAX_PRIORITIES-1);
+    if (!transport_interface.initialize(configMAX_PRIORITIES-1))
+    {
+        PISAR_LOG_ERROR("Failed to initialize transport interface!");
+        return;
+    }
     PISAR_LOG_INFO("Transport interface initialized");
 }
 
-void loop()
+void pisarLoop()
 {
     PISAR_LOG_INFO("Hello World!");
-    digitalWrite(25, LOW);
-    delay(1000);
-    digitalWrite(25, HIGH);
-    delay(1000);
+    delay(3000);
 }
 

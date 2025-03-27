@@ -38,19 +38,21 @@ public:
     {}
 
     /// @brief Initialize the operating mode manager and run thread loop.
-    void initialize(UBaseType_t task_priority)
+    [[nodiscard]] bool initialize(UBaseType_t task_priority)
     {
         if (task_priority < 0 || task_priority > configMAX_PRIORITIES)
         {
             PISAR_LOG_ERROR("Task priority %u is out of range");
-            return; // TODO ERROR CODE
+            return false; // TODO ERROR CODE
         }
 
         if (xTaskCreate(taskEntry, "Mode_Manager", 4096, this, task_priority, &m_task_handle) != pdPASS)
         {
             PISAR_LOG_ERROR("Failed to create operating mode manager task!");
-            return; // TODO ERROR CODE
+            return false; // TODO ERROR CODE
         }
+
+        return true;
     }
 
     /**

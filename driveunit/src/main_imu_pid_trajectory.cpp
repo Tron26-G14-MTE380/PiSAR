@@ -26,10 +26,13 @@ MotorDriver left_motor(7, 6, 0.06f, 0.2f);
 MotorDriver right_motor(8, 9, 0.06f, 0.2f);
 DifferentialDriveController drive_controller(left_motor, right_motor, 10, 1.0f, 4.0f);
 
+// Servo Driver Instance
+ServoDriver servo_driver(15);
+
 static constexpr bool kDoCalibration = false;
 static constexpr auto kTrackerResetTime = std::chrono::milliseconds(5000);
 
-RobotFacility facility(drive_controller, kinematic_tracker);
+RobotFacility facility(drive_controller, kinematic_tracker, servo_driver);
 
 /// @brief Factory function for creating the default mode
 inline OperatingModeIdle createDefaultMode()
@@ -37,6 +40,7 @@ inline OperatingModeIdle createDefaultMode()
     return OperatingModeIdle(facility);
 }
 
+// ELEPHANT - do we add hard stop here?
 using OperatingModeManagerT = OperatingModeManager<OperatingModeIdle, OperatingModeFollowTrajectory, OperatingModeRotate, OperatingModeGoToTarget>;
 OperatingModeManagerT operating_mode_manager(createDefaultMode);
 
@@ -90,6 +94,12 @@ void pisarSetup()
         PISAR_LOG_ERROR("Failed to initialize drive controller!");
         return;
     }
+
+    if (!servo_driver.initialize())
+    {
+        PISAR_LOG_ERROR("Failed to initialize servo driver!");
+        return;
+    }    
 
     // if (!kinematic_tracker.calibrate(3, 1000, true))
     // {

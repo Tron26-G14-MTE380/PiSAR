@@ -61,23 +61,25 @@ public:
      * @brief Initializes UART and starts the processing task.
      * @param task_priority Priority of the processing task.
      */
-    void initialize(UBaseType_t task_priority)
+    [[nodiscard]] bool initialize(UBaseType_t task_priority)
     {
         if (task_priority < 0 || task_priority > configMAX_PRIORITIES)
         {
             PISAR_LOG_ERROR("Task priority %u is out of range", task_priority);
-            return; // TODO ERROR CODE
+            return false; // TODO ERROR CODE
         }
 
         // Spawn the processing task
         if (xTaskCreate(taskEntry, "transport_interface_task", 2048, this, task_priority, &m_task_handle) != pdPASS)
         {
             PISAR_LOG_ERROR("Failed to create SPI processing task");
-            return;
+            return false; // TODO ERROR CODE
         }
 
         // Initialize UART
         m_uart.begin(driveunit_interface::kUartSpeed);
+
+        return true;
     }
 
 private:
