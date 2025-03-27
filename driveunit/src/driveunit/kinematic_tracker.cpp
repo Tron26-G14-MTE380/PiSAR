@@ -102,8 +102,10 @@ void ImuPlanarKinematicTracker::onImuReading(const Imu::AccelData& accel_data, c
         return; // Skip first update
     }
 
+    const auto oriented_accel_data = Eigen::Vector3f(-accel_data.values.y(), accel_data.values.x() , accel_data.values.z());
+
     // --- APPLY LOW-PASS FILTERS TO ACCEL & GYRO ---
-    const auto filtered_accel_data = m_accel_filter.update(accel_data.values);
+    const auto filtered_accel_data = m_accel_filter.update(oriented_accel_data);
     const auto filtered_gyro_data = m_gyro_filter.update(gyro_data.values);
 
     m_current_state.angular_velocity = filtered_gyro_data.z();

@@ -97,10 +97,11 @@ private:
     static constexpr float kThetaTolerance = 5.0f;
     static constexpr float kDistTolerance = 0.0000001f;
     static constexpr float kDotProductTolerance = 120.0f;
+    static constexpr float kAngleLockThreshold = 35.0f;
 
-    static constexpr float kPidkpRotation = 0.000005f;
+    static constexpr float kPidkpRotation = 0.0001f;
     static constexpr float kPidkiRotation = 0.0f;
-    static constexpr float kPidkdRotation = 0.0001f;
+    static constexpr float kPidkdRotation = 0.0f;//0001f;
 
     static constexpr float kPidkpTravel = 0.01f;
     static constexpr float kPidkiTravel = 0.0f;
@@ -112,6 +113,7 @@ private:
 
     PidController m_pid_rotation;
     PidController m_pid_travel;
+    
 
     int m_target_index;
 

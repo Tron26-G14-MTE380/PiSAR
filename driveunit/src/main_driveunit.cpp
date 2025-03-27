@@ -15,8 +15,8 @@ using namespace pisar::driveunit;
 Imu imu(SPI1, 13, 12, 11, 10, 14, "/imu_calibration_data.bin");
 ImuPlanarKinematicTracker kinematic_tracker(imu, "/kinematic_tracker_calibration_data.bin");
 
-MotorDriver left_motor(7, 6, 0.06f, 0.2f);
-MotorDriver right_motor(8, 9, 0.06f, 0.2f);
+MotorDriver left_motor(7, 6, 0.06f, 0.1f);
+MotorDriver right_motor(8, 9, 0.06f, 0.1f);
 DifferentialDriveController drive_controller(left_motor, right_motor, 10, 1.0f, 4.0f);
 
 GripperController gripper_controller(15);
@@ -37,7 +37,7 @@ TransportInterface<decltype(message_handler)> transport_interface(AsyncSerial2, 
 
 void pisarSetup()
 {
-    initLogging(115200, LogLevel::kDebug, false);
+    initLogging(115200, LogLevel::kInfo, false);
 
     AsyncSerial2.setTX(4);
     AsyncSerial2.setRX(5);
@@ -56,6 +56,9 @@ void pisarSetup()
     }
     PISAR_LOG_INFO("Imu Initialized");
 
+    imu.setCalibration({ .accel_offset = {-96, -95, 8351}, .gyro_offset = {15, -1, -7}});
+
+
     // auto calib_data = imu.getCalibration();
     // PISAR_LOG_INFO("Accel Offset: x=%i, y=%i, z=%i", calib_data.accel_offset.x(), calib_data.accel_offset.y(), calib_data.accel_offset.z());
     // PISAR_LOG_INFO("Gyro Offset: x=%i, y=%i, z=%i", calib_data.gyro_offset.x(), calib_data.gyro_offset.y(), calib_data.gyro_offset.z());
@@ -66,6 +69,8 @@ void pisarSetup()
         return;
     }
     PISAR_LOG_INFO("Kinematic tracker initialized");
+
+    kinematic_tracker.setCalibration({.velocity_slope = {0.000280f, -0.001267f}, .position_slope = {-0.000439f, -0.000288f}});
 
     if (!drive_controller.initialize(configMAX_PRIORITIES-2))
     {
@@ -106,7 +111,7 @@ void pisarSetup()
 
 void pisarLoop()
 {
-    PISAR_LOG_INFO("Hello World!");
+    //PISAR_LOG_INFO("Hello World!");
     delay(3000);
 }
 
