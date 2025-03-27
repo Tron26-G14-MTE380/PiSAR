@@ -4,7 +4,7 @@ project(Eigen)
 include(ExternalProject)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    set(extra_cmake_args)
+    set(extra_cmake_args -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
 else()
     set(extra_cmake_args -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
 endif()

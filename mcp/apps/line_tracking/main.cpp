@@ -55,11 +55,9 @@ int main()
     auto line_tracker = LineTracker<CapturedFrame::TimestampT, ColorExtractorT, kDebug>(
         gkCamCaptureConfig.downscaledSize(),
         color_extractor,
-        sized_projection
+        sized_projection,
         filter
     );
-
-    std::cout << gkCameraCalibration.get_transformation(gkCamCaptureConfig) << std::endl;
 
     const auto start = std::chrono::high_resolution_clock::now(); // Start time
 

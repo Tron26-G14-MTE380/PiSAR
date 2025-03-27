@@ -17,8 +17,8 @@ namespace pisar::mcp {
 /**
  * @brief Constructs a LibcameraCameraSource instance.
  */
-LibcameraCameraSource::LibcameraCameraSource(std::string_view camera_id, size_t frame_buffer_size)
-    : m_capture_rect(0, 0, 0, 0),
+LibcameraCameraSource::LibcameraCameraSource(const CameraCaptureConfig& capture_config, std::string_view camera_id, size_t frame_buffer_size)
+    : CameraSource(capture_config),
       m_camera_manager(std::make_unique<libcamera::CameraManager>()),
       m_frame_buffer_size(frame_buffer_size)
 {
@@ -97,8 +97,6 @@ void LibcameraCameraSource::startImpl()
     {
         throw std::runtime_error("Set size doesn't match validated size");
     }
-
-    m_capture_rect = cv::Rect(0, 0, validated_size.width, validated_size.height);
 
     if (m_camera->configure(m_config.get()) < 0)
     {
@@ -270,13 +268,16 @@ void LibcameraCameraSource::processFrame(libcamera::FrameBuffer* buffer)
     cv::Mat bgr_image;
     cv::cvtColor(yuv_image, bgr_image, cv::COLOR_YUV2BGR);
 
+    cv::Mat resized_image;
+    cv::resize(bgr_image, resized_image, m_capture_config.downscaledSize(), 0, 0, cv::INTER_LINEAR);
+
     while (m_frame_queue.size() >= m_frame_buffer_size)
     {
         m_frame_queue.pop();
     }
 
     // Push to frame queue
-    m_frame_queue.push(CapturedFrame { .frame = std::move(bgr_image), .timestamp = timestamp });
+    m_frame_queue.push(CapturedFrame { .frame = std::move(resized_image), .timestamp = timestamp });
 }
 
 /**

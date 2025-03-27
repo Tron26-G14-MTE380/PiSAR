@@ -2,6 +2,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <span>
+
 namespace pisar::mcp {
 
     /// @brief Computes the bounding box of nonzero pixels in a binary image.

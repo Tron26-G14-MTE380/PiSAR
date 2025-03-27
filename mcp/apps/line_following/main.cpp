@@ -13,8 +13,8 @@
 
 using namespace pisar::mcp;
 
-constexpr bool kDebug = true;
-constexpr double kFrameRateLimit = 10.0;
+constexpr bool kDebug = false;
+constexpr double kFrameRateLimit = 120.0;
 constexpr auto kFrameDurationLimit = std::chrono::duration<double>(1.0 / kFrameRateLimit);
 
 std::vector<Eigen::Vector2f> convertVector(const std::vector<Eigen::Vector2d>& input)
@@ -28,7 +28,7 @@ std::vector<Eigen::Vector2f> convertVector(const std::vector<Eigen::Vector2d>& i
     return output;
 }
 
-void runRobot(DriveunitController& driveunit_controller, std::vector<Eigen::Vector2d> trajectory)
+void runRobot(DriveunitController& driveunit_controller, std::vector<Eigen::Vector2d> trajectory, CapturedFrame::TimestampT frame_time)
 {
     if (trajectory.empty())
     {
@@ -40,7 +40,8 @@ void runRobot(DriveunitController& driveunit_controller, std::vector<Eigen::Vect
         trajectory.resize(gkMaxTrajectoryPoints);
     }
 
-    const auto du_response = driveunit_controller.sendTrajectoryCommand(std::chrono::duration<float>(0), convertVector(trajectory));
+    const auto reference_time = CapturedFrame::ClockT::now() - frame_time;
+    const auto du_response = driveunit_controller.sendTrajectoryCommand(reference_time, convertVector(trajectory));
     if (!du_response.has_value())
     {
         std::cerr << "Error sending trajectory: " << du_response.error().message() << std::endl;
@@ -96,6 +97,8 @@ int main()
         const double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - loop_start).count(); // Convert to milliseconds
         const double fps = 1000000.0 / elapsed;
         std::cout << "extractTrajectory FPS: " << fps << std::endl;
+        
+        runRobot(driveunit_controller, world_trajectory, captured_frame.value().timestamp);
 
         if constexpr (kDebug)
         {
@@ -115,10 +118,9 @@ int main()
             };
 
 
-            displayDebug(createDebugCanvas(debug_image_map, 320));
+            displayDebug(createDebugCanvas(debug_image_map, gkCamCaptureConfig.downscaledSize().width));
         }
 
-        runRobot(driveunit_controller, world_trajectory);
 
         auto loop_end = std::chrono::high_resolution_clock::now();
         auto loop_duration = std::chrono::duration_cast<std::chrono::duration<double>>(loop_end - loop_start);

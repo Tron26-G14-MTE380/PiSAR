@@ -26,7 +26,7 @@
 namespace pisar::mcp {
 
 struct CapturedFrame {
-    using ClockT = std::chrono::steady_clock;
+    using ClockT = std::chrono::high_resolution_clock;
     using DurationT = std::chrono::duration<double>;
     using TimestampT = std::chrono::time_point<ClockT, DurationT>;
 
@@ -357,7 +357,7 @@ public:
      * @param camera_id The camera id to select.
      * @param frame_buffer_size The max number of frames in queue.
      */
-    LibcameraCameraSource(const CameraCaptureConfig& capture_config, std::string_view camera_id, size_t frame_buffer_size = 10);
+    LibcameraCameraSource(const CameraCaptureConfig& capture_config, std::string_view camera_id, size_t frame_buffer_size = 3);
 
     /**
      * @brief Destructs the video source and ensures cleanup.

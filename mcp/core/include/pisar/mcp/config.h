@@ -14,13 +14,17 @@ static const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> gkRedTapeHsvThresh
     std::make_pair(cv::Scalar(170, 120, 70), cv::Scalar(180, 255, 255))
 };
 
+// static const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> gkRedTapeYuvThresholds = {
+//     std::make_pair(cv::Scalar(0, 110, 180), cv::Scalar(255, 140, 255))
+// };
+
 static const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> gkRedTapeYuvThresholds = {
-    std::make_pair(cv::Scalar(0, 110, 180), cv::Scalar(255, 140, 255))
+    std::make_pair(cv::Scalar(0, 0, 145), cv::Scalar(255, 255, 255))
 };
 
 static const CameraTransform gkCameraTransform = {
-    .position = {0, 9.5, 12},
-    .tilt = Eigen::AngleAxisd(pisar::mcp::degToRad<double>(-48), Eigen::Vector3d::UnitX())
+    .position = {0, 10.0 / 100.0, 15.8 / 100.0},
+    .tilt = Eigen::AngleAxisd(pisar::mcp::degToRad<double>(-70), Eigen::Vector3d::UnitX())
 };
 
 static const auto gkCameraAxisMapping = Eigen::Matrix3d{
@@ -74,5 +78,5 @@ static const std::pair<cv::Scalar, cv::Scalar> gkBullseyeWhiteYuvMask =
     std::make_pair(cv::Scalar(200, 0, 0), cv::Scalar(255, 255, 255));
 
 // Interfacing settings
-static const size_t gkMaxTrajectoryPoints = 10;
+static const size_t gkMaxTrajectoryPoints = 5;
 }

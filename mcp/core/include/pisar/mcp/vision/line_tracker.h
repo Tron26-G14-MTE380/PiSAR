@@ -90,7 +90,7 @@ public:
     {
         EASY_FUNCTION();
 
-        if (tkDebug)
+        if constexpr (tkDebug)
         {
             const RoiMat empty_img = RoiMat(cv::Mat::zeros(m_frame_size, CV_8UC3));
             m_debug = {
