@@ -74,6 +74,23 @@ public:
 
 // Actual operating modes here
 
+class OperatingModeHardStop : public OperatingMode<OperatingModeHardStop>
+{
+private:
+    std::reference_wrapper<RobotFacility> m_facility;
+
+public:
+    OperatingModeHardStop(RobotFacility& facility) : m_facility(facility) {}
+
+    inline void onEnterImpl()
+    {
+        m_facility.get().getDriveController().hardStop();
+    }
+
+    [[nodiscard]] bool updateImpl() {}
+    void onExitImpl() {}
+};
+
 class OperatingModeFollowTrajectory : public OperatingMode<OperatingModeFollowTrajectory>
 {
 private:
@@ -91,6 +108,7 @@ private:
 
     std::reference_wrapper<RobotFacility> m_facility;
     std::vector<Eigen::Vector2f> m_trajectory;
+    std::chrono::duration<float> m_reference_time;
 
     PidController m_pid_rotation;
     PidController m_pid_travel;
@@ -107,7 +125,8 @@ private:
 public:
     OperatingModeFollowTrajectory(
         RobotFacility& facility,
-        const std::span<const Eigen::Vector2f> trajectory
+        const std::span<const Eigen::Vector2f> trajectory,
+        const std::chrono::duration<float> reference_time
     );
     void onEnterImpl();
     [[nodiscard]] bool updateImpl();
@@ -170,8 +189,6 @@ public:
 class OperatingModeRotate: public OperatingMode<OperatingModeRotate>
 {
 private:
-    std::reference_wrapper<RobotFacility> m_facility;
-    float m_rotation_deg;
 
     static constexpr float kPidkp = 0.0007f;
     static constexpr float kPidki = 0.0f;
@@ -180,12 +197,11 @@ private:
     static constexpr float kTolerance = 3.0f;
     static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(500);
 
-    float m_adj_kp;
-    float m_adj_ki;
-    float m_adj_kd;
+    std::reference_wrapper<RobotFacility> m_facility;
+    float m_rotation_deg;
 
-    float m_integral;
-    float m_last_error;
+    PidController m_pid;
+
     std::chrono::milliseconds m_last_update_time;
     std::optional<std::chrono::milliseconds> m_on_target_timestamp;
 
@@ -202,6 +218,31 @@ public:
         m_last_update_time = current_time;
         return elapsed;
     }    
+};
+
+class OperatingModeSetGripper : public OperatingMode<OperatingModeSetGripper>
+{
+private:
+    std::reference_wrapper<RobotFacility> m_facility;
+    bool m_open;
+
+public:
+    OperatingModeSetGripper(RobotFacility& facility, bool open) : m_facility(facility), m_open(open) {}
+
+    inline void onEnterImpl()
+    {
+        if (m_open)
+        {
+            m_facility.get().getGripperController().open();
+        }
+        else
+        {
+            m_facility.get().getGripperController().close();
+        }
+    }
+
+    [[nodiscard]] bool updateImpl() {}
+    void onExitImpl() {}
 };
 
 }

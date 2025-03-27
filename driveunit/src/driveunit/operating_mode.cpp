@@ -12,9 +12,10 @@ template <typename T>
 
 ///////////////////////////////////////////// OperatingModeFollowTrajectory ////////////////////////////////////////////
 
-OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& facility, const std::span<const Eigen::Vector2f> trajectory) :
+OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& facility, const std::span<const Eigen::Vector2f> trajectory, const std::chrono::duration<float> reference_time) :
     m_facility(facility),
     m_trajectory(trajectory.begin(), trajectory.end()),
+    m_reference_time(reference_time),
     m_pid_rotation(kPidkpRotation, kPidkiRotation, kPidkdRotation, -1.0f, 1.0f),
     m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 1.0f),
     m_target_index(0),
@@ -254,28 +255,20 @@ void OperatingModeGoToTarget::onExitImpl()
 OperatingModeRotate::OperatingModeRotate(RobotFacility& facility, const float rotation_deg) :
     m_facility(facility),
     m_rotation_deg(rotation_deg),
-    m_adj_kp(0.0f),
-    m_adj_ki(0.0f),
-    m_adj_kd(0.0f),
-    m_integral(0.0f),
-    m_last_error(0.0f),
-    m_last_update_time{0},
+    m_pid(kPidkp, kPidki, kPidkd, -1.0f, 1.0f),
     m_on_target_timestamp(std::nullopt)
     {}
 
 void OperatingModeRotate::onEnterImpl()
 {
-    m_facility.get().getDriveController().stop();
-
-    const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
-    m_adj_kp = kPidkp * pid_adj_scale;
-    m_adj_ki = kPidki * pid_adj_scale;
-    m_adj_kd = kPidkd * pid_adj_scale;
-
-    m_integral = 0.0f;
-    m_last_error = m_rotation_deg;
     m_on_target_timestamp = std::nullopt;
     m_facility.get().getKinematicTracker().reset();
+
+    const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
+    m_pid.setGains(kPidkp * pid_adj_scale, kPidki * pid_adj_scale, kPidkd * pid_adj_scale);
+
+    // ELEPHANT do a lot of bs with ash about distance travelled after image vs actual travel attempt
+    m_facility.get().getKinematicTracker().reset(false);
 }
 
 [[nodiscard]] bool OperatingModeRotate::updateImpl()
@@ -289,20 +282,13 @@ void OperatingModeRotate::onEnterImpl()
     while (error < -180.0f) error += 360.0f;
 
     auto current_time = std::chrono::milliseconds(millis());
-    std::chrono::duration<float> elapsed = current_time - m_last_update_time;
-    float dt = elapsed.count();
-
+    const auto delta_time = updateDeltaTime();
 
     if (std::abs(error) > kTolerance)
     {
         m_on_target_timestamp = std::nullopt;
 
-        // Compute PID terms
-        m_integral += error * dt;
-        float derivative = (error - m_last_error) / dt;
-
-        // Compute PID output
-        float pid_output = (m_adj_kp * error) + (m_adj_ki * m_integral) + (m_adj_kd * derivative);
+        const float pid_output = m_pid.update(error, delta_time);
 
         // negative PID means left, positive means right
         float left_speed = -pid_output;
@@ -312,6 +298,7 @@ void OperatingModeRotate::onEnterImpl()
         left_speed = std::clamp(left_speed, -1.0f, 1.0f);
         right_speed = std::clamp(right_speed, -1.0f, 1.0f);
 
+        // ROTATEEEEEE!!! :D
         m_facility.get().getDriveController().tankDrive(left_speed, right_speed);
     }
     else
@@ -328,8 +315,6 @@ void OperatingModeRotate::onEnterImpl()
         }
     }
 
-    m_last_error = error;
-    m_last_update_time = current_time;
     return false;
 }
 
