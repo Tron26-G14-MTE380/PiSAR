@@ -27,7 +27,7 @@ void runRobot(DriveunitController& driveunit_controller, std::optional<Eigen::Ve
 {
     if (!target_position.has_value() || target_position.value().norm() < 0.002)
     {
-        const auto du_response = driveunit_controller.sendHardStopCommand();
+        const auto du_response = driveunit_controller.sendHardStopCommand(100);
         if (!du_response.has_value())
         {
             std::cerr << "Error sending trajectory: " << du_response.error().message() << std::endl;
