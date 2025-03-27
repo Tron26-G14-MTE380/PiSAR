@@ -1,7 +1,7 @@
 #pragma once
 
 #include "pisar/mcp/vision/camera.h"
-#include "pisar/mcp/utils/math.h"
+#include "pisar/utilities/math.h"
 
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>

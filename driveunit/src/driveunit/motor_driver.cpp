@@ -17,11 +17,11 @@ static uint32_t div_u32u32(uint32_t a, uint32_t b) {
 
 
 MotorDriver::MotorDriver(uint8_t pin_a, uint8_t pin_b, float min_speed, float max_speed, uint32_t pwm_freq)
-    : m_pin_a(pin_a), 
-    m_pin_b(pin_b), 
-    m_pwm_freq(pwm_freq), 
-    m_pwm_resolution(0), 
-    m_min_speed(std::clamp(min_speed, 0.0f, 1.0f)), 
+    : m_pin_a(pin_a),
+    m_pin_b(pin_b),
+    m_pwm_freq(pwm_freq),
+    m_pwm_resolution(0),
+    m_min_speed(std::clamp(min_speed, 0.0f, 1.0f)),
     m_max_speed(std::clamp(max_speed, 0.0f, 1.0f))
 {
     // Store PWM slice and channel once

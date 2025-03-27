@@ -94,10 +94,8 @@ public:
 class OperatingModeFollowTrajectory : public OperatingMode<OperatingModeFollowTrajectory>
 {
 private:
-    static constexpr float kThetaTolerance = 5.0f;
-    static constexpr float kDistTolerance = 0.0000001f;
-    static constexpr float kDotProductTolerance = 120.0f;
-    static constexpr float kAngleLockThreshold = 35.0f;
+    static constexpr float kPastTargetAngleThreshold = 100.0f; // Forget about the target if we need to turn more than this.
+    static constexpr float kOnTargetDistanceThresholds = 0.002f; // Must be within 2 cm of the target.
 
     static constexpr float kPidkpRotation = 0.0015f;
     static constexpr float kPidkiRotation = 0.0f;

@@ -3,7 +3,7 @@
 #include <type_traits>
 #include <numbers>
 
-namespace pisar::mcp {
+namespace pisar {
 
 template<typename T>
 inline constexpr T degToRad(T deg)
