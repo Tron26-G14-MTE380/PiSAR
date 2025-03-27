@@ -11,7 +11,7 @@
 namespace pisar::driveunit {
 
 /**
- * @brief Handles SPI messages and executes robot commands.
+ * @brief Handles incoming messages and executes robot commands.
  */
 template<class TOperatingModeManager>
 class MessageHandler {
@@ -68,6 +68,13 @@ public:
                             {
                                 PISAR_LOG_DEBUG("Got command 'Rotate'");
                                 m_operating_mode_manager.template switchMode(OperatingModeRotate(m_robot_facility, command.rotation_deg));
+                                return driveunit_interface::DefaultResponse {.ack = true};
+                            },
+
+                            [this](const driveunit_interface::CommandSetGripper command) -> driveunit_interface::Response
+                            {
+                                PISAR_LOG_DEBUG("Got command 'SetGripper'");
+                                m_operating_mode_manager.template switchMode(OperatingModeSetGripper(m_robot_facility, command.open));
                                 return driveunit_interface::DefaultResponse {.ack = true};
                             },
                         }, command

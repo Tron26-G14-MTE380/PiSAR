@@ -86,7 +86,14 @@ struct CommandRotate
     float rotation_deg; // CCW positive
 };
 
-using CommandRequest = MessageSet<CommandIdle, CommandHardStop, CommandFollowTrajectory, CommandGoToTarget, CommandRotate>;
+struct CommandSetGripper
+{
+    using serialize = zpp::bits::members<1>;
+
+    bool open;
+};
+
+using CommandRequest = MessageSet<CommandIdle, CommandHardStop, CommandFollowTrajectory, CommandGoToTarget, CommandRotate, CommandSetGripper>;
 using CommandResponse = DefaultResponse;
 
 
