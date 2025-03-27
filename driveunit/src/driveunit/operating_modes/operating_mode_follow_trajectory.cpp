@@ -16,7 +16,6 @@ OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& faci
 
 void OperatingModeFollowTrajectory::onEnterImpl()
 {
-    //PISAR_LOG_INFO("Going to (%f, %f)", m_trajectory[0].x(), m_trajectory[0].y());
     const auto ref_pose = m_facility.get().getKinematicTracker().poseAtNearest(m_reference_time);
 
     const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
@@ -26,7 +25,6 @@ void OperatingModeFollowTrajectory::onEnterImpl()
     // Set target
     m_target_index = m_trajectory.size()-1;
 
-    // ELEPHANT do a lot of bs with ash about distance travelled after image vs actual travel attempt
     m_facility.get().getKinematicTracker().reset(false);
     if (ref_pose)
     {

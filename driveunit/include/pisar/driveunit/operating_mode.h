@@ -112,9 +112,7 @@ private:
     PidController m_pid_rotation;
     PidController m_pid_travel;
 
-
     int m_target_index;
-
     std::chrono::milliseconds m_last_update_time;
 
     [[nodiscard]] inline const Eigen::Vector2f& getCurrentTarget() const
@@ -144,34 +142,32 @@ public:
 class OperatingModeGoToTarget : public OperatingMode<OperatingModeGoToTarget>
 {
 private:
+    static constexpr float kPastTargetAngleThreshold = 100.0f; // Forget about the target if we need to turn more than this.
+    static constexpr float kOnTargetDistanceThresholds = 0.002f; // Must be within 2 cm of the target.
 
-    static constexpr float kThetaTolerance = 3.0f;
-    static constexpr float kDistTolerance = 0.0005f;
-    static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(10);
-
-    static constexpr float kPidkpRotation = 0.000005f;
+    static constexpr float kPidkpRotation = 0.0015f;
     static constexpr float kPidkiRotation = 0.0f;
-    static constexpr float kPidkdRotation = 0.0001f;
+    static constexpr float kPidkdRotation = 0.0004f;
 
     static constexpr float kPidkpTravel = 0.01f;
     static constexpr float kPidkiTravel = 0.0f;
     static constexpr float kPidkdTravel = 0.0f;
 
     std::reference_wrapper<RobotFacility> m_facility;
-    Eigen::Vector2f m_target;
+    Eigen::Vector2f m_target_position;
+    std::chrono::microseconds m_reference_time;
 
     PidController m_pid_rotation;
     PidController m_pid_travel;
 
-    float m_distance_to_target;
-
+    int m_target_index;
     std::chrono::milliseconds m_last_update_time;
-    std::optional<std::chrono::milliseconds> m_on_target_timestamp;
 
 public:
     OperatingModeGoToTarget(
         RobotFacility& facility,
-        const Eigen::Vector2f target
+        const Eigen::Vector2f target,
+        const std::chrono::microseconds reference_time
     );
     void onEnterImpl();
     [[nodiscard]] bool updateImpl();
