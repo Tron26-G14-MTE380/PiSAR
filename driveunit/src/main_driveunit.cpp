@@ -15,8 +15,8 @@ using namespace pisar::driveunit;
 Imu imu(SPI1, 13, 12, 11, 10, 14, "/imu_calibration_data.bin");
 ImuPlanarKinematicTracker kinematic_tracker(imu, "/kinematic_tracker_calibration_data.bin");
 
-MotorDriver left_motor(7, 6, 0.11f, 0.2f);
-MotorDriver right_motor(8, 9, 0.11f, 0.2f);
+MotorDriver left_motor(7, 6, 0.11f, 0.15f);
+MotorDriver right_motor(8, 9, 0.11f, 0.15f);
 DifferentialDriveController drive_controller(left_motor, right_motor, 10, 1.0f, 4.0f);
 
 GripperController gripper_controller(2, 175, 0);
