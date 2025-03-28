@@ -22,7 +22,7 @@ struct RobotStateMachine {
             state<StatePickupTarget<TRobotContext>>            + event<EventPickedUpTarget>        = state<StateFindLineAfterRetrieval<TRobotContext>>,
             state<StateFindLineAfterRetrieval<TRobotContext>>  + event<EventFoundLineWithTarget>   = state<StateTrackLineToHome<TRobotContext>>,
             state<StateTrackLineToHome<TRobotContext>>         + event<EventReachedHome>           = state<StateFinish<TRobotContext>>,
-            state<StateFinish<TRobotContext>>                  + event<EventFinish>                = X
+            state<StateFinish<TRobotContext>>                  + event<EventDroppedTarget>         = X
         );
     }
 };

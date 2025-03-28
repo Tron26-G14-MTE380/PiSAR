@@ -19,21 +19,36 @@ constexpr bool kDebug = true;
 constexpr bool kProfile = false;
 constexpr bool kRunRobot = true;
 constexpr uint64_t kProfileTimeMs = 10000;
-constexpr double kFrameRateLimit = 10.0;
+constexpr double kFrameRateLimit = 120.0;
 constexpr auto kFrameDurationLimit = std::chrono::duration<double>(1.0 / kFrameRateLimit);
 
+void stop(DriveunitController& driveunit_controller)
+{
+    const auto du_response = driveunit_controller.sendHardStopCommand(100);
+    if (!du_response.has_value())
+    {
+        std::cerr << "Error sending hard stop command: " << du_response.error().message() << std::endl;
+    }   
+}
 
 void runRobot(DriveunitController& driveunit_controller, std::optional<Eigen::Vector2d> target_position, CapturedFrame::TimestampT frame_time)
 {
-    if (!target_position.has_value() || target_position.value().norm() < 0.002)
+    if (!target_position.has_value())
     {
-        const auto du_response = driveunit_controller.sendHardStopCommand(100);
+        stop(driveunit_controller);
+        return;
+    }
+
+    if (target_position.value().norm() < gkOnTargetDistanceTolerance)
+    {
+        stop(driveunit_controller);
+        
+        std::cout << "On target, closing gripper!!" << std::endl;
+        const auto du_response = driveunit_controller.sendGripperCommand(false, 100);
         if (!du_response.has_value())
         {
-            std::cerr << "Error sending trajectory: " << du_response.error().message() << std::endl;
-        }
-
-        return;
+            std::cerr << "Error sending close gripper command: " << du_response.error().message() << std::endl;
+        }   
     }
 
     const auto reference_time = std::chrono::duration_cast<pisar::driveunit_interface::CommandFollowTrajectory::ReferenceTimeT>(CapturedFrame::ClockT::now() - frame_time);
@@ -67,7 +82,7 @@ int main()
 
     const auto sized_projection = projection.forCapture(video_source.captureConfig());
 
-    //HsvColorExtractor color_extractor(gkBullseyeWhiteHsvMask)
+    //const HsvColorExtractor color_extractor(std::span(&gkBullseyeWhiteHsvMask, 1));
     const YuvColorExtractor color_extractor(std::span(&gkBullseyeWhiteYuvMask, 1));
     using ColorExtractorT = decltype(color_extractor);
 
@@ -83,6 +98,12 @@ int main()
     if constexpr (kRunRobot)
     {
         driveunit_transport.open();
+
+        const auto du_response = driveunit_controller.sendGripperCommand(true, 100);
+        if (!du_response.has_value())
+        {
+            std::cerr << "Error sending open gripper command: " << du_response.error().message() << std::endl;
+        } 
     }
 
     video_source.start();

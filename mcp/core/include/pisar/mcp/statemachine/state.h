@@ -4,6 +4,8 @@
 #include "pisar/mcp/statemachine/events.h"
 #include "pisar/utilities/type_info.h"
 
+#include <thread>
+#include <chrono>
 #include <optional>
 
 namespace pisar::mcp {
@@ -186,7 +188,7 @@ public:
         {
             const auto res = driveunit_controller.sendHardStopCommand(100);
             logCommandResponse<driveunit_interface::CommandHardStop>(res);
-
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             return EventReachedTarget{};
         }
 
@@ -223,8 +225,9 @@ public:
         auto& driveunit_controller = this->getContext().getDriveunitController();
         if (!m_grab_cmd_sent)
         {
-            const auto res = driveunit_controller.sendGripperCommand(true, 100);
+            const auto res = driveunit_controller.sendGripperCommand(false, 100);
             m_grab_cmd_sent = logCommandResponse<driveunit_interface::CommandSetGripper>(res);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
         else
         {
@@ -240,6 +243,7 @@ public:
             {
                 std::cerr << "Error checking whether a command is in progress: " << res.error().message() << std::endl;
             }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
 
         return std::nullopt;
@@ -270,6 +274,7 @@ public:
         {
             const auto res = driveunit_controller.sendRotateCommand(180.0f, 100);
             m_rotate_cmd_sent = logCommandResponse<driveunit_interface::CommandRotate>(res);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
         else
         {
@@ -280,11 +285,16 @@ public:
                 {
                     return EventFoundLineWithTarget {};
                 }
+                else
+                {
+                    std::cout << "Robot busy turning!!" << std::endl;
+                }
             }
             else
             {
                 std::cerr << "Error checking whether a command is in progress: " << res.error().message() << std::endl;
             }
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
         return std::nullopt;
@@ -332,7 +342,10 @@ public:
 
         if (trajectory.empty())
         {
-            return std::nullopt;
+            const auto res = driveunit_controller.sendHardStopCommand(100);
+            logCommandResponse<driveunit_interface::CommandHardStop>(res);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            return EventReachedHome {};
         }
 
         // Convert trajectory to float
@@ -357,15 +370,47 @@ public:
 
 template<class TRobotContext>
 class StateFinish : public State<StateFinish<TRobotContext>, TRobotContext> {
-private:
+    private:
     using BaseT = State<StateFinish<TRobotContext>, TRobotContext>;
+    bool m_drop_cmd_sent;
 
 public:
-
     using BaseT::State;
 
-    void enterImpl() {}
-    std::optional<RobotEvent> updateImpl() { return std::nullopt; }
+    void enterImpl()
+    {
+        m_drop_cmd_sent = false;
+    }
+
+    std::optional<RobotEvent> updateImpl()
+    {
+        auto& driveunit_controller = this->getContext().getDriveunitController();
+        if (!m_drop_cmd_sent)
+        {
+            const auto res = driveunit_controller.sendGripperCommand(true, 100);
+            m_drop_cmd_sent = logCommandResponse<driveunit_interface::CommandSetGripper>(res);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+        else
+        {
+            const auto res = driveunit_controller.sendCommandStatusRequest();
+            if (res)
+            {
+                if (res.value() == false)
+                {
+                    return EventDroppedTarget {};
+                }
+            }
+            else
+            {
+                std::cerr << "Error checking whether a command is in progress: " << res.error().message() << std::endl;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+
+        return std::nullopt;
+    }
+
     void exitImpl() {}
 };
 

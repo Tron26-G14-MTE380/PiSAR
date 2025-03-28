@@ -19,11 +19,11 @@ static const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> gkRedTapeHsvThresh
 // };
 
 static const std::array<std::pair<cv::Scalar, cv::Scalar>, 2> gkRedTapeYuvThresholds = {
-    std::make_pair(cv::Scalar(0, 0, 145), cv::Scalar(255, 255, 255))
+    std::make_pair(cv::Scalar(0, 0, 150), cv::Scalar(255, 255, 255))
 };
 
 static const CameraTransform gkCameraTransform = {
-    .position = {0, 10.0 / 100.0, 15.8 / 100.0},
+    .position = {0, 10.1 / 100.0, 15.8 / 100.0},
     .tilt = Eigen::AngleAxisd(pisar::degToRad<double>(-70), Eigen::Vector3d::UnitX())
 };
 
@@ -72,12 +72,12 @@ static const auto gkCamCaptureConfig = gkRpiCamV2Mode4CaptureConfig;
 
 // Bullseye/Target detection
 static const std::pair<cv::Scalar, cv::Scalar> gkBullseyeWhiteHsvMask =
-    std::make_pair(cv::Scalar(0, 0, 220), cv::Scalar(180, 40, 255));
+    std::make_pair(cv::Scalar(0, 0, 100), cv::Scalar(180, 40, 255));
 
 static const std::pair<cv::Scalar, cv::Scalar> gkBullseyeWhiteYuvMask =
-    std::make_pair(cv::Scalar(200, 0, 0), cv::Scalar(255, 255, 255));
+    std::make_pair(cv::Scalar(0, 145, 0), cv::Scalar(130, 255, 170));
 
-static constexpr double gkTargetGrabDistanceOffset = 10.0 / 100.0;
+static constexpr double gkTargetGrabDistanceOffset = 9.5 / 100.0;
 static constexpr double gkOnTargetDistanceTolerance = 1.0 / 100.0;
 
 // Interfacing settings

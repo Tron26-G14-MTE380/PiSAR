@@ -9,7 +9,7 @@ OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& faci
     m_trajectory(trajectory.begin(), trajectory.end()),
     m_reference_time(std::chrono::microseconds(micros()) - reference_time),
     m_pid_rotation(kPidkpRotation, kPidkiRotation, kPidkdRotation, 0.0f, 1.0f),
-    m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 1.0f),
+    m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, -0.6f, 0.6f),
     m_target_index(0),
     m_last_update_time{0}
     {}
@@ -18,9 +18,9 @@ void OperatingModeFollowTrajectory::onEnterImpl()
 {
     const auto ref_pose = m_facility.get().getKinematicTracker().poseAtNearest(m_reference_time);
 
-    const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
-    m_pid_rotation.setGains(kPidkpRotation * pid_adj_scale, kPidkiRotation * pid_adj_scale, kPidkdRotation * pid_adj_scale);
-    m_pid_travel.setGains(kPidkpTravel * pid_adj_scale, kPidkiTravel * pid_adj_scale, kPidkdTravel * pid_adj_scale);
+    //const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
+    //m_pid_rotation.setGains(kPidkpRotation * pid_adj_scale, kPidkiRotation * pid_adj_scale, kPidkdRotation * pid_adj_scale);
+    //m_pid_travel.setGains(kPidkpTravel * pid_adj_scale, kPidkiTravel * pid_adj_scale, kPidkdTravel * pid_adj_scale);
 
     // Set target
     m_target_index = m_trajectory.size()-1;
@@ -135,8 +135,7 @@ static float angleFromTrajectory(const Eigen::Vector2f& trajectory_vector, const
 
     // PID update
     const auto delta_time = updateDeltaTime();
-    float forward_output = 1.0f; // m_pid_travel.update(std::abs(distance_error), delta_time)'
-
+    float forward_output = 1.0f; // - std::abs(m_pid_travel.update(std::abs(angle_error), delta_time));
     const float turn_ratio = m_pid_rotation.update(std::abs(angle_error), delta_time);
 
     // Use turn ratio to offset forward output on one wheel.
@@ -154,7 +153,7 @@ static float angleFromTrajectory(const Eigen::Vector2f& trajectory_vector, const
         right_speed = forward_output * (1.0f - turn_ratio);
     }
 
-    //PISAR_LOG_INFO("(%f, %f) -> (%f, %f)", forward_output, turn_ratio, left_speed, right_speed);
+    PISAR_LOG_INFO("(%f, %f) -> (%f, %f)", forward_output, turn_ratio, left_speed, right_speed);
 
     left_speed = std::clamp(left_speed, 0.0f, 1.0f);
     right_speed = std::clamp(right_speed, 0.0f, 1.0f);

@@ -7,6 +7,8 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>
 
+#include <variant>
+
 namespace pisar::mcp {
 
 /**
@@ -76,7 +78,10 @@ public:
             };
         }
 
-        const cv::Mat mask = m_color_extractor.get().extract(frame);
+        cv::Mat mask = m_color_extractor.get().extract(frame);
+        const auto kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+        cv::erode(mask, mask, kernel);
 
         if constexpr (tkDebug)
         {
@@ -141,7 +146,7 @@ public:
     }
 
     /// @brief Retrieve debug data from last frame submitted.
-    [[nodiscard]] inline const DebugData& debugData() const { return m_debug; }
+    [[nodiscard]] inline const DebugDataT& debugData() const { return m_debug; }
 };
 
 }

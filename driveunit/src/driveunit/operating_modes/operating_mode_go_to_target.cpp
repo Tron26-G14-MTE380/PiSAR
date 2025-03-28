@@ -17,9 +17,9 @@ void OperatingModeGoToTarget::onEnterImpl()
 {
     const auto ref_pose = m_facility.get().getKinematicTracker().poseAtNearest(m_reference_time);
 
-    const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
-    m_pid_rotation.setGains(kPidkpRotation * pid_adj_scale, kPidkiRotation * pid_adj_scale, kPidkdRotation * pid_adj_scale);
-    m_pid_travel.setGains(kPidkpTravel * pid_adj_scale, kPidkiTravel * pid_adj_scale, kPidkdTravel * pid_adj_scale);
+    // const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
+    // m_pid_rotation.setGains(kPidkpRotation * pid_adj_scale, kPidkiRotation * pid_adj_scale, kPidkdRotation * pid_adj_scale);
+    // m_pid_travel.setGains(kPidkpTravel * pid_adj_scale, kPidkiTravel * pid_adj_scale, kPidkdTravel * pid_adj_scale);
 
     m_facility.get().getKinematicTracker().reset(false);
     if (ref_pose)

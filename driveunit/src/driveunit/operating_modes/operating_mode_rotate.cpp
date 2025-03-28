@@ -12,12 +12,10 @@ OperatingModeRotate::OperatingModeRotate(RobotFacility& facility, const float ro
 void OperatingModeRotate::onEnterImpl()
 {
     m_on_target_timestamp = std::nullopt;
-    m_facility.get().getKinematicTracker().reset();
 
     const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
     m_pid.setGains(kPidkp * pid_adj_scale, kPidki * pid_adj_scale, kPidkd * pid_adj_scale);
 
-    // ELEPHANT do a lot of bs with ash about distance travelled after image vs actual travel attempt
     m_facility.get().getKinematicTracker().reset(false);
 }
 

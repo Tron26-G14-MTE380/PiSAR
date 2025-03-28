@@ -10,8 +10,15 @@ namespace pisar::mcp {
  */
 template<class TTargetTracker>
 class TargetDetector {
+public:
+    using TimestampT = TTargetTracker::TimestampT;
+    using DurationT = TimestampT::duration;
+    using ClockT = TimestampT::clock;
+
 private:
     std::reference_wrapper<TTargetTracker> m_target_tracker;
+    DurationT m_threshold_duration;
+    std::optional<TimestampT> m_detection_start_time;
 
 public:
     /**
@@ -19,7 +26,8 @@ public:
      *
      * @param target_tracker Target tracker used to detect presence of target.
      */
-    TargetDetector(TTargetTracker& target_tracker) : m_target_tracker(target_tracker) {}
+    TargetDetector(TTargetTracker& target_tracker, DurationT threshold_duration = std::chrono::milliseconds(500)) :
+        m_target_tracker(target_tracker), m_threshold_duration(threshold_duration) {}
 
     /**
      * @brief Scan the current frame and returns if target is in frame.
@@ -30,9 +38,26 @@ public:
      * @param timestamp The associated frame timestamp.
      * @return true if the target was found otherwise false.
      */
-    [[nodiscard]] bool scanFrame(const cv::Mat& frame, TTargetTracker::TimestampT timestamp)
+    [[nodiscard]] bool scanFrame(const cv::Mat& frame, TimestampT timestamp)
     {
-        return m_target_tracker.get().track(frame, timestamp).has_value();
+        const bool detected = m_target_tracker.get().track(frame, timestamp).has_value();
+
+        if (detected)
+        {
+            auto now = ClockT::now();
+            if (!m_detection_start_time.has_value())
+            {
+                m_detection_start_time = now;
+            }
+
+            auto duration = now - *m_detection_start_time;
+            return duration >= m_threshold_duration;
+        }
+        else
+        {
+            m_detection_start_time.reset();
+            return false;
+        }
     }
 
     /**
@@ -42,6 +67,7 @@ public:
     void reset()
     {
         m_target_tracker.get().reset();
+        m_detection_start_time.reset();
     }
 };
 
