@@ -40,7 +40,15 @@ public:
 
         if (event.has_value())
         {
-            m_sm.process_event(event.value());
+            const bool handled = std::visit([this](const auto& e) -> bool
+            {
+                return m_sm.process_event(e);
+            }, event.value());
+
+            if (!handled)
+            {
+                throw std::runtime_error("Failed to handle transition");
+            }
 
             if (m_sm.is(sml::X))
             {

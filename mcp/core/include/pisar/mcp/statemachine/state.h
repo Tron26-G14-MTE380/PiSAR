@@ -59,7 +59,7 @@ public:
     using BaseT::State;
 
     void enterImpl() {}
-    std::optional<RobotEvent> updateImpl() { return std::nullopt; }
+    std::optional<RobotEvent> updateImpl() { return EventStartSearchAndRescue{}; }
     void exitImpl() {}
 };
 
