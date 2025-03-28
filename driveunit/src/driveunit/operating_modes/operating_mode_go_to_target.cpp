@@ -15,8 +15,6 @@ OperatingModeGoToTarget::OperatingModeGoToTarget(RobotFacility& facility, const 
 
 void OperatingModeGoToTarget::onEnterImpl()
 {
-    m_facility.get().getDriveController().hardStop();
-
     const auto ref_pose = m_facility.get().getKinematicTracker().poseAtNearest(m_reference_time);
 
     const float pid_adj_scale = 1.0f / m_facility.get().getDriveController().getSpeedRange();
@@ -58,7 +56,7 @@ void OperatingModeGoToTarget::onEnterImpl()
 
     // PID update
     const auto delta_time = updateDeltaTime();
-    float forward_output = 1.0f; // m_pid_travel.update(std::abs(distance_error), delta_time)'
+    float forward_output = m_pid_travel.update(std::abs(distance_error), delta_time);
 
     const float turn_ratio = m_pid_rotation.update(std::abs(angle_error), delta_time);
 
@@ -88,8 +86,6 @@ void OperatingModeGoToTarget::onEnterImpl()
     return false;
 }
 
-void OperatingModeGoToTarget::onExitImpl() {
-    m_facility.get().getDriveController().hardStop();
-}
+void OperatingModeGoToTarget::onExitImpl() {}
 
 }

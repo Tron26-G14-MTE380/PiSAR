@@ -95,9 +95,9 @@ class OperatingModeFollowTrajectory : public OperatingMode<OperatingModeFollowTr
 {
 private:
     static constexpr float kPastTargetAngleThreshold = 100.0f; // Forget about the target if we need to turn more than this.
-    static constexpr float kOnTargetDistanceThresholds = 0.002f; // Must be within 2 cm of the target.
+    static constexpr float kOnTargetDistanceThresholds = 1.0 / 100.0; // Must be within 1 cm of the target.
 
-    static constexpr float kPidkpRotation = 0.0015f;
+    static constexpr float kPidkpRotation = 0.0013f;
     static constexpr float kPidkiRotation = 0.0f;
     static constexpr float kPidkdRotation = 0.0004f;
 
@@ -186,11 +186,11 @@ class OperatingModeRotate: public OperatingMode<OperatingModeRotate>
 {
 private:
 
-    static constexpr float kPidkp = 0.0007f;
+    static constexpr float kPidkp = 0.00005f;
     static constexpr float kPidki = 0.0f;
-    static constexpr float kPidkd = 0.0001f;
+    static constexpr float kPidkd = 0.1f;
 
-    static constexpr float kTolerance = 3.0f;
+    static constexpr float kTolerance = 7.5f;
     static constexpr auto kOnTargetDurationTolerance = std::chrono::milliseconds(500);
 
     std::reference_wrapper<RobotFacility> m_facility;

@@ -9,7 +9,7 @@ OperatingModeFollowTrajectory::OperatingModeFollowTrajectory(RobotFacility& faci
     m_trajectory(trajectory.begin(), trajectory.end()),
     m_reference_time(std::chrono::microseconds(micros()) - reference_time),
     m_pid_rotation(kPidkpRotation, kPidkiRotation, kPidkdRotation, 0.0f, 1.0f),
-    m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 1.0f),
+    m_pid_travel(kPidkpTravel, kPidkiTravel, kPidkdTravel, 0.0f, 0.5f),
     m_target_index(0),
     m_last_update_time{0}
     {}
@@ -135,7 +135,7 @@ static float angleFromTrajectory(const Eigen::Vector2f& trajectory_vector, const
 
     // PID update
     const auto delta_time = updateDeltaTime();
-    float forward_output = 1.0f; // m_pid_travel.update(std::abs(distance_error), delta_time)'
+    float forward_output = 1.0f - m_pid_travel.update(std::abs(angle_error), delta_time);
 
     const float turn_ratio = m_pid_rotation.update(std::abs(angle_error), delta_time);
 
