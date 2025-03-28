@@ -11,7 +11,7 @@ struct EventReachedTarget {};
 struct EventPickedUpTarget {};
 struct EventFoundLineWithTarget {};
 struct EventReachedHome {};
-
+struct EventFinish {};
 
 using RobotEvent = std::variant<
     EventStartSearchAndRescue,
@@ -20,7 +20,8 @@ using RobotEvent = std::variant<
     EventReachedTarget,
     EventPickedUpTarget,
     EventFoundLineWithTarget,
-    EventReachedHome
+    EventReachedHome,
+    EventFinish
 >;
 
 }

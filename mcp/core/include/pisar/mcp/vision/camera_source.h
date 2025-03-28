@@ -27,7 +27,7 @@ namespace pisar::mcp {
 
 struct CapturedFrame {
     using ClockT = std::chrono::high_resolution_clock;
-    using DurationT = std::chrono::duration<double>;
+    using DurationT = std::chrono::duration<double, std::ratio<1, 1>>;
     using TimestampT = std::chrono::time_point<ClockT, DurationT>;
 
     cv::Mat frame;

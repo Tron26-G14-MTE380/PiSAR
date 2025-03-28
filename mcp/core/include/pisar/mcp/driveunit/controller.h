@@ -59,11 +59,12 @@ public:
     /**
      * @brief Sends a command status request. Returns whether the driveunit is still busy with last command.
      * @param retries Number of times to retry on failure.
-     * @return The command status response if successful, otherwise error code.
+     * @return Whether the driveunit is busy with a command if successful, otherwise error code.
      */
-    inline rd::expected<driveunit_interface::CommandStatusResponse, std::error_code> sendCommandStatusRequest(const unsigned int retries = 0)
+    inline rd::expected<bool, std::error_code> sendCommandStatusRequest(const unsigned int retries = 0)
     {
-        return sendRequest<driveunit_interface::CommandStatusRequest, driveunit_interface::CommandStatusResponse>(driveunit_interface::CommandStatusRequest{}, retries);
+        auto response = sendRequest<driveunit_interface::CommandStatusRequest, driveunit_interface::CommandStatusResponse>(driveunit_interface::CommandStatusRequest{}, retries);
+        return response.transform([](driveunit_interface::CommandStatusResponse response) { return response.busy; });
     }
 
     /**

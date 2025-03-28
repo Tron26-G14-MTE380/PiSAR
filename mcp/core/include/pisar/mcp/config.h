@@ -78,6 +78,7 @@ static const std::pair<cv::Scalar, cv::Scalar> gkBullseyeWhiteYuvMask =
     std::make_pair(cv::Scalar(200, 0, 0), cv::Scalar(255, 255, 255));
 
 static constexpr double gkTargetGrabDistanceOffset = 10.0 / 100.0;
+static constexpr double gkOnTargetDistanceTolerance = 1.0 / 100.0;
 
 // Interfacing settings
 static const size_t gkMaxTrajectoryPoints = 5;

@@ -18,13 +18,15 @@ public:
     ~State() = default;
 
     /** Called when entering the state */
-    inline void enter() { return std::static_cast<TDerived*>(this)->enterImpl(); }
+    inline void enter() { return static_cast<TDerived*>(this)->enterImpl(); }
 
     /** Called repeatedly while in this state. Returns optional event */
-    [[nodiscard]] inline std::optional<RobotEvent> update() { return std::static_cast<TDerived*>(this)->updateImpl(); }
+    [[nodiscard]] inline std::optional<RobotEvent> update() { return static_cast<TDerived*>(this)->updateImpl(); }
 
     /** Called before transitioning out of the state */
-    inline void exit() { return std::static_cast<TDerived*>(this)->exitImpl(); }
+    inline void exit() { return static_cast<TDerived*>(this)->exitImpl(); }
+
+    [[nodiscard]] inline TRobotContext& getContext() { return m_context; }
 };
 
 template<class TCommand>
@@ -48,23 +50,33 @@ inline bool logCommandResponse(rd::expected<bool, std::error_code> res)
 }
 
 template<class TRobotContext>
-class StateIdle : public State<StateIdle, TRobotContext> {
+class StateIdle : public State<StateIdle<TRobotContext>, TRobotContext> {
+private:
+    using BaseT = State<StateIdle<TRobotContext>, TRobotContext>;
+
 public:
+
+    using BaseT::State;
+
     void enterImpl() {}
     std::optional<RobotEvent> updateImpl() { return std::nullopt; }
     void exitImpl() {}
 };
 
 template<class TRobotContext>
-class StateTracklineToTarget : public State<StateTracklineToTarget, TRobotContext> {
+class StateTracklineToTarget : public State<StateTracklineToTarget<TRobotContext>, TRobotContext> {
+private:
+    using BaseT = State<StateTracklineToTarget<TRobotContext>, TRobotContext>;
+
 public:
-    using Clock = std::chrono::high_resolution_clock;
+
+    using BaseT::State;
 
     void enterImpl()
     {
-        auto& video_source = m_context.get().getVideoSource();
-        auto& line_tracker = m_context.get().getLineTracker();
-        auto& target_detector = m_context.get().getTargetDetector();
+        auto& video_source = this->getContext().getVideoSource();
+        auto& line_tracker = this->getContext().getLineTracker();
+        auto& target_detector = this->getContext().getTargetDetector();
 
         if (!video_source.isRunning())
         {
@@ -77,10 +89,10 @@ public:
 
     std::optional<RobotEvent> updateImpl()
     {
-        auto& video_source = m_context.get().getVideoSource();
-        auto& line_tracker = m_context.get().getLineTracker();
-        auto& target_detector = m_context.get().getTargetDetector();
-        auto& driveunit_controller = m_context.get().getDriveunitController();
+        auto& video_source = this->getContext().getVideoSource();
+        auto& line_tracker = this->getContext().getLineTracker();
+        auto& target_detector = this->getContext().getTargetDetector();
+        auto& driveunit_controller = this->getContext().getDriveunitController();
 
         const std::optional<CapturedFrame> captured_frame = video_source.getFrame();
         if (!captured_frame.has_value())
@@ -107,14 +119,13 @@ public:
 
         // Convert trajectory to float
         std::vector<Eigen::Vector2f> float_trajectory(trajectory.size(), Eigen::Vector2f::Zero());
-        std::transform(trajectory.begin(), trajectory.end(), trajectory.begin(), [](const auto& pt){
-            return pt.cast<float>();
+        std::transform(trajectory.begin(), trajectory.end(), float_trajectory.begin(), [](const auto& pt) {
+            return pt.template cast<float>();
         });
 
         // Send trajectory to driveunit
-        const std::chrono::duration<float> trajectory_reference_time = Clock::now() - frame_timestamp;
         const auto res = driveunit_controller.sendTrajectoryCommand(
-            CapturedFrame::ClockT::now() - captured_frame.value().timestamp,
+            std::chrono::duration_cast<std::chrono::microseconds>(CapturedFrame::ClockT::now() - captured_frame.value().timestamp),
             std::span(float_trajectory)
         );
 
@@ -127,12 +138,18 @@ public:
 };
 
 template<class TRobotContext>
-class StateGoToTarget : public State<StateGoToTarget, TRobotContext> {
+class StateGoToTarget : public State<StateGoToTarget<TRobotContext>, TRobotContext> {
+private:
+    using BaseT = State<StateGoToTarget<TRobotContext>, TRobotContext>;
+
 public:
+
+    using BaseT::State;
+
     void enterImpl()
     {
-        auto& video_source = m_context.get().getVideoSource();
-        auto& target_tracker = m_context.get().getTargetTracker();
+        auto& video_source = this->getContext().getVideoSource();
+        auto& target_tracker = this->getContext().getTargetTracker();
 
         if (!video_source.isRunning())
         {
@@ -144,9 +161,9 @@ public:
 
     std::optional<RobotEvent> updateImpl()
     {
-        auto& video_source = m_context.get().getVideoSource();
-        auto& target_tracker = m_context.get().getTargetTracker();
-        auto& driveunit_controller = m_context.get().getDriveunitController();
+        auto& video_source = this->getContext().getVideoSource();
+        auto& target_tracker = this->getContext().getTargetTracker();
+        auto& driveunit_controller = this->getContext().getDriveunitController();
 
         const std::optional<CapturedFrame> captured_frame = video_source.getFrame();
         if (!captured_frame.has_value())
@@ -165,7 +182,7 @@ public:
         }
 
         // If we reached the target, kill the motors and switch states.
-        if (target_position.norm() < gkOnTargetDistanceTolerance)
+        if (target_position.value().norm() < gkOnTargetDistanceTolerance)
         {
             const auto res = driveunit_controller.sendHardStopCommand(100);
             logCommandResponse<driveunit_interface::CommandHardStop>(res);
@@ -175,8 +192,8 @@ public:
 
         // Send trajectory to driveunit
         const auto res = driveunit_controller.sendGoToTargetCommand(
-            CapturedFrame::ClockT::now() - captured_frame.value().timestamp,
-            target_position
+            std::chrono::duration_cast<std::chrono::microseconds>(CapturedFrame::ClockT::now() - captured_frame.value().timestamp),
+            target_position.value().template cast<float>()
         );
 
         logCommandResponse<driveunit_interface::CommandGoToTarget>(res);
@@ -188,10 +205,14 @@ public:
 };
 
 template<class TRobotContext>
-class StatePickupTarget : public State<StatePickupTarget, TRobotContext> {
+class StatePickupTarget : public State<StatePickupTarget<TRobotContext>, TRobotContext> {
 private:
+    using BaseT = State<StatePickupTarget<TRobotContext>, TRobotContext>;
     bool m_grab_cmd_sent;
+
 public:
+    using BaseT::State;
+
     void enterImpl()
     {
         m_grab_cmd_sent = false;
@@ -199,7 +220,7 @@ public:
 
     std::optional<RobotEvent> updateImpl()
     {
-        auto& driveunit_controller = m_context.get().getDriveunitController();
+        auto& driveunit_controller = this->getContext().getDriveunitController();
         if (!m_grab_cmd_sent)
         {
             const auto res = driveunit_controller.sendGripperCommand(true, 100);
@@ -207,7 +228,7 @@ public:
         }
         else
         {
-            const auto res = driveunit_controller.commandInProgress();
+            const auto res = driveunit_controller.sendCommandStatusRequest();
             if (res)
             {
                 if (res.value() == false)
@@ -228,10 +249,15 @@ public:
 };
 
 template<class TRobotContext>
-class StateFindLineAfterRetrieval : public State<StateFindLineAfterRetrieval, TRobotContext> {
+class StateFindLineAfterRetrieval : public State<StateFindLineAfterRetrieval<TRobotContext>, TRobotContext> {
 private:
+    using BaseT = State<StateFindLineAfterRetrieval<TRobotContext>, TRobotContext>;
     bool m_rotate_cmd_sent;
+
 public:
+
+    using BaseT::State;
+
     void enterImpl()
     {
         m_rotate_cmd_sent = false;
@@ -239,7 +265,7 @@ public:
 
     std::optional<RobotEvent> updateImpl()
     {
-        auto& driveunit_controller = m_context.get().getDriveunitController();
+        auto& driveunit_controller = this->getContext().getDriveunitController();
         if (!m_rotate_cmd_sent)
         {
             const auto res = driveunit_controller.sendRotateCommand(180.0f, 100);
@@ -268,12 +294,18 @@ public:
 };
 
 template<class TRobotContext>
-class StateTrackLineToHome : public State<StateTrackLineToHome, TRobotContext> {
+class StateTrackLineToHome : public State<StateTrackLineToHome<TRobotContext>, TRobotContext> {
+private:
+    using BaseT = State<StateTrackLineToHome<TRobotContext>, TRobotContext>;
+
 public:
+
+    using BaseT::State;
+
     void enterImpl()
     {
-        auto& video_source = m_context.get().getVideoSource();
-        auto& line_tracker = m_context.get().getLineTracker();
+        auto& video_source = this->getContext().getVideoSource();
+        auto& line_tracker = this->getContext().getLineTracker();
 
         if (!video_source.isRunning())
         {
@@ -285,9 +317,9 @@ public:
 
     std::optional<RobotEvent> updateImpl()
     {
-        auto& video_source = m_context.get().getVideoSource();
-        auto& line_tracker = m_context.get().getLineTracker();
-        auto& driveunit_controller = m_context.get().getDriveunitController();
+        auto& video_source = this->getContext().getVideoSource();
+        auto& line_tracker = this->getContext().getLineTracker();
+        auto& driveunit_controller = this->getContext().getDriveunitController();
 
         const std::optional<CapturedFrame> captured_frame = video_source.getFrame();
         if (!captured_frame.has_value())
@@ -305,13 +337,13 @@ public:
 
         // Convert trajectory to float
         std::vector<Eigen::Vector2f> float_trajectory(trajectory.size(), Eigen::Vector2f::Zero());
-        std::transform(trajectory.begin(), trajectory.end(), trajectory.begin(), [](const auto& pt){
-            return pt.cast<float>();
+        std::transform(trajectory.begin(), trajectory.end(), float_trajectory.begin(), [](const auto& pt){
+            return pt.template cast<float>();
         });
 
         // Send trajectory to driveunit
         const auto res = driveunit_controller.sendTrajectoryCommand(
-            CapturedFrame::ClockT::now() - captured_frame.value().timestamp,
+            std::chrono::duration_cast<std::chrono::microseconds>(CapturedFrame::ClockT::now() - captured_frame.value().timestamp),
             std::span(float_trajectory)
         );
 
@@ -324,8 +356,14 @@ public:
 };
 
 template<class TRobotContext>
-class StateFinish : public State<StateFinish, TRobotContext> {
+class StateFinish : public State<StateFinish<TRobotContext>, TRobotContext> {
+private:
+    using BaseT = State<StateFinish<TRobotContext>, TRobotContext>;
+
 public:
+
+    using BaseT::State;
+
     void enterImpl() {}
     std::optional<RobotEvent> updateImpl() { return std::nullopt; }
     void exitImpl() {}

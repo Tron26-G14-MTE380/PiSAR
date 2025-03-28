@@ -34,10 +34,47 @@ constexpr auto typeNameImpl() {
     return name; // Return pointer to static storage
 }
 
+template <typename T>
+constexpr auto simpleTypeNameImpl()
+{
+#if defined(__clang__) || defined(__GNUC__)
+    constexpr std::string_view function = __PRETTY_FUNCTION__;
+    constexpr std::string_view prefix = "constexpr auto pisar::detail::simpleTypeNameImpl() [with T = ";
+    constexpr std::string_view suffix = "]";
+#else
+#error Unsupported compiler
+#endif
+
+    constexpr size_t start = prefix.size();
+    constexpr size_t end = function.size() - suffix.size();
+    constexpr std::string_view full_type = function.substr(start, end - start);
+
+    // Cut at first '<' if present
+    constexpr size_t angle_pos = full_type.find('<');
+    constexpr std::string_view stripped = (angle_pos != std::string_view::npos)
+                                            ? full_type.substr(0, angle_pos)
+                                            : full_type;
+
+    // Copy to array so it can be used as a compile-time literal
+    std::array<char, stripped.size() + 1> result = {};
+    for (size_t i = 0; i < stripped.size(); ++i)
+        result[i] = stripped[i];
+    result[stripped.size()] = '\0';
+
+    return result;
+}
+
 template<typename T>
 struct TypeNameImpl
 {
     static constexpr auto value = typeNameImpl<T>();
+};
+
+
+template<typename T>
+struct SimpleTypeNameImpl
+{
+    static constexpr auto value = simpleTypeNameImpl<T>();
 };
 
 }
@@ -46,6 +83,13 @@ template<typename T>
 struct TypeName
 {
     static constexpr std::string_view value = std::string_view(detail::TypeNameImpl<T>::value.data(), detail::TypeNameImpl<T>::value.size());
+};
+
+
+template<typename T>
+struct SimpleTypeName
+{
+    static constexpr std::string_view value = std::string_view(detail::SimpleTypeNameImpl<T>::value.data(), detail::SimpleTypeNameImpl<T>::value.size());
 };
 
 }

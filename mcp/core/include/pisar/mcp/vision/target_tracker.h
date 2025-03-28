@@ -66,7 +66,7 @@ public:
      */
     [[nodiscard]] std::optional<Eigen::Vector2d> track(const cv::Mat& frame, TTimestamp timestamp)
     {
-        if (tkDebug)
+        if constexpr (tkDebug)
         {
             const auto empty_frame = cv::Mat::zeros(frame.size(), CV_8UC3);
             m_debug = {
@@ -78,7 +78,7 @@ public:
 
         const cv::Mat mask = m_color_extractor.get().extract(frame);
 
-        if (tkDebug)
+        if constexpr (tkDebug)
         {
             m_debug.color_extracted = mask.clone();
         }
@@ -119,7 +119,7 @@ public:
         const auto world = m_projection.get().project(pixel);
         const auto offset_world = Eigen::Vector2d(world.x(), std::max(world.y() - m_distance_offset, 0.0));
 
-        if (tkDebug)
+        if constexpr (tkDebug)
         {
             m_debug.target_point = frame.clone();
             cv::circle(m_debug.target_point, center, 5, cv::Scalar(0, 255, 0), 2);
