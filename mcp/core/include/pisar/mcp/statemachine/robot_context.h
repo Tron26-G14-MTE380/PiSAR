@@ -37,36 +37,38 @@ public:
         TLineTracker& line_tracker,
         TTargetDetector& target_detector,
         TTargetTracker& target_tracker,
-        DriveunitController& drive
+        DriveunitController& drive_controller
     )
         : m_video_source(video_source),
           m_line_tracker(line_tracker),
+          m_target_detector(target_detector),
+          m_target_tracker(target_tracker),
           m_drive_controller(drive_controller)
     {}
 
     [[nodiscard]] inline TVideoSource& getVideoSource()
     {
-        return m_video_source.get();
+        return m_video_source;
     }
 
     [[nodiscard]] inline TLineTracker& getLineTracker()
     {
-        return m_line_tracker.get();
+        return m_line_tracker;
     }
 
     [[nodiscard]] inline TTargetDetector& getTargetDetector()
     {
-        return m_line_tracker.get();
+        return m_target_detector;
     }
 
     [[nodiscard]] inline TTargetTracker& getTargetTracker()
     {
-        return m_line_tracker.get();
+        return m_target_tracker;
     }
 
     [[nodiscard]] inline DriveunitController& getDriveunitController()
     {
-        return m_drive_controller.get();
+        return m_drive_controller;
     }
 };
 

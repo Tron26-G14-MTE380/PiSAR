@@ -35,6 +35,19 @@ struct HeartbeatResponse
     std::chrono::duration<uint32_t, std::milli> time_alive;
 };
 
+// Command Status
+
+struct CommandStatusRequest
+{
+    using serialize = zpp::bits::members<0>;
+};
+
+struct CommandStatusResponse
+{
+    using serialize = zpp::bits::members<1>;
+    bool busy;
+};
+
 // Commands
 
 struct CommandIdle
@@ -42,13 +55,28 @@ struct CommandIdle
     using serialize = zpp::bits::members<0>;
 };
 
+struct CommandHardStop
+{
+    using serialize = zpp::bits::members<0>;
+};
+
+
 struct CommandFollowTrajectory
 {
     using serialize = zpp::bits::members<2>;
     using ReferenceTimeT = std::chrono::microseconds;
 
-    ReferenceTimeT reference_time;
+    uint32_t reference_time; // Microseconds
     std::vector<Eigen::Vector2f> trajectory;
+};
+
+struct CommandGoToTarget
+{
+    using serialize = zpp::bits::members<2>;
+    using ReferenceTimeT = std::chrono::microseconds;
+
+    uint32_t reference_time; // Microseconds
+    Eigen::Vector2f target_position;
 };
 
 struct CommandRotate
@@ -58,12 +86,19 @@ struct CommandRotate
     float rotation_deg; // CCW positive
 };
 
-using CommandRequest = MessageSet<CommandIdle, CommandFollowTrajectory, CommandRotate>;
+struct CommandSetGripper
+{
+    using serialize = zpp::bits::members<1>;
+
+    bool open;
+};
+
+using CommandRequest = MessageSet<CommandIdle, CommandHardStop, CommandFollowTrajectory, CommandGoToTarget, CommandRotate, CommandSetGripper>;
 using CommandResponse = DefaultResponse;
 
 
-using Request = MessageSet<HeartbeatRequest, CommandRequest>;
-using Response = MessageSet<HeartbeatResponse, CommandResponse>;
+using Request = MessageSet<HeartbeatRequest, CommandStatusRequest, CommandRequest>;
+using Response = MessageSet<HeartbeatResponse, CommandStatusResponse, CommandResponse>;
 
 using RequestEncoder = PacketEncoder<Request, kMaxRequestPacketSize>;
 

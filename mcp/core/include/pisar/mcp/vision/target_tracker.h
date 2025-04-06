@@ -7,6 +7,8 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Dense>
 
+#include <variant>
+
 namespace pisar::mcp {
 
 /**
@@ -24,15 +26,20 @@ public:
         cv::Mat projected_point;
     };
 
+    using TimestampT = TTimestamp;
+
 private:
     using DebugDataT = typename std::conditional_t<tkDebug, DebugData, std::monostate>;
 
-    static constexpr float kMinContourArea = 2000.0f;
-    static constexpr float kMinRadius = 20.0f;
-    static constexpr float kMaxRadius = 200.0f;
+    static constexpr double kMinContourArea = 2000.0;
+    static constexpr double kMinRadius = 20.0;
+    static constexpr double kMaxRadius = 200.0;
 
     std::reference_wrapper<const TColorExtractor> m_color_extractor;
     std::reference_wrapper<const HomographySizedProjection> m_projection;
+
+    /// @brief Offset distance applied to target (tuned based on gripper position.)
+    double m_distance_offset;
 
     DebugDataT m_debug;
 
@@ -41,11 +48,16 @@ public:
     /**
      * @brief Construct a new Target Tracker object
      *
-     * @param color_extractor
-     * @param projection
+     * @param color_extractor Color extractor used to extract ring color.
+     * @param projection Homography projection used to project pixel coordinates to real world coordinates.
+     * @param distance_offset Offset distance applied to target (tuned based on gripper position.)
      */
-    TargetTracker(const TColorExtractor& color_extractor, const HomographySizedProjection& projection) :
-        m_color_extractor(color_extractor), m_projection(projection) {}
+    TargetTracker(
+        const TColorExtractor& color_extractor,
+        const HomographySizedProjection& projection,
+        double distance_offset
+    ) :
+        m_color_extractor(color_extractor), m_projection(projection), m_distance_offset(distance_offset) {}
 
     /**
      * @brief Scans the input @p frame and returns the position of the target.
@@ -56,7 +68,7 @@ public:
      */
     [[nodiscard]] std::optional<Eigen::Vector2d> track(const cv::Mat& frame, TTimestamp timestamp)
     {
-        if (tkDebug)
+        if constexpr (tkDebug)
         {
             const auto empty_frame = cv::Mat::zeros(frame.size(), CV_8UC3);
             m_debug = {
@@ -66,9 +78,12 @@ public:
             };
         }
 
-        const cv::Mat mask = m_color_extractor.get().extract(frame);
+        cv::Mat mask = m_color_extractor.get().extract(frame);
+        const auto kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+        cv::erode(mask, mask, kernel);
 
-        if (tkDebug)
+        if constexpr (tkDebug)
         {
             m_debug.color_extracted = mask.clone();
         }
@@ -107,15 +122,18 @@ public:
 
         const Eigen::Vector2i pixel(static_cast<int>(center.x), static_cast<int>(center.y));
         const auto world = m_projection.get().project(pixel);
+        const auto offset_world = Eigen::Vector2d(world.x(), std::max(world.y() - m_distance_offset, 0.0));
 
-        if (tkDebug)
+        if constexpr (tkDebug)
         {
             m_debug.target_point = frame.clone();
             cv::circle(m_debug.target_point, center, 5, cv::Scalar(0, 255, 0), 2);
-            m_debug.projected_point = createHomographyProjectionVisualization(frame.size(), m_projection, std::span(&world, 1));
+
+            std::array<Eigen::Vector2d, 2> world_points = {world, offset_world};
+            m_debug.projected_point = createHomographyProjectionVisualization(frame.size(), m_projection, std::span(world_points));
         }
 
-        return world;
+        return offset_world;
     }
 
     /**
@@ -128,7 +146,7 @@ public:
     }
 
     /// @brief Retrieve debug data from last frame submitted.
-    [[nodiscard]] inline const DebugData& debugData() const { return m_debug; }
+    [[nodiscard]] inline const DebugDataT& debugData() const { return m_debug; }
 };
 
 }

@@ -12,7 +12,7 @@ namespace pisar::driveunit {
 class GripperController
 {
 private:
-    const int kMinPulseWidth = 800;
+    const int kMinPulseWidth = 600;
     const int kMaxPulseWidth = 2500; 
     uint8_t m_servo_pin;        ///< GPIO pin for the servo.
     uint8_t m_open_angle;       ///< Angle to open the gripper.
@@ -46,7 +46,14 @@ public:
      */
     [[nodiscard]] bool initialize()
     {
-        return m_servo.attach(m_servo_pin, kMinPulseWidth, kMaxPulseWidth) != 0;
+        if (m_servo.attach(m_servo_pin, kMinPulseWidth, kMaxPulseWidth) == 0)
+        {
+            return false;
+        }
+
+        open();
+
+        return true;
     }
 
     /**

@@ -24,7 +24,7 @@ int main()
     std::cout << "Starting Communication Test..." << std::endl;
 
     // 1️⃣ Test Heartbeat
-    auto heartbeat = controller.sendHeartbeat();
+    auto heartbeat = controller.sendHeartbeatRequest();
     if (heartbeat)
     {
         std::cout << "✅ Heartbeat received. Time alive: " << heartbeat->time_alive.count() << " ms" << std::endl;

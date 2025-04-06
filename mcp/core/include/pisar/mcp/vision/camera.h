@@ -42,7 +42,7 @@ public:
 
     [[nodiscard]] inline const cv::Size& fullSize() const { return m_full_size; }
     [[nodiscard]] inline const cv::Size& binnedSize() const { return m_binned_size; }
-    [[nodiscard]] inline const cv::Size& captureOffset() const { return m_capture_offset.value_or(cv::Point(0, 0)); }
+    [[nodiscard]] inline const cv::Size captureOffset() const { return m_capture_offset.value_or(cv::Point(0, 0)); }
     [[nodiscard]] inline const cv::Size& captureSize() const { return m_capture_size; }
     [[nodiscard]] inline const cv::Size& downscaledSize() const { return m_downscaled_size; }
     [[nodiscard]] inline unsigned int framerate() const { return m_framerate; }

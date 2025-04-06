@@ -16,7 +16,7 @@ class StateMachineController {
 private:
     std::reference_wrapper<TRobotContext> m_context;
     boost::sml::sm<RobotStateMachine<TRobotContext>> m_sm;
-    RobotState m_current_state;
+    RobotState<TRobotContext> m_current_state;
 
 public:
     /**
@@ -25,27 +25,54 @@ public:
      * @param ctx Shared robot context
      */
     inline explicit StateMachineController(TRobotContext& ctx)
-        : m_context(ctx), m_sm(), m_current_state(StateIdle(ctx))
+        : m_context(ctx), m_sm(), m_current_state(StateIdle<TRobotContext>(ctx))
     {
         enterState();
     }
 
     /**
      * @brief Should be called regularly to update the current state and manage transitions.
+     * @return True if finished, false if still going.
      */
-    inline void update()
+    inline bool update()
     {
         auto event = updateState();
 
         if (event.has_value())
         {
-            m_sm.process_event(event.value());
+            const bool handled = std::visit([this](const auto& e) -> bool
+            {
+                return m_sm.process_event(e);
+            }, event.value());
 
-            m_sm.visit_current_states([this](auto state){
-                using StateType = std::decay_t<decltype(state)>;
-                switchState<StateType>();
+            if (!handled)
+            {
+                throw std::runtime_error("Failed to handle transition");
+            }
+
+            if (m_sm.is(sml::X))
+            {
+                return true;
+            }
+
+            m_sm.visit_current_states(
+                [this](auto state){
+                using Tag = std::decay_t<decltype(state)>;
+
+                // if it's a string<T>, then type = T
+                using StateType = typename Tag::type;
+
+                if constexpr (std::is_same_v<StateType, boost::ext::sml::back::terminate_state>)
+                {
+                }
+                else
+                {
+                    switchState<StateType>();
+                }
             });
         }
+
+        return false;
     }
 
 private:
@@ -58,7 +85,7 @@ private:
     inline void switchState()
     {
         exitState();
-        m_current_state.emplace(TNextState(m_context));
+        m_current_state.template emplace<TNextState>(TNextState(m_context.get()));
         enterState();
     }
 
@@ -66,7 +93,7 @@ private:
     inline void enterState()
     {
         std::visit([this](auto& state) {
-            std::cout << "Entering state: " << TypeName<std::decay<decltype(state)>>::value << std::endl;
+            std::cout << "Entering state: " << SimpleTypeName<decltype(state)>::value << std::endl;
             state.enter();
         }, m_current_state);
     }
@@ -83,7 +110,7 @@ private:
     inline void exitState()
     {
         std::visit([this](auto& state) {
-            std::cout << "Exiting state: " << TypeName<std::decay<decltype(state)>>::value << std::endl;
+            std::cout << "Exiting state: " << SimpleTypeName<decltype(state)>::value << std::endl;
             state.exit();
         }, m_current_state);
     }

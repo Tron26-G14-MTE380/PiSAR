@@ -94,6 +94,29 @@ public:
         return sendRequestInternal(request);
     }
 
+    /**
+     * @brief Sends a request to the driveunit with retry logic.
+     * @tparam TRequest Type of request.
+     * @tparam TResponse Expected response type.
+     * @param request The request data.
+     * @param retries Number of times to retry on failure.
+     * @return `rd::expected<TResponse, std::error_code>` Response or error.
+     */
+    template<typename TRequest, typename TResponse>
+    [[nodiscard]]
+    std::enable_if_t<!std::is_same_v<TRequest, driveunit_interface::Request>, rd::expected<TResponse, std::error_code>>
+    sendRequest(const TRequest& request, const unsigned int retries);
+
+    /**
+     * @brief Sends a raw request with retry logic.
+     * @param request The already encoded request.
+     * @param retries Number of times to retry on failure.
+     * @return `rd::expected<driveunit_interface::Response, std::error_code>` Response or error.
+     */
+    [[nodiscard]]
+    rd::expected<driveunit_interface::Response, std::error_code>
+    sendRequest(const driveunit_interface::Request& request, const unsigned int retries);
+
 private:
 
     /**
@@ -146,6 +169,43 @@ DriveunitTransport::sendRequest(const TRequest& request)
     return rd::unexpected(make_error_code(Error::kInvalidResponse));
 }
 
+template<typename TRequest, typename TResponse>
+[[nodiscard]]
+std::enable_if_t<!std::is_same_v<TRequest, driveunit_interface::Request>, rd::expected<TResponse, std::error_code>>
+DriveunitTransport::sendRequest(const TRequest& request, const unsigned int retries)
+{
+    rd::expected<TResponse, std::error_code> last_error = rd::unexpected(make_error_code(Error::kNone));
+
+    int64_t retries_left = retries;
+    while (retries_left-- >= 0)
+    {
+        auto result = sendRequest<TRequest, TResponse>(request);
+        if (result.has_value())
+            return result;
+
+        last_error = rd::unexpected(result.error());
+    }
+
+    return last_error;
+}
+
+inline rd::expected<driveunit_interface::Response, std::error_code>
+DriveunitTransport::sendRequest(const driveunit_interface::Request& request, const unsigned int retries)
+{
+    rd::expected<driveunit_interface::Response, std::error_code> last_error = rd::unexpected(make_error_code(Error::kNone));
+
+    int64_t retries_left = retries;
+    while (retries_left-- >= 0)
+    {
+        auto result = sendRequest(request);
+        if (result.has_value())
+            return result;
+
+        last_error = rd::unexpected(result.error());
+    }
+
+    return last_error;
+}
 
 } // namespace pisar::mcp
 
